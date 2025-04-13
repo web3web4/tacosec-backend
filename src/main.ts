@@ -1,14 +1,25 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import * as express from 'express';
+
+let cachedServer: any;
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.enableCors();
-  app.setGlobalPrefix('api');
-  await app.init();
-  
-  const server = app.getHttpAdapter().getInstance();
-  return server;
+  if (!cachedServer) {
+    const expressApp = express();
+    const app = await NestFactory.create(
+      AppModule,
+      new ExpressAdapter(expressApp),
+    );
+
+    app.enableCors();
+    app.setGlobalPrefix('api');
+    await app.init();
+    
+    cachedServer = expressApp;
+  }
+  return cachedServer;
 }
 
 // For local development

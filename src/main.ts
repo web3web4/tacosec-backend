@@ -1,21 +1,22 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ExpressAdapter } from '@nestjs/platform-express';
-import * as express from 'express';
 
 async function bootstrap() {
-  const server = express();
-  const app = await NestFactory.create(
-    AppModule,
-    new ExpressAdapter(server),
-  );
-  
+  const app = await NestFactory.create(AppModule);
   app.enableCors();
+  app.setGlobalPrefix('api');
   await app.init();
   
+  const server = app.getHttpAdapter().getInstance();
   return server;
 }
 
-// This is important for Vercel
-const handler = bootstrap();
-export default handler;
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  bootstrap().then(server => {
+    server.listen(3000);
+  });
+}
+
+// For Vercel
+export default bootstrap;

@@ -9,4 +9,12 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
+
+  @Get('test')
+  test() {
+    return {
+      status: 'ok',
+      message: 'API is working!'
+    };
+  }
 }

@@ -1,35 +1,41 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User, UserDocument } from './schemas/user.schema';
+import { MongoDBService } from '../database/mongodb.service';
 import * as bcrypt from 'bcrypt';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class UsersService {
-  constructor(
-    @InjectModel(User.name) private userModel: Model<UserDocument>
-  ) {}
+  constructor(private readonly mongoDBService: MongoDBService) {}
+
+  private getUsersCollection() {
+    return this.mongoDBService.getDatabase().collection('users');
+  }
 
   async create(createUserDto: {
     email: string;
     password: string;
     firstName?: string;
     lastName?: string;
-  }): Promise<User> {
-    const createdUser = new this.userModel(createUserDto);
-    return createdUser.save();
+  }) {
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const result = await this.getUsersCollection().insertOne({
+      ...createUserDto,
+      password: hashedPassword,
+      createdAt: new Date()
+    });
+    return result;
   }
 
-  async findAll(): Promise<User[]> {
-    return this.userModel.find().exec();
+  async findAll() {
+    return this.getUsersCollection().find().toArray();
   }
 
-  async findOne(id: string): Promise<User> {
-    return this.userModel.findById(id).exec();
+  async findOne(id: string) {
+    return this.getUsersCollection().findOne({ _id: new ObjectId(id) });
   }
 
-  async findByEmail(email: string): Promise<User> {
-    return this.userModel.findOne({ email }).exec();
+  async findByEmail(email: string) {
+    return this.getUsersCollection().findOne({ email });
   }
 
   async update(id: string, updateUserDto: {
@@ -37,16 +43,18 @@ export class UsersService {
     password?: string;
     firstName?: string;
     lastName?: string;
-  }): Promise<User> {
+  }) {
     if (updateUserDto.password) {
-      const hash = await bcrypt.hash(updateUserDto.password, 10);
-      updateUserDto.password = hash;
+      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
-    return this.userModel.findByIdAndUpdate(id, updateUserDto, { new: true }).exec();
+    return this.getUsersCollection().updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateUserDto }
+    );
   }
 
-  async remove(id: string): Promise<User> {
-    return this.userModel.findByIdAndDelete(id).exec();
+  async remove(id: string) {
+    return this.getUsersCollection().deleteOne({ _id: new ObjectId(id) });
   }
 
   async validatePassword(email: string, password: string): Promise<boolean> {

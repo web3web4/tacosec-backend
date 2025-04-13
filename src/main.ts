@@ -1,18 +1,23 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
-let app;
+let cachedServer = null;
 
 async function bootstrap() {
-  if (!app) {
-    app = await NestFactory.create(AppModule, {
-      logger: ['error', 'warn']
-    });
-    app.enableCors();
-    await app.init();
+  if (cachedServer) {
+    return cachedServer;
   }
-  const server = app.getHttpServer();
-  return server;
+
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error'],
+    cors: true,
+    bodyParser: true
+  });
+
+  await app.init();
+  cachedServer = app.getHttpServer();
+  return cachedServer;
 }
 
-export default bootstrap;
+// Export the bootstrap function for Vercel
+module.exports = bootstrap;

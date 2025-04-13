@@ -1,23 +1,23 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import serverlessExpress from '@vendia/serverless-express';
+import { Callback, Context, Handler } from 'aws-lambda';
 
-let cachedServer = null;
+let server: Handler;
 
-async function bootstrap() {
-  if (cachedServer) {
-    return cachedServer;
-  }
-
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error'],
-    cors: true,
-    bodyParser: true
-  });
-
+async function bootstrap(): Promise<Handler> {
+  const app = await NestFactory.create(AppModule);
   await app.init();
-  cachedServer = app.getHttpServer();
-  return cachedServer;
+
+  const expressApp = app.getHttpAdapter().getInstance();
+  return serverlessExpress({ app: expressApp });
 }
 
-// Export the bootstrap function for Vercel
-module.exports = bootstrap;
+export const handler: Handler = async (
+  event: any,
+  context: Context,
+  callback: Callback,
+) => {
+  server = server ?? (await bootstrap());
+  return server(event, context, callback);
+};

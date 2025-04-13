@@ -10,19 +10,19 @@ export class MongoDBService implements OnModuleInit {
   private db: Db;
 
   async onModuleInit() {
+    if (cachedClient && cachedDb) {
+      this.client = cachedClient;
+      this.db = cachedDb;
+      return;
+    }
+
+    const uri = process.env.MONGODB_URI;
+    if (!uri) {
+      throw new Error('MONGODB_URI is not defined');
+    }
+
     try {
-      if (cachedClient && cachedDb) {
-        this.client = cachedClient;
-        this.db = cachedDb;
-        return;
-      }
-
-      const uri = process.env.MONGODB_URI;
-      if (!uri) {
-        throw new Error('MONGODB_URI is not defined');
-      }
-
-      this.client = new MongoClient(uri, {
+      this.client = await MongoClient.connect(uri, {
         serverApi: {
           version: ServerApiVersion.v1,
           strict: true,
@@ -30,18 +30,14 @@ export class MongoDBService implements OnModuleInit {
         },
         maxPoolSize: 1,
         minPoolSize: 1,
-        connectTimeoutMS: 5000,
-        socketTimeoutMS: 5000,
-        serverSelectionTimeoutMS: 5000,
-        waitQueueTimeoutMS: 5000
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 10000,
+        serverSelectionTimeoutMS: 10000,
+        waitQueueTimeoutMS: 10000
       });
 
-      await this.client.connect();
       this.db = this.client.db('user-management');
-
-      // Test the connection
       await this.db.command({ ping: 1 });
-      console.log("Connected to MongoDB");
 
       cachedClient = this.client;
       cachedDb = this.db;
@@ -59,12 +55,8 @@ export class MongoDBService implements OnModuleInit {
   }
 
   async onModuleDestroy() {
-    try {
-      if (this.client && !cachedClient) {
-        await this.client.close(true);
-      }
-    } catch (error) {
-      console.error('Error closing MongoDB connection:', error);
+    if (this.client && !cachedClient) {
+      await this.client.close(true);
     }
   }
 } 

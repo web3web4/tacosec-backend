@@ -1,67 +1,79 @@
 import { Injectable } from '@nestjs/common';
-import { MongoDBService } from '../database/mongodb.service';
-import * as bcrypt from 'bcrypt';
-import { ObjectId } from 'mongodb';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { User, UserDocument } from './schemas/user.schema';
+import { PasswordService } from './password.service';
+
+interface TelegramInitData {
+  telegramId: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  photoUrl?: string;
+  authDate: Date;
+  hash: string;
+}
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly mongoDBService: MongoDBService) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private passwordService: PasswordService,
+  ) {}
 
-  private getUsersCollection() {
-    return this.mongoDBService.getDatabase().collection('users');
-  }
-
-  async create(createUserDto: {
-    email: string;
-    password: string;
-    firstName?: string;
-    lastName?: string;
-  }) {
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-    const result = await this.getUsersCollection().insertOne({
-      ...createUserDto,
-      password: hashedPassword,
-      createdAt: new Date()
+  async create(createUserDto: TelegramInitData) {
+    const existingUser = await this.userModel.findOne({
+      telegramId: createUserDto.telegramId,
     });
-    return result;
-  }
 
-  async findAll() {
-    return this.getUsersCollection().find().toArray();
-  }
-
-  async findOne(id: string) {
-    return this.getUsersCollection().findOne({ _id: new ObjectId(id) });
-  }
-
-  async findByEmail(email: string) {
-    return this.getUsersCollection().findOne({ email });
-  }
-
-  async update(id: string, updateUserDto: {
-    email?: string;
-    password?: string;
-    firstName?: string;
-    lastName?: string;
-  }) {
-    if (updateUserDto.password) {
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+    if (existingUser) {
+      return this.update(existingUser._id.toString(), createUserDto);
     }
-    return this.getUsersCollection().updateOne(
-      { _id: new ObjectId(id) },
-      { $set: updateUserDto }
-    );
+
+    const createdUser = new this.userModel(createUserDto);
+    return createdUser.save();
   }
 
-  async remove(id: string) {
-    return this.getUsersCollection().deleteOne({ _id: new ObjectId(id) });
+  async findAll(): Promise<User[]> {
+    return this.userModel.find({ isActive: true }).exec();
   }
 
-  async validatePassword(email: string, password: string): Promise<boolean> {
-    const user = await this.findByEmail(email);
+  async findOne(id: string): Promise<User> {
+    return this.userModel.findById(id).exec();
+  }
+
+  async findByTelegramId(telegramId: string): Promise<User> {
+    return this.userModel.findOne({ telegramId, isActive: true }).exec();
+  }
+
+  async update(id: string, updateUserDto: Partial<User>): Promise<User> {
+    return this.userModel
+      .findByIdAndUpdate(id, updateUserDto, { new: true })
+      .exec();
+  }
+
+  async remove(id: string): Promise<User> {
+    return this.userModel
+      .findByIdAndUpdate(id, { isActive: false }, { new: true })
+      .exec();
+  }
+
+  async addPassword(
+    userId: string,
+    passwordData: {
+      passwordName: string;
+      telegramPassword?: string;
+      facebookPassword?: string;
+    },
+  ) {
+    const user = await this.findOne(userId);
     if (!user) {
-      return false;
+      throw new Error('User not found');
     }
-    return bcrypt.compare(password, user.password);
+
+    return this.passwordService.create({
+      userId: new Types.ObjectId(userId),
+      ...passwordData,
+    });
   }
 } 

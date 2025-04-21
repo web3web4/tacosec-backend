@@ -4,6 +4,20 @@ import { Model, Types } from 'mongoose';
 import { Password, PasswordDocument } from './schemas/password.schema';
 import * as bcrypt from 'bcrypt';
 
+interface CreatePasswordDto {
+  userId: Types.ObjectId;
+  passwordName: string;
+  telegramPassword?: string;
+  facebookPassword?: string;
+  telegramId: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  photoUrl?: string;
+  authDate: Date;
+  hash: string;
+}
+
 @Injectable()
 export class PasswordService {
   constructor(
@@ -15,12 +29,7 @@ export class PasswordService {
     return bcrypt.hash(password, saltRounds);
   }
 
-  async create(createPasswordDto: {
-    userId: Types.ObjectId;
-    passwordName: string;
-    telegramPassword?: string;
-    facebookPassword?: string;
-  }): Promise<Password> {
+  async create(createPasswordDto: CreatePasswordDto): Promise<Password> {
     const { telegramPassword, facebookPassword, ...rest } = createPasswordDto;
     
     const hashedData: any = { ...rest };

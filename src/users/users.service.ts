@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
@@ -64,16 +64,45 @@ export class UsersService {
       passwordName: string;
       telegramPassword?: string;
       facebookPassword?: string;
+      initData: TelegramInitData;
     },
   ) {
     const user = await this.findOne(userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
 
-    return this.passwordService.create({
-      userId: new Types.ObjectId(userId),
-      ...passwordData,
-    });
+    if (user.telegramId !== passwordData.initData.telegramId) {
+      throw new HttpException(
+        'Telegram ID mismatch. Please provide correct user credentials.',
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
+    if (user.hash !== passwordData.initData.hash) {
+      throw new HttpException(
+        'Authentication hash mismatch. Please provide correct user credentials.',
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
+    try {
+      return this.passwordService.create({
+        userId: new Types.ObjectId(userId),
+        ...passwordData,
+        telegramId: user.telegramId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        photoUrl: user.photoUrl,
+        authDate: user.authDate,
+        hash: user.hash,
+      });
+    } catch (error) {
+      throw new HttpException(
+        'Failed to create password. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 } 

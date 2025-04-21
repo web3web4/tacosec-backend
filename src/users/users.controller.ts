@@ -23,6 +23,19 @@ interface TelegramInitData {
   hash: string;
 }
 
+interface PasswordData {
+  passwordName: string;
+  telegramPassword?: string;
+  facebookPassword?: string;
+  initData: TelegramInitData;
+}
+
+interface VerifyPasswordData {
+  passwordId: string;
+  passwordType: 'telegram' | 'facebook';
+  password: string;
+}
+
 @Controller('users')
 export class UsersController {
   constructor(
@@ -63,11 +76,7 @@ export class UsersController {
   @Post(':id/passwords')
   addPassword(
     @Param('id') userId: string,
-    @Body() passwordData: {
-      passwordName: string;
-      telegramPassword?: string;
-      facebookPassword?: string;
-    },
+    @Body() passwordData: PasswordData,
   ) {
     return this.usersService.addPassword(userId, passwordData);
   }
@@ -80,11 +89,7 @@ export class UsersController {
   @Post(':id/passwords/verify')
   async verifyPassword(
     @Param('id') userId: string,
-    @Body() verifyData: {
-      passwordId: string;
-      passwordType: 'telegram' | 'facebook';
-      password: string;
-    },
+    @Body() verifyData: VerifyPasswordData,
   ) {
     const password = await this.passwordService.findByUserId(new Types.ObjectId(userId));
     const targetPassword = password.find(p => p._id.toString() === verifyData.passwordId);

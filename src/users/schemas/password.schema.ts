@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { User } from './user.schema';
 
 export type PasswordDocument = Password & Document;
 
@@ -21,6 +22,28 @@ export class Password {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  // User information fields
+  @Prop({ required: true })
+  telegramId: string;
+
+  @Prop()
+  firstName: string;
+
+  @Prop()
+  lastName: string;
+
+  @Prop()
+  username: string;
+
+  @Prop()
+  photoUrl: string;
+
+  @Prop()
+  authDate: Date;
+
+  @Prop()
+  hash: string;
 }
 
 export const PasswordSchema = SchemaFactory.createForClass(Password); 

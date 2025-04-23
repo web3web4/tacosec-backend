@@ -104,8 +104,8 @@ export class UsersService {
         HttpStatus.UNAUTHORIZED,
       );
     }
-    console.log('passwordData.Key', passwordData.key);
-    console.log('passwordData.Value', passwordData.value);
+    // console.log('passwordData.Key', passwordData.key);
+    // console.log('passwordData.Value', passwordData.value);
     // console.log('passwordData.Description', passwordData.description);
     try {
       return this.passwordService.create({
@@ -114,6 +114,8 @@ export class UsersService {
         value: passwordData.value,
         description:
           passwordData.description || `Password for ${passwordData.key}`,
+        isActive: true,
+        initData: passwordData.initData,
       });
     } catch (error) {
       throw new HttpException(

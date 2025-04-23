@@ -16,6 +16,7 @@ import { Types } from 'mongoose';
 import { TelegramInitDto } from './dto/telegram-init.dto';
 // import { PasswordData } from './interfaces/password-data.interface';
 import { VerifyPasswordData } from './interfaces/verify-password.interface';
+import { CreatePasswordDto } from './dto/create-password.dto';
 
 @Controller('users')
 export class UsersController {
@@ -27,6 +28,14 @@ export class UsersController {
   @Post('signup')
   async signup(@Body() createUserDto: TelegramInitDto) {
     return this.usersService.create(createUserDto);
+  }
+
+  @Post(':id/passwords')
+  createPassword(
+    @Param('id') userId: string,
+    @Body() createPasswordDto: CreatePasswordDto,
+  ) {
+    return this.usersService.addPassword(userId, createPasswordDto);
   }
 
   @Patch(':id')

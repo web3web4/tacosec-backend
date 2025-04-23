@@ -8,12 +8,15 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         uri: configService.get<string>('MONGODB_URI'),
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
+        maxPoolSize: 10,
+        minPoolSize: 5,
+        maxIdleTimeMS: 60000,
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
       }),
       inject: [ConfigService],
     }),
   ],
   exports: [MongooseModule],
 })
-export class DatabaseModule {} 
+export class DatabaseModule {}

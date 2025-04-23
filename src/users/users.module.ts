@@ -17,4 +17,4 @@ import { PasswordService } from './password.service';
   providers: [UsersService, PasswordService],
   exports: [UsersService, PasswordService],
 })
-export class UsersModule {} 
+export class UsersModule {}

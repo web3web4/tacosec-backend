@@ -2,21 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Password, PasswordDocument } from './schemas/password.schema';
+import { CreatePasswordDto } from './dto/create-password.dto';
 import * as bcrypt from 'bcrypt';
-
-interface CreatePasswordDto {
-  userId: Types.ObjectId;
-  passwordName: string;
-  telegramPassword?: string;
-  facebookPassword?: string;
-  telegramId: string;
-  firstName?: string;
-  lastName?: string;
-  username?: string;
-  photoUrl?: string;
-  authDate: Date;
-  hash: string;
-}
 
 @Injectable()
 export class PasswordService {
@@ -24,46 +11,72 @@ export class PasswordService {
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
   ) {}
 
-  private async hashPassword(password: string): Promise<string> {
-    const saltRounds = 10;
-    return bcrypt.hash(password, saltRounds);
-  }
-
   async create(createPasswordDto: CreatePasswordDto): Promise<Password> {
-    const { telegramPassword, facebookPassword, ...rest } = createPasswordDto;
-    
-    const hashedData: any = { ...rest };
-    
-    if (telegramPassword) {
-      hashedData.telegramPassword = await this.hashPassword(telegramPassword);
-    }
-    
-    if (facebookPassword) {
-      hashedData.facebookPassword = await this.hashPassword(facebookPassword);
+    const { value, ...rest } = createPasswordDto;
+    const hashedData: Partial<Password> = { ...rest };
+    hashedData.isActive = true;
+
+    if (value) {
+      hashedData.value = await this.hashPassword(value);
     }
 
     const createdPassword = new this.passwordModel(hashedData);
     return createdPassword.save();
   }
 
+  private async hashPassword(password: string): Promise<string> {
+    const salt = await bcrypt.genSalt();
+    return bcrypt.hash(password, salt);
+  }
+
+  async findOne(filter: Partial<Password>): Promise<Password> {
+    return this.passwordModel.findOne(filter).exec();
+  }
+
+  async findById(id: string): Promise<Password> {
+    return this.passwordModel.findById(id).exec();
+  }
+
   async findByUserId(userId: Types.ObjectId): Promise<Password[]> {
     return this.passwordModel.find({ userId, isActive: true }).exec();
+  }
+
+  async findOneAndUpdate(
+    filter: Partial<Password>,
+    update: Partial<Password>,
+  ): Promise<Password> {
+    return this.passwordModel
+      .findOneAndUpdate(filter, update, { new: true })
+      .exec();
+  }
+
+  async findByIdAndUpdate(
+    id: string,
+    update: Partial<Password>,
+  ): Promise<Password> {
+    return this.passwordModel
+      .findByIdAndUpdate(id, update, { new: true })
+      .exec();
+  }
+
+  async findOneAndDelete(filter: Partial<Password>): Promise<Password> {
+    return this.passwordModel.findOneAndDelete(filter).exec();
+  }
+
+  async findByIdAndDelete(id: string): Promise<Password> {
+    return this.passwordModel.findByIdAndDelete(id).exec();
   }
 
   async update(
     id: string,
     updatePasswordDto: Partial<Password>,
   ): Promise<Password> {
-    const { telegramPassword, facebookPassword, ...rest } = updatePasswordDto;
-    
-    const updateData: any = { ...rest };
-    
-    if (telegramPassword) {
-      updateData.telegramPassword = await this.hashPassword(telegramPassword);
-    }
-    
-    if (facebookPassword) {
-      updateData.facebookPassword = await this.hashPassword(facebookPassword);
+    const { value, ...rest } = updatePasswordDto;
+    const updateData: Partial<Password> = { ...rest };
+    updateData.isActive = true;
+
+    if (value) {
+      updateData.value = await this.hashPassword(value);
     }
 
     return this.passwordModel
@@ -77,7 +90,10 @@ export class PasswordService {
       .exec();
   }
 
-  async verifyPassword(hashedPassword: string, plainPassword: string): Promise<boolean> {
+  async verifyPassword(
+    hashedPassword: string,
+    plainPassword: string,
+  ): Promise<boolean> {
     return bcrypt.compare(plainPassword, hashedPassword);
   }
-} 
+}

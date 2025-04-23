@@ -8,33 +8,14 @@ import {
   Delete,
   HttpException,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { PasswordService } from './password.service';
 import { Types } from 'mongoose';
-
-interface TelegramInitData {
-  telegramId: string;
-  firstName?: string;
-  lastName?: string;
-  username?: string;
-  photoUrl?: string;
-  authDate: Date;
-  hash: string;
-}
-
-interface PasswordData {
-  passwordName: string;
-  telegramPassword?: string;
-  facebookPassword?: string;
-  initData: TelegramInitData;
-}
-
-interface VerifyPasswordData {
-  passwordId: string;
-  passwordType: 'telegram' | 'facebook';
-  password: string;
-}
+import { TelegramInitDto } from './dto/telegram-init.dto';
+// import { PasswordData } from './interfaces/password-data.interface';
+import { VerifyPasswordData } from './interfaces/verify-password.interface';
 
 @Controller('users')
 export class UsersController {
@@ -44,8 +25,21 @@ export class UsersController {
   ) {}
 
   @Post('signup')
-  async signup(@Body() createUserDto: TelegramInitData) {
+  async signup(@Body() createUserDto: TelegramInitDto) {
     return this.usersService.create(createUserDto);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() updateUserDto: Partial<TelegramInitDto>,
+  ) {
+    return this.usersService.update(id, updateUserDto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.usersService.remove(id);
   }
 
   @Get()
@@ -63,24 +57,6 @@ export class UsersController {
     return this.usersService.findByTelegramId(telegramId);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: Partial<TelegramInitData>) {
-    return this.usersService.update(id, updateUserDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
-  }
-
-  @Post(':id/passwords')
-  addPassword(
-    @Param('id') userId: string,
-    @Body() passwordData: PasswordData,
-  ) {
-    return this.usersService.addPassword(userId, passwordData);
-  }
-
   @Get(':id/passwords')
   getUserPasswords(@Param('id') userId: string) {
     return this.passwordService.findByUserId(new Types.ObjectId(userId));
@@ -91,16 +67,18 @@ export class UsersController {
     @Param('id') userId: string,
     @Body() verifyData: VerifyPasswordData,
   ) {
-    const password = await this.passwordService.findByUserId(new Types.ObjectId(userId));
-    const targetPassword = password.find(p => p._id.toString() === verifyData.passwordId);
-    
+    const password = await this.passwordService.findByUserId(
+      new Types.ObjectId(userId),
+    );
+    const targetPassword = password.find(
+      (p) => p._id.toString() === verifyData.passwordId,
+    );
+
     if (!targetPassword) {
       throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
     }
 
-    const hashedPassword = verifyData.passwordType === 'telegram' 
-      ? targetPassword.telegramPassword 
-      : targetPassword.facebookPassword;
+    const hashedPassword = targetPassword.value;
 
     if (!hashedPassword) {
       throw new HttpException('Password type not found', HttpStatus.NOT_FOUND);
@@ -113,4 +91,9 @@ export class UsersController {
 
     return { isValid };
   }
-} 
+
+  @Get('search')
+  async findAllByQuery(@Query('query') query: string) {
+    return this.usersService.findByQuery(JSON.parse(query));
+  }
+}

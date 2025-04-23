@@ -14,7 +14,7 @@ async function bootstrap() {
 
 // For local development
 if (process.env.NODE_ENV !== 'production') {
-  bootstrap().then(app => {
+  bootstrap().then((app) => {
     app.listen(3000).then(() => {
       console.log('Server running on http://localhost:3000');
     });

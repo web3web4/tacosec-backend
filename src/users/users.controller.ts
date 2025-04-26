@@ -38,7 +38,8 @@ export class UsersController {
    * X-Telegram-Init-Data: query_id=AAHdF6IQAAAAAN0XohDhrOrc&user=%7B%22id%22%3A123456789%2C%22first_name%22%3A%22John%22...
    */
   @Post('signup-initData')
-  @TelegramAuth()
+  // @TelegramAuth()
+  @TelegramDtoAuth()
   async signup(@Body() createUserDto: TelegramInitDto) {
     return this.usersService.createAndUpdateUser(createUserDto);
   }
@@ -59,7 +60,7 @@ export class UsersController {
    * }
    */
   @Post('signup')
-  @TelegramDtoAuth()
+  // @TelegramDtoAuth()
   async signupDto(@Body() createUserDto: TelegramInitDto) {
     return this.usersService.createAndUpdateUser(createUserDto);
   }
@@ -73,7 +74,8 @@ export class UsersController {
    * 3. In query parameter: tgInitData
    */
   @Post('/passwords-initData')
-  @TelegramAuth()
+  // @TelegramAuth()
+  @TelegramDtoAuth()
   createPassword(@Body() createPasswordDto: CreatePasswordRequestDto) {
     return this.usersService.addPassword(createPasswordDto);
   }
@@ -96,7 +98,7 @@ export class UsersController {
    * }
    */
   @Post('/passwords')
-  @TelegramDtoAuth()
+  // @TelegramDtoAuth()
   createPasswordDto(@Body() createPasswordDto: CreatePasswordRequestDto) {
     return this.usersService.addPassword(createPasswordDto);
   }

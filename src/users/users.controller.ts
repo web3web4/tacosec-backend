@@ -26,7 +26,7 @@ export class UsersController {
 
   @Post('signup')
   async signup(@Body() createUserDto: TelegramInitDto) {
-    return this.usersService.create(createUserDto);
+    return this.usersService.createAndUpdateUser(createUserDto);
   }
 
   @Post(':id/passwords')

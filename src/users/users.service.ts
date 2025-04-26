@@ -5,25 +5,59 @@ import { User, UserDocument } from './schemas/user.schema';
 import { PasswordService } from './password.service';
 import { TelegramInitDto } from './dto/telegram-init.dto';
 import { CreatePasswordDto } from './dto/create-password.dto';
-
+import { Password, PasswordDocument } from './schemas/password.schema';
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private passwordService: PasswordService,
+    @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
   ) {}
 
-  async create(createUserDto: TelegramInitDto) {
-    const existingUser = await this.userModel.findOne({
-      telegramId: createUserDto.telegramId,
+  async createAndUpdateUser(createUserDto: TelegramInitDto) {
+    const authDate = this.getValidAuthDate(createUserDto.authDate);
+
+    const user = await this.createOrUpdateUser({
+      telegramId: createUserDto.telegramId.toString(),
+      firstName: createUserDto.firstName,
+      lastName: createUserDto.lastName,
+      username: createUserDto.username,
+      photoUrl: createUserDto.photoUrl,
+      authDate: authDate,
+      hash: createUserDto.hash || 'default_hash',
     });
 
-    if (existingUser) {
-      return this.update(existingUser._id.toString(), createUserDto);
-    }
+    return user;
+  }
 
-    const createdUser = new this.userModel(createUserDto);
-    return createdUser.save();
+  async createOrUpdateUser(userData: Partial<User>): Promise<User> {
+    const existingUser = await this.userModel.findOne({
+      telegramId: userData.telegramId,
+    });
+    if (existingUser) {
+      return this.userModel.findByIdAndUpdate(existingUser.id, userData, {
+        new: true,
+      });
+    }
+    const newUser = new this.userModel(userData);
+    return newUser.save();
+  }
+
+  async createOrUpdatePassword(
+    passwordData: Partial<Password>,
+  ): Promise<Password> {
+    const existingPassword = await this.passwordService.findOne({
+      userId: passwordData.userId,
+      key: passwordData.key,
+    });
+    if (existingPassword) {
+      return this.passwordService.findByIdAndUpdate(
+        existingPassword._id.toString(),
+        passwordData,
+      );
+    }
+    const newPassword = new this.passwordModel(passwordData);
+    return newPassword.save();
   }
 
   async findAll(): Promise<User[]> {
@@ -82,6 +116,12 @@ export class UsersService {
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
+    const authDate = this.getValidAuthDate(passwordData.initData.authDate);
+    const password = await this.createOrUpdatePassword({
+      ...passwordData,
+      initData: { ...passwordData.initData, authDate },
+    });
+    return password;
     const oldPassword = await this.passwordService.findOne({
       // userId: new Types.ObjectId(userId),
       userId: passwordData.userId,
@@ -134,4 +174,33 @@ export class UsersService {
       );
     }
   }
+
+private getValidAuthDate(authDateInput: any): Date {
+    // check if input is number (timestamp)
+    if (typeof authDateInput === 'number') {
+      return new Date(authDateInput * 1000); // convert timestamp to milliseconds
+    }
+    
+    // check if input is string and try to convert it to number
+    if (typeof authDateInput === 'string') {
+      const timestamp = parseInt(authDateInput, 10);
+      if (!isNaN(timestamp)) {
+        return new Date(timestamp * 1000);
+      }
+      
+      // try to convert string directly to date
+      const date = new Date(authDateInput);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+    
+    // if input is date and valid
+    if (authDateInput instanceof Date && !isNaN(authDateInput.getTime())) {
+      return authDateInput;
+    }
+    
+    // return current date as default value
+    return new Date();
+  }  
 }

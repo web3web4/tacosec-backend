@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsDate, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class TelegramInitDto {
@@ -22,9 +22,12 @@ export class TelegramInitDto {
   @IsOptional()
   photoUrl?: string;
 
-  @IsDate()
-  @Type(() => Date)
-  authDate: Date;
+  // @IsDate()
+  // @Type(() => Date)
+  // authDate: Date;
+  @IsNumber()
+  @IsNotEmpty()
+  authDate: number;
 
   @IsString()
   @IsNotEmpty()

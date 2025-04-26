@@ -29,17 +29,9 @@ export class UsersController {
     return this.usersService.createAndUpdateUser(createUserDto);
   }
 
-  @Post(':id/passwords')
-  createPassword(
-    @Param('id') userId: string,
-    @Body() createPasswordDto: CreatePasswordRequestDto,
-  ) {
-    // Convert string ID to MongoDB ObjectId and add to DTO
-    const passwordWithUserId = {
-      ...createPasswordDto,
-      userId: new Types.ObjectId(userId),
-    };
-    return this.usersService.addPassword(passwordWithUserId);
+  @Post('/passwords')
+  createPassword(@Body() createPasswordDto: CreatePasswordRequestDto) {
+    return this.usersService.addPassword(createPasswordDto);
   }
 
   @Patch(':id')

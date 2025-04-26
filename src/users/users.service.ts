@@ -4,8 +4,8 @@ import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import { PasswordService } from './password.service';
 import { TelegramInitDto } from './dto/telegram-init.dto';
-import { CreatePasswordDto } from './dto/create-password.dto';
 import { Password, PasswordDocument } from './schemas/password.schema';
+import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 @Injectable()
 export class UsersService {
   constructor(
@@ -26,8 +26,9 @@ export class UsersService {
       authDate: authDate,
       hash: createUserDto.hash || 'default_hash',
     });
-
-    return user;
+    // Remove _id from the returned object
+    const { _id, ...userWithoutId } = (user as UserDocument).toObject();
+    return userWithoutId;
   }
 
   async createOrUpdateUser(userData: Partial<User>): Promise<User> {
@@ -109,70 +110,30 @@ export class UsersService {
       .exec();
   }
 
-  async addPassword(passwordData: CreatePasswordDto) {
-    // const user = await this.findOne(userId);
-    const user = await this.findOne(passwordData.userId.toString());
-    // const user = await this.userModel.findById(passwordData.userId).exec();
+  async addPassword(passwordData: CreatePasswordRequestDto) {
+    const user = await this.userModel.findOne({
+      telegramId: passwordData.initData.telegramId,
+      isActive: true,
+    }).exec();
+    
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
+
     const authDate = this.getValidAuthDate(passwordData.initData.authDate);
     const password = await this.createOrUpdatePassword({
-      ...passwordData,
+      userId: (user as UserDocument)._id as Types.ObjectId,
+      key: passwordData.key,
+      value: passwordData.value,
+      description: passwordData.description,
+      isActive: true,
+      type: passwordData.type,
+      sharedWith: passwordData.sharedWith,
       initData: { ...passwordData.initData, authDate },
     });
-    return password;
-    const oldPassword = await this.passwordService.findOne({
-      // userId: new Types.ObjectId(userId),
-      userId: passwordData.userId,
-      key: passwordData.key,
-    });
-    if (oldPassword) {
-      return this.passwordService.update(oldPassword._id.toString(), {
-        value: passwordData.value,
-        description: passwordData.description,
-        isActive: true,
-        type: passwordData.type,
-        sharedWith: passwordData.sharedWith,
-        initData: passwordData.initData,
-        key: passwordData.key,
-      });
-    }
-
-    if (user.telegramId !== passwordData.initData.telegramId) {
-      throw new HttpException(
-        'Telegram ID mismatch. Please provide correct user credentials.',
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
-
-    if (user.hash !== passwordData.initData.hash) {
-      throw new HttpException(
-        'Authentication hash mismatch. Please provide correct user credentials.',
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
-    // console.log('passwordData.Key', passwordData.key);
-    // console.log('passwordData.Value', passwordData.value);
-    // console.log('passwordData.Description', passwordData.description);
-    try {
-      return this.passwordService.create({
-        userId: passwordData.userId,
-        key: passwordData.key,
-        value: passwordData.value,
-        description:
-          passwordData.description || `Password for ${passwordData.key}`,
-        isActive: true,
-        initData: passwordData.initData,
-        type: passwordData.type,
-        sharedWith: passwordData.sharedWith,
-      });
-    } catch (error) {
-      throw new HttpException(
-        'Failed to create password. Please try again. Error: ' + error,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    // Remove _id from the returned object
+    const { userId,_id, ...passwordWithoutId } = (password as PasswordDocument).toObject();
+    return passwordWithoutId;
   }
 
 private getValidAuthDate(authDateInput: any): Date {

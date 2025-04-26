@@ -5,6 +5,9 @@ import { UsersController } from './users.controller';
 import { User, UserSchema } from './schemas/user.schema';
 import { Password, PasswordSchema } from './schemas/password.schema';
 import { PasswordService } from './password.service';
+import { TelegramValidatorService } from './telegram-validator.service';
+import { TelegramAuthGuard } from './guards/telegram-auth.guard';
+import { TelegramDtoAuthGuard } from './guards/telegram-dto-auth.guard';
 
 @Module({
   imports: [
@@ -14,7 +17,13 @@ import { PasswordService } from './password.service';
     ]),
   ],
   controllers: [UsersController],
-  providers: [UsersService, PasswordService],
-  exports: [UsersService, PasswordService],
+  providers: [
+    UsersService,
+    PasswordService,
+    TelegramValidatorService,
+    TelegramAuthGuard,
+    TelegramDtoAuthGuard,
+  ],
+  exports: [UsersService, PasswordService, TelegramValidatorService],
 })
 export class UsersModule {}

@@ -31,4 +31,8 @@ export class TelegramInitDto {
   @IsString()
   @IsNotEmpty()
   hash: string;
+
+  @IsString()
+  @IsOptional()
+  initDataRaw?: string;
 }

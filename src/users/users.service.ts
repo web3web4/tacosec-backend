@@ -111,11 +111,13 @@ export class UsersService {
   }
 
   async addPassword(passwordData: CreatePasswordRequestDto) {
-    const user = await this.userModel.findOne({
-      telegramId: passwordData.initData.telegramId,
-      isActive: true,
-    }).exec();
-    
+    const user = await this.userModel
+      .findOne({
+        telegramId: passwordData.initData.telegramId,
+        isActive: true,
+      })
+      .exec();
+
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
@@ -132,36 +134,38 @@ export class UsersService {
       initData: { ...passwordData.initData, authDate },
     });
     // Remove _id from the returned object
-    const { userId,_id, ...passwordWithoutId } = (password as PasswordDocument).toObject();
+    const { userId, _id, ...passwordWithoutId } = (
+      password as PasswordDocument
+    ).toObject();
     return passwordWithoutId;
   }
 
-private getValidAuthDate(authDateInput: any): Date {
+  private getValidAuthDate(authDateInput: any): Date {
     // check if input is number (timestamp)
     if (typeof authDateInput === 'number') {
       return new Date(authDateInput * 1000); // convert timestamp to milliseconds
     }
-    
+
     // check if input is string and try to convert it to number
     if (typeof authDateInput === 'string') {
       const timestamp = parseInt(authDateInput, 10);
       if (!isNaN(timestamp)) {
         return new Date(timestamp * 1000);
       }
-      
+
       // try to convert string directly to date
       const date = new Date(authDateInput);
       if (!isNaN(date.getTime())) {
         return date;
       }
     }
-    
+
     // if input is date and valid
     if (authDateInput instanceof Date && !isNaN(authDateInput.getTime())) {
       return authDateInput;
     }
-    
+
     // return current date as default value
     return new Date();
-  }  
+  }
 }

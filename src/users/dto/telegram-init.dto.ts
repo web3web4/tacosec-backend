@@ -1,5 +1,4 @@
 import { IsString, IsOptional, IsNumber, IsNotEmpty } from 'class-validator';
-import { Type } from 'class-transformer';
 
 export class TelegramInitDto {
   @IsString()

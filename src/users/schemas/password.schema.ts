@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-// import { User } from './user.schema';
+import { Type } from '../enums/type.enum';
 
 export type PasswordDocument = Password & Document;
 
@@ -22,6 +22,15 @@ export class Password {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ type: Object, required: false })
+  initData: any;
+
+  @Prop({ type: String, enum: Type, required: false })
+  type: Type;
+
+  @Prop({ type: [String], required: false })
+  sharedWith: string[];
 }
 
 export const PasswordSchema = SchemaFactory.createForClass(Password);

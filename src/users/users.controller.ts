@@ -14,9 +14,8 @@ import { UsersService } from './users.service';
 import { PasswordService } from './password.service';
 import { Types } from 'mongoose';
 import { TelegramInitDto } from './dto/telegram-init.dto';
-// import { PasswordData } from './interfaces/password-data.interface';
 import { VerifyPasswordData } from './interfaces/verify-password.interface';
-import { CreatePasswordDto } from './dto/create-password.dto';
+import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 
 @Controller('users')
 export class UsersController {
@@ -33,9 +32,14 @@ export class UsersController {
   @Post(':id/passwords')
   createPassword(
     @Param('id') userId: string,
-    @Body() createPasswordDto: CreatePasswordDto,
+    @Body() createPasswordDto: CreatePasswordRequestDto,
   ) {
-    return this.usersService.addPassword(userId, createPasswordDto);
+    // Convert string ID to MongoDB ObjectId and add to DTO
+    const passwordWithUserId = {
+      ...createPasswordDto,
+      userId: new Types.ObjectId(userId),
+    };
+    return this.usersService.addPassword(passwordWithUserId);
   }
 
   @Patch(':id')

@@ -4,7 +4,7 @@ import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import { PasswordService } from './password.service';
 import { TelegramInitDto } from './dto/telegram-init.dto';
-import { PasswordData } from './interfaces/password-data.interface';
+import { CreatePasswordDto } from './dto/create-password.dto';
 
 @Injectable()
 export class UsersService {
@@ -75,20 +75,28 @@ export class UsersService {
       .exec();
   }
 
-  async addPassword(userId: string, passwordData: PasswordData) {
-    const user = await this.findOne(userId);
+  async addPassword(passwordData: CreatePasswordDto) {
+    // const user = await this.findOne(userId);
+    const user = await this.findOne(passwordData.userId.toString());
+    // const user = await this.userModel.findById(passwordData.userId).exec();
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
     const oldPassword = await this.passwordService.findOne({
-      userId: new Types.ObjectId(userId),
+      // userId: new Types.ObjectId(userId),
+      userId: passwordData.userId,
       key: passwordData.key,
     });
     if (oldPassword) {
-      throw new HttpException(
-        `${passwordData.key} password for User Name:(${user.username}), User TelegramId:(${user.telegramId}) already exists.`,
-        HttpStatus.BAD_REQUEST,
-      );
+      return this.passwordService.update(oldPassword._id.toString(), {
+        value: passwordData.value,
+        description: passwordData.description,
+        isActive: true,
+        type: passwordData.type,
+        sharedWith: passwordData.sharedWith,
+        initData: passwordData.initData,
+        key: passwordData.key,
+      });
     }
 
     if (user.telegramId !== passwordData.initData.telegramId) {
@@ -109,13 +117,15 @@ export class UsersService {
     // console.log('passwordData.Description', passwordData.description);
     try {
       return this.passwordService.create({
-        userId: new Types.ObjectId(userId),
+        userId: passwordData.userId,
         key: passwordData.key,
         value: passwordData.value,
         description:
           passwordData.description || `Password for ${passwordData.key}`,
         isActive: true,
         initData: passwordData.initData,
+        type: passwordData.type,
+        sharedWith: passwordData.sharedWith,
       });
     } catch (error) {
       throw new HttpException(

@@ -169,7 +169,7 @@ export class TelegramDtoAuthGuard implements CanActivate {
     return null;
   }
 
-  private parseTelegramInitData(initData: string): TelegramInitDto {
+  public parseTelegramInitData(initData: string): TelegramInitDto {
     const params = new URLSearchParams(initData);
     const userJson = params.get('user');
     let user: TelegramUser = {} as TelegramUser;

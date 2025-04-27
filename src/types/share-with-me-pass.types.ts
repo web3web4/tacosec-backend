@@ -1,0 +1,15 @@
+export type SharedPassword = {
+  key: string;
+  value: string;
+};
+
+export type OwnerPasswords = {
+  username: string;
+  passwords: SharedPassword[];
+  count: number;
+};
+
+export type SharedWithMeResponse = {
+  sharedWithMe: OwnerPasswords[];
+  userCount: number;
+};

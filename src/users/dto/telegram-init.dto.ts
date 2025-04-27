@@ -21,9 +21,6 @@ export class TelegramInitDto {
   @IsOptional()
   photoUrl?: string;
 
-  // @IsDate()
-  // @Type(() => Date)
-  // authDate: Date;
   @IsNumber()
   @IsNotEmpty()
   authDate: number;

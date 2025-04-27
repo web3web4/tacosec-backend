@@ -9,6 +9,7 @@ import {
   HttpException,
   HttpStatus,
   Query,
+  Request,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { PasswordService } from './password.service';
@@ -18,12 +19,14 @@ import { VerifyPasswordData } from './interfaces/verify-password.interface';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { TelegramAuth } from './decorators/telegram-auth.decorator';
 import { TelegramDtoAuth } from './decorators/telegram-dto-auth.decorator';
+import { TelegramDtoAuthGuard } from './guards/telegram-dto-auth.guard';
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly passwordService: PasswordService,
+    private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
   ) {}
 
   /**
@@ -122,6 +125,15 @@ export class UsersController {
       body.telegramId,
       body.key,
     );
+  }
+
+  @Get('passwords/shared-with-me')
+  @TelegramDtoAuth()
+  getPasswordsSharedWithMe(@Request() req: Request) {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+    return this.passwordService.findPasswordsSharedWithMe(teleDtoData.username);
   }
 
   @Patch(':id')

@@ -6,6 +6,7 @@ import { PasswordService } from './password.service';
 import { TelegramInitDto } from './dto/telegram-init.dto';
 import { Password, PasswordDocument } from './schemas/password.schema';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
+
 @Injectable()
 export class UsersService {
   constructor(

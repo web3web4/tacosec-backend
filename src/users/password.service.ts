@@ -5,7 +5,7 @@ import { Password, PasswordDocument } from './schemas/password.schema';
 import { User, UserDocument } from './schemas/user.schema';
 import { CreatePasswordDto } from './dto/create-password.dto';
 import * as bcrypt from 'bcrypt';
-
+import { SharedWithMeResponse } from '../types/share-with-me-pass.types';
 @Injectable()
 export class PasswordService {
   constructor(
@@ -107,6 +107,87 @@ export class PasswordService {
         .select('username -_id')
         .exec();
       return users.map((user) => user.username);
+    } catch (error) {
+      console.log('error', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async findPasswordsSharedWithMe(
+    username: string,
+  ): Promise<SharedWithMeResponse> {
+    try {
+      if (!username) {
+        throw new Error('Username is required');
+      }
+      const user = await this.userModel.findOne({
+        username,
+        isActive: true,
+      });
+      if (!user) {
+        throw new Error('username is not valid');
+      }
+      console.log('user', user);
+      const sharedWithMe = await this.getSharedWithMe(username);
+      return sharedWithMe;
+    } catch (error) {
+      console.log('error', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async getSharedWithMe(username: string): Promise<SharedWithMeResponse> {
+    try {
+      // get shared passwords with me
+      const sharedPasswords = await this.passwordModel
+        .find({
+          sharedWith: { $in: [username] },
+          isActive: true,
+        })
+        .select('key value initData.username -_id')
+        .lean()
+        .exec();
+
+      if (!sharedPasswords || sharedPasswords.length === 0) {
+        return { sharedWithMe: [], userCount: 0 }; // return empty array if no results
+      }
+
+      //2. group results with check for empty values
+      const groupedByOwner = sharedPasswords.reduce(
+        (acc, password) => {
+          const ownerUsername = password.initData?.username || 'unknown';
+
+          if (!acc[ownerUsername]) {
+            acc[ownerUsername] = [];
+          }
+
+          // check for empty values before adding
+          if (password.key && password.value) {
+            acc[ownerUsername].push({
+              key: password.key,
+              value: password.value,
+              // can add additional fields here if needed
+            });
+          }
+
+          return acc;
+        },
+        {} as Record<string, Array<{ key: string; value: string }>>,
+      );
+
+      // 3. convert object to array with filter for unknown owners
+      const result = Object.entries(groupedByOwner)
+        .filter(([username]) => username !== 'unknown') // exclude unknown owners
+        .map(([username, passwords]) => ({
+          username,
+          passwords,
+          count: passwords.length, // add number of passwords for each owner
+        }));
+
+      // 4. sort results by number of passwords (descending)
+      result.sort((a, b) => b.count - a.count);
+
+      return { sharedWithMe: result, userCount: result.length };
     } catch (error) {
       console.log('error', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);

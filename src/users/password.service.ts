@@ -74,8 +74,22 @@ export class PasswordService {
       if (!telegramId) {
         throw new Error('Telegram ID is required');
       }
+      const user = await this.userModel.findOne({
+        telegramId,
+        isActive: true,
+      });
+      if (!user) {
+        throw new Error('telegramId is not valid');
+      }
       if (!key) {
         throw new Error('Key is required');
+      }
+      const passwordKey = await this.passwordModel.findOne({
+        key,
+        isActive: true,
+      });
+      if (!passwordKey) {
+        throw new Error('Key is not found');
       }
       const sharedWith = await this.passwordModel
         .find({

@@ -97,14 +97,16 @@ export class UsersController {
    *   }
    * }
    */
-  @Post('/passwords-init-data')
+  @Post('/passwords')
   @TelegramDtoAuth()
   createPasswordDto(@Body() createPasswordDto: CreatePasswordRequestDto) {
     return this.usersService.addPassword(createPasswordDto);
   }
 
-  @Post('/passwords')
-  createPassword(@Body() createPasswordDto: CreatePasswordRequestDto) {
+  @Post('/passwords-without-auth')
+  createPasswordWithoutAuth(
+    @Body() createPasswordDto: CreatePasswordRequestDto,
+  ) {
     return this.usersService.addPassword(createPasswordDto);
   }
 

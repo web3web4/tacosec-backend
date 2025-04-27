@@ -103,7 +103,7 @@ export class PasswordService {
         (password) => password.sharedWith,
       );
       const users = await this.userModel
-        .find({ username: { $in: sharedWithUsers }, isActive: true })
+        .find({ telegramId: { $in: sharedWithUsers }, isActive: true })
         .select('username -_id')
         .exec();
       return users.map((user) => user.username);
@@ -114,21 +114,21 @@ export class PasswordService {
   }
 
   async findPasswordsSharedWithMe(
-    username: string,
+    telegramId: string,
   ): Promise<SharedWithMeResponse> {
     try {
-      if (!username) {
-        throw new Error('Username is required');
+      if (!telegramId) {
+        throw new Error('Telegram ID is required');
       }
       const user = await this.userModel.findOne({
-        username,
+        telegramId,
         isActive: true,
       });
       if (!user) {
-        throw new Error('username is not valid');
+        throw new Error('telegramId is not valid');
       }
       console.log('user', user);
-      const sharedWithMe = await this.getSharedWithMe(username);
+      const sharedWithMe = await this.getSharedWithMe(user.telegramId);
       return sharedWithMe;
     } catch (error) {
       console.log('error', error);
@@ -136,43 +136,61 @@ export class PasswordService {
     }
   }
 
-  async getSharedWithMe(username: string): Promise<SharedWithMeResponse> {
+  async getSharedWithMe(telegramId: string): Promise<SharedWithMeResponse> {
     try {
       // get shared passwords with me
       const sharedPasswords = await this.passwordModel
         .find({
-          sharedWith: { $in: [username] },
+          sharedWith: { $in: [telegramId] },
           isActive: true,
         })
-        .select('key value initData.username -_id')
+        .select('key value initData.telegramId -_id')
         .lean()
         .exec();
-
-      if (!sharedPasswords || sharedPasswords.length === 0) {
+      console.log('sharedPasswords', sharedPasswords);
+      if (!sharedPasswords?.length) {
         return { sharedWithMe: [], userCount: 0 }; // return empty array if no results
       }
 
-      //2. group results with check for empty values
-      const groupedByOwner = sharedPasswords.reduce(
-        (acc, password) => {
-          const ownerUsername = password.initData?.username || 'unknown';
+      // 1. resolve passwords with usernames
+      const resolvedPasswords = await Promise.all(
+        sharedPasswords.map(async (password) => {
+          const user = await this.userModel.findOne({
+            telegramId: password.initData.telegramId,
+            isActive: true,
+          });
+
+          // return password with username
+          return {
+            key: password.key,
+            value: password.value,
+            username: user?.username || 'unknown', // handle empty values
+          } as { key: string; value: string; username: string };
+        }),
+      );
+
+      // 2. fix type of reduce
+      const groupedByOwner = resolvedPasswords.reduce(
+        (
+          acc: Record<string, Array<{ key: string; value: string }>>,
+          password,
+        ) => {
+          const ownerUsername = password.username;
 
           if (!acc[ownerUsername]) {
             acc[ownerUsername] = [];
           }
 
-          // check for empty values before adding
           if (password.key && password.value) {
             acc[ownerUsername].push({
               key: password.key,
               value: password.value,
-              // can add additional fields here if needed
             });
           }
 
           return acc;
         },
-        {} as Record<string, Array<{ key: string; value: string }>>,
+        {},
       );
 
       // 3. convert object to array with filter for unknown owners

@@ -133,7 +133,10 @@ export class UsersController {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],
     );
-    return this.passwordService.findPasswordsSharedWithMe(teleDtoData.username);
+    console.log('teleDtoData.telegramId', teleDtoData.telegramId);
+    return this.passwordService.findPasswordsSharedWithMe(
+      teleDtoData.telegramId,
+    );
   }
 
   @Patch(':id')

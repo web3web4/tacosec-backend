@@ -113,7 +113,7 @@ export class UsersService {
 
   async addPassword(passwordData: CreatePasswordRequestDto) {
     try {
-      // check if user is sharing password with himself
+      // get user by telegramId
       const user = await this.userModel
         .findOne({
           telegramId: passwordData.initData.telegramId,
@@ -143,15 +143,15 @@ export class UsersService {
                 isActive: true,
                 // telegramId: { $ne: passwordData.initData.telegramId },
               })
-              .select('username -_id')
+              .select('telegramId -_id')
               .exec();
             if (user) {
-              return user.username;
+              return user.telegramId;
             }
             return null;
           }),
         )
-      ).filter((username) => username !== null && username !== undefined);
+      ).filter((telegramId) => telegramId !== null && telegramId !== undefined);
       // check if all users in sharedWith array are found
       if (sharedWithArray.length !== passwordData.sharedWith.length) {
         throw new HttpException(
@@ -170,11 +170,24 @@ export class UsersService {
         sharedWith: sharedWithArray,
         initData: { ...passwordData.initData, authDate },
       });
+      console.log('password', password);
       // Remove _id from the returned object
       const { userId, _id, ...passwordWithoutId } = (
         password as PasswordDocument
       ).toObject();
-      return passwordWithoutId;
+      const passwordWithSharedWithUsernames = await Promise.all(
+        passwordWithoutId.sharedWith.map(async (telegramId) => {
+          const user = await this.userModel.findOne({
+            telegramId,
+            isActive: true,
+          });
+          return user?.username;
+        }),
+      );
+      return {
+        ...passwordWithoutId,
+        sharedWith: passwordWithSharedWithUsernames,
+      };
     } catch (error) {
       console.error('Error creating password:', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);

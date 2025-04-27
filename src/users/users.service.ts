@@ -111,33 +111,73 @@ export class UsersService {
   }
 
   async addPassword(passwordData: CreatePasswordRequestDto) {
-    const user = await this.userModel
-      .findOne({
-        telegramId: passwordData.initData.telegramId,
+    try {
+      // check if user is sharing password with himself
+      const user = await this.userModel
+        .findOne({
+          telegramId: passwordData.initData.telegramId,
+          isActive: true,
+        })
+        .exec();
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+      // check if user is sharing password with himself
+      if (passwordData.sharedWith.includes(user.username)) {
+        throw new HttpException(
+          'User cannot share password with himself',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      // get valid auth date
+      const authDate = this.getValidAuthDate(passwordData.initData.authDate);
+      // get shared with array
+      const sharedWithArray = (
+        await Promise.all(
+          passwordData.sharedWith.map(async (username) => {
+            const user = await this.userModel
+              .findOne({
+                username,
+                isActive: true,
+                // telegramId: { $ne: passwordData.initData.telegramId },
+              })
+              .select('username -_id')
+              .exec();
+            if (user) {
+              return user.username;
+            }
+            return null;
+          }),
+        )
+      ).filter((username) => username !== null && username !== undefined);
+      // check if all users in sharedWith array are found
+      if (sharedWithArray.length !== passwordData.sharedWith.length) {
+        throw new HttpException(
+          'some users in sharedWith array not found',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      // create password
+      const password = await this.createOrUpdatePassword({
+        userId: (user as UserDocument)._id as Types.ObjectId,
+        key: passwordData.key,
+        value: passwordData.value,
+        description: passwordData.description,
         isActive: true,
-      })
-      .exec();
-
-    if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+        type: passwordData.type,
+        sharedWith: sharedWithArray,
+        initData: { ...passwordData.initData, authDate },
+      });
+      // Remove _id from the returned object
+      const { userId, _id, ...passwordWithoutId } = (
+        password as PasswordDocument
+      ).toObject();
+      return passwordWithoutId;
+    } catch (error) {
+      console.error('Error creating password:', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
-
-    const authDate = this.getValidAuthDate(passwordData.initData.authDate);
-    const password = await this.createOrUpdatePassword({
-      userId: (user as UserDocument)._id as Types.ObjectId,
-      key: passwordData.key,
-      value: passwordData.value,
-      description: passwordData.description,
-      isActive: true,
-      type: passwordData.type,
-      sharedWith: passwordData.sharedWith,
-      initData: { ...passwordData.initData, authDate },
-    });
-    // Remove _id from the returned object
-    const { userId, _id, ...passwordWithoutId } = (
-      password as PasswordDocument
-    ).toObject();
-    return passwordWithoutId;
   }
 
   private getValidAuthDate(authDateInput: any): Date {

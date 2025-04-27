@@ -103,14 +103,29 @@ export class UsersController {
     return this.usersService.addPassword(createPasswordDto);
   }
 
-  @Post('/passwords-without-auth')
-  createPasswordWithoutAuth(
-    @Body() createPasswordDto: CreatePasswordRequestDto,
-  ) {
-    return this.usersService.addPassword(createPasswordDto);
+  // @Post('/passwords-without-auth')
+  // createPasswordWithoutAuth(
+  //   @Body() createPasswordDto: CreatePasswordRequestDto,
+  // ) {
+  //   return this.usersService.addPassword(createPasswordDto);
+  // }
+  @Get('passwords')
+  @TelegramDtoAuth()
+  getUserPasswords(@Body() body: { telegramId: string }) {
+    return this.passwordService.findByUserTelegramId(body.telegramId);
+  }
+
+  @Get('passwords/shared-with')
+  @TelegramDtoAuth()
+  getUserBySharedWith(@Body() body: { telegramId: string; key: string }) {
+    return this.passwordService.findSharedWithByTelegramId(
+      body.telegramId,
+      body.key,
+    );
   }
 
   @Patch(':id')
+  @TelegramDtoAuth()
   update(
     @Param('id') id: string,
     @Body() updateUserDto: Partial<TelegramInitDto>,
@@ -119,31 +134,31 @@ export class UsersController {
   }
 
   @Delete(':id')
+  @TelegramDtoAuth()
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
   }
 
   @Get()
+  @TelegramDtoAuth()
   findAll() {
     return this.usersService.findAll();
   }
 
   @Get(':id')
+  @TelegramDtoAuth()
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
 
   @Get('telegram/:telegramId')
+  @TelegramDtoAuth()
   findByTelegramId(@Param('telegramId') telegramId: string) {
     return this.usersService.findByTelegramId(telegramId);
   }
 
-  @Get(':id/passwords')
-  getUserPasswords(@Param('id') userId: string) {
-    return this.passwordService.findByUserId(new Types.ObjectId(userId));
-  }
-
   @Post(':id/passwords/verify')
+  @TelegramDtoAuth()
   async verifyPassword(
     @Param('id') userId: string,
     @Body() verifyData: VerifyPasswordData,
@@ -174,6 +189,7 @@ export class UsersController {
   }
 
   @Get('search')
+  @TelegramDtoAuth()
   async findAllByQuery(@Query('query') query: string) {
     return this.usersService.findByQuery(JSON.parse(query));
   }

@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Password, PasswordDocument } from './schemas/password.schema';
+import { User, UserDocument } from './schemas/user.schema';
 import { CreatePasswordDto } from './dto/create-password.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -9,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 export class PasswordService {
   constructor(
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
   async create(createPasswordDto: CreatePasswordDto): Promise<Password> {
@@ -40,6 +42,55 @@ export class PasswordService {
 
   async findByUserId(userId: Types.ObjectId): Promise<Password[]> {
     return this.passwordModel.find({ userId, isActive: true }).exec();
+  }
+
+  async findByUserTelegramId(telegramId: string): Promise<Password[]> {
+    try {
+      if (!telegramId) {
+        throw new Error('Telegram ID is required');
+      }
+      const passwords = await this.passwordModel
+        .find({ 'initData.telegramId': telegramId, isActive: true })
+        .select('key value -_id')
+        .exec();
+      return passwords;
+    } catch (error) {
+      console.log('error', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async findSharedWithByTelegramId(
+    telegramId: string,
+    key: string,
+  ): Promise<string[]> {
+    try {
+      if (!telegramId) {
+        throw new Error('Telegram ID is required');
+      }
+      if (!key) {
+        throw new Error('Key is required');
+      }
+      const sharedWith = await this.passwordModel
+        .find({
+          'initData.telegramId': telegramId,
+          isActive: true,
+          key: key,
+        })
+        .select('sharedWith -_id')
+        .exec();
+      const sharedWithUsers = sharedWith.flatMap(
+        (password) => password.sharedWith,
+      );
+      const users = await this.userModel
+        .find({ username: { $in: sharedWithUsers }, isActive: true })
+        .select('username -_id')
+        .exec();
+      return users.map((user) => user.username);
+    } catch (error) {
+      console.log('error', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 
   async findOneAndUpdate(

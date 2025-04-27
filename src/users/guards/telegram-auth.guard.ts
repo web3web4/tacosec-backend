@@ -16,7 +16,7 @@ export class TelegramAuthGuard implements CanActivate {
 
     // Extract Telegram init data from the request
     const telegramInitData = this.extractTelegramInitData(request);
-
+    console.log('telegramInitData', telegramInitData);
     if (!telegramInitData) {
       throw new UnauthorizedException('Missing Telegram authentication data');
     }

@@ -23,6 +23,7 @@ export class TelegramValidatorService {
 
       const telegramBotToken =
         this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+      console.log('telegramBotToken', telegramBotToken);
 
       if (!telegramBotToken) {
         console.error('TELEGRAM_BOT_TOKEN is not defined in .env file');
@@ -126,7 +127,8 @@ export class TelegramValidatorService {
       // Map DTO properties to the format Telegram expects
       if (data.telegramId) dataCheck.id = data.telegramId;
       if (data.firstName) dataCheck.first_name = data.firstName;
-      if (data.lastName) dataCheck.last_name = data.lastName;
+      //  if (data.lastName) dataCheck.last_name = data.lastName;
+      dataCheck.last_name = data.lastName;
       if (data.username) dataCheck.username = data.username;
       if (data.photoUrl) dataCheck.photo_url = data.photoUrl;
       if (data.authDate) dataCheck.auth_date = data.authDate.toString();

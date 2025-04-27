@@ -49,6 +49,12 @@ export class PasswordService {
       if (!telegramId) {
         throw new Error('Telegram ID is required');
       }
+      const user = await this.userModel
+        .findOne({ telegramId, isActive: true })
+        .exec();
+      if (!user) {
+        throw new Error('telegramId is not valid');
+      }
       const passwords = await this.passwordModel
         .find({ 'initData.telegramId': telegramId, isActive: true })
         .select('key value -_id')

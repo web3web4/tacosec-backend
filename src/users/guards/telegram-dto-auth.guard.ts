@@ -37,10 +37,10 @@ export class TelegramDtoAuthGuard implements CanActivate {
         ) {
           if (
             telegramDataDto.telegramId !==
-              telegramDataBody.initData.telegramId.toString() ||
-            telegramDataDto.hash !== telegramDataBody.initData.hash ||
+              telegramDataBody.telegramId.toString() ||
+            telegramDataDto.hash !== telegramDataBody.hash ||
             telegramDataDto.authDate !==
-              parseInt(telegramDataBody.initData.authDate.toString())
+              parseInt(telegramDataBody.authDate.toString())
           ) {
             throw new UnauthorizedException('Invalid Telegram data');
           } else {

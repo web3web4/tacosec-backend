@@ -20,6 +20,8 @@ import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { TelegramAuth } from './decorators/telegram-auth.decorator';
 import { TelegramDtoAuth } from './decorators/telegram-dto-auth.decorator';
 import { TelegramDtoAuthGuard } from './guards/telegram-dto-auth.guard';
+import { Roles } from './decorators/roles.decorator';
+import { Role } from './enums/role.enum';
 
 @Controller('users')
 export class UsersController {
@@ -157,6 +159,7 @@ export class UsersController {
 
   @Get()
   @TelegramDtoAuth()
+  @Roles(Role.ADMIN)
   findAll(@Request() req: Request) {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],

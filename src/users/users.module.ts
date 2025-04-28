@@ -8,6 +8,7 @@ import { PasswordService } from './password.service';
 import { TelegramValidatorService } from './telegram-validator.service';
 import { TelegramAuthGuard } from './guards/telegram-auth.guard';
 import { TelegramDtoAuthGuard } from './guards/telegram-dto-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
@@ -23,7 +24,13 @@ import { TelegramDtoAuthGuard } from './guards/telegram-dto-auth.guard';
     TelegramValidatorService,
     TelegramAuthGuard,
     TelegramDtoAuthGuard,
+    RolesGuard,
   ],
-  exports: [UsersService, PasswordService, TelegramValidatorService],
+  exports: [
+    UsersService,
+    PasswordService,
+    TelegramValidatorService,
+    RolesGuard,
+  ],
 })
 export class UsersModule {}

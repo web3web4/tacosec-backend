@@ -17,20 +17,23 @@ export class UsersService {
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
   ) {}
 
-  async createAndUpdateUser(createUserDto: TelegramInitDto) {
-    const authDate = this.getValidAuthDate(createUserDto.authDate);
+  async createAndUpdateUser(telegramInitDto: TelegramInitDto): Promise<User> {
+    const { telegramId } = telegramInitDto;
+    let user = await this.userModel.findOne({ telegramId }).exec();
 
-    const user = await this.createOrUpdateUser({
-      telegramId: createUserDto.telegramId.toString(),
-      firstName: createUserDto.firstName,
-      lastName: createUserDto.lastName,
-      username: createUserDto.username,
-      photoUrl: createUserDto.photoUrl,
-      authDate: authDate,
-      hash: createUserDto.hash || 'default_hash',
-    });
-    // Remove _id from the returned object
-    const { _id, ...userWithoutId } = (user as UserDocument).toObject();
+    if (!user) {
+      user = await this.userModel.create(telegramInitDto);
+    } else {
+      user = await this.userModel.findByIdAndUpdate(
+        user._id,
+        telegramInitDto,
+        { new: true },
+      ).exec();
+    }
+
+    // Convert to plain object if it's a Mongoose document
+    const userObject = user.toObject ? user.toObject() : user;
+    const { _id, ...userWithoutId } = userObject;
     return userWithoutId;
   }
 
@@ -75,45 +78,29 @@ export class UsersService {
     return newPassword.save();
   }
 
-  async findAllExceptMe(
-    telegramId: string,
-    pagination: PaginationParams,
-  ): Promise<PaginationResponse<User>> {
-    try {
-      const user = await this.userModel
-        .findOne({ telegramId, isActive: true })
-        .exec();
-      if (!user) {
-        throw new HttpException('invalid telegramId', HttpStatus.BAD_REQUEST);
-      }
-      const [users, total] = await Promise.all([
-        this.userModel
-          .find({
-            telegramId: { $ne: telegramId },
-            isActive: true,
-          })
-          .select('username -_id')
-          .skip(pagination.skip)
-          .limit(pagination.limit)
-          .exec(),
-        this.userModel.countDocuments({
-          telegramId: { $ne: telegramId },
-          isActive: true,
-        }),
-      ]);
-
-      const pages_count = Math.ceil(total / pagination.limit);
-
-      return {
-        data: users,
-        total,
-        pages_count,
-        current_page: pagination.page,
-        limit: pagination.limit,
-      };
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+  async findAllExceptMe(telegramId: string, pagination: PaginationParams) {
+    const user = await this.userModel.findOne({ telegramId }).exec();
+    if (!user) {
+      throw new HttpException('invalid telegramId', HttpStatus.BAD_REQUEST);
     }
+
+    const [users, total] = await Promise.all([
+      this.userModel
+        .find({ _id: { $ne: user._id } })
+        .select('username')
+        .skip(pagination.skip)
+        .limit(pagination.limit)
+        .exec(),
+      this.userModel.countDocuments({ _id: { $ne: user._id } }).exec(),
+    ]);
+
+    return {
+      data: users,
+      total,
+      pages_count: Math.ceil(total / pagination.limit),
+      current_page: pagination.page,
+      limit: pagination.limit,
+    };
   }
 
   async findAllByIsActive(isActive: boolean): Promise<User[]> {

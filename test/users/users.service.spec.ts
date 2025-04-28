@@ -6,6 +6,8 @@ import { User, UserDocument } from '../../src/users/schemas/user.schema';
 import { PasswordService } from '../../src/users/password.service';
 import { Password, PasswordDocument } from '../../src/users/schemas/password.schema';
 import { PaginationParams } from '../../src/users/interfaces/pagination.interface';
+import { TelegramInitDto } from '../../src/users/dto/telegram-init.dto';
+import { HttpException, HttpStatus } from '@nestjs/common';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -22,12 +24,22 @@ describe('UsersService', () => {
     username: 'johndoe',
     isActive: true,
     role: 'user',
+    toObject: () => ({ ...mockUser }),
   };
 
   const mockPagination: PaginationParams = {
     page: 1,
     limit: 10,
     skip: 0,
+  };
+
+  const mockTelegramInitDto: TelegramInitDto = {
+    telegramId: '123456',
+    firstName: 'John',
+    lastName: 'Doe',
+    username: 'johndoe',
+    authDate: new Date().getTime(),
+    hash: 'test_hash',
   };
 
   beforeEach(async () => {
@@ -38,11 +50,25 @@ describe('UsersService', () => {
         {
           provide: getModelToken(User.name),
           useValue: {
-            findOne: jest.fn(),
-            findByIdAndUpdate: jest.fn(),
-            save: jest.fn(),
-            find: jest.fn(),
-            countDocuments: jest.fn(),
+            findOne: jest.fn().mockReturnValue({
+              exec: jest.fn(),
+            }),
+            findByIdAndUpdate: jest.fn().mockReturnValue({
+              exec: jest.fn(),
+            }),
+            create: jest.fn(),
+            find: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                skip: jest.fn().mockReturnValue({
+                  limit: jest.fn().mockReturnValue({
+                    exec: jest.fn(),
+                  }),
+                }),
+              }),
+            }),
+            countDocuments: jest.fn().mockReturnValue({
+              exec: jest.fn(),
+            }),
           },
         },
         {
@@ -71,23 +97,20 @@ describe('UsersService', () => {
      * Test Case: Should create a new user when user doesn't exist
      * Steps:
      * 1. Mock findOne to return null (user doesn't exist)
-     * 2. Mock save to return the new user
+     * 2. Mock create to return the new user
      * 3. Call createAndUpdateUser
      * 4. Verify the result
      */
     it('should create a new user when user doesn\'t exist', async () => {
-      const userData = {
-        telegramId: '123456',
-        firstName: 'John',
-        lastName: 'Doe',
-      };
+      jest.spyOn(userModel, 'findOne').mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      } as any);
+      jest.spyOn(userModel, 'create').mockResolvedValue(mockUser as any);
 
-      jest.spyOn(userModel, 'findOne').mockResolvedValue(null);
-      jest.spyOn(userModel, 'save').mockResolvedValue(mockUser);
-
-      const result = await service.createAndUpdateUser(userData);
-      expect(result).toEqual(mockUser);
-      expect(userModel.findOne).toHaveBeenCalledWith({ telegramId: userData.telegramId });
+      const result = await service.createAndUpdateUser(mockTelegramInitDto);
+      const { _id, ...expectedUser } = mockUser;
+      expect(result).toEqual(expectedUser);
+      expect(userModel.findOne).toHaveBeenCalledWith({ telegramId: mockTelegramInitDto.telegramId });
     });
 
     /**
@@ -99,23 +122,27 @@ describe('UsersService', () => {
      * 4. Verify the result
      */
     it('should update existing user', async () => {
-      const userData = {
-        telegramId: '123456',
-        firstName: 'John',
-        lastName: 'Doe',
-      };
-
-      jest.spyOn(userModel, 'findOne').mockResolvedValue(mockUser);
-      jest.spyOn(userModel, 'findByIdAndUpdate').mockResolvedValue({
+      const updatedUser = {
         ...mockUser,
         firstName: 'Updated John',
-      });
+      };
 
-      const result = await service.createAndUpdateUser(userData);
-      expect(result.firstName).toBe('Updated John');
+      jest.spyOn(userModel, 'findOne').mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      } as any);
+      jest.spyOn(userModel, 'findByIdAndUpdate').mockReturnValue({
+        exec: jest.fn().mockResolvedValue({
+          ...updatedUser,
+          toObject: () => ({ ...updatedUser }),
+        }),
+      } as any);
+
+      const result = await service.createAndUpdateUser(mockTelegramInitDto);
+      const { _id, ...expectedUser } = updatedUser;
+      expect(result).toEqual(expectedUser);
       expect(userModel.findByIdAndUpdate).toHaveBeenCalledWith(
         mockUser._id,
-        userData,
+        mockTelegramInitDto,
         { new: true },
       );
     });
@@ -137,7 +164,9 @@ describe('UsersService', () => {
         { username: 'user2' },
       ];
 
-      jest.spyOn(userModel, 'findOne').mockResolvedValue(mockUser);
+      jest.spyOn(userModel, 'findOne').mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      } as any);
       jest.spyOn(userModel, 'find').mockReturnValue({
         select: jest.fn().mockReturnValue({
           skip: jest.fn().mockReturnValue({
@@ -147,7 +176,9 @@ describe('UsersService', () => {
           }),
         }),
       } as any);
-      jest.spyOn(userModel, 'countDocuments').mockResolvedValue(20);
+      jest.spyOn(userModel, 'countDocuments').mockReturnValue({
+        exec: jest.fn().mockResolvedValue(20),
+      } as any);
 
       const result = await service.findAllExceptMe('123456', mockPagination);
 
@@ -168,10 +199,12 @@ describe('UsersService', () => {
      * 3. Verify error is thrown
      */
     it('should throw error for invalid telegramId', async () => {
-      jest.spyOn(userModel, 'findOne').mockResolvedValue(null);
+      jest.spyOn(userModel, 'findOne').mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      } as any);
 
       await expect(service.findAllExceptMe('invalid', mockPagination)).rejects.toThrow(
-        'invalid telegramId',
+        new HttpException('invalid telegramId', HttpStatus.BAD_REQUEST),
       );
     });
   });

@@ -35,16 +35,30 @@ describe('PasswordService', () => {
         {
           provide: getModelToken(User.name),
           useValue: {
-            findOne: jest.fn(),
-            find: jest.fn(),
+            findOne: jest.fn().mockReturnValue({
+              exec: jest.fn(),
+            }),
+            find: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                exec: jest.fn(),
+              }),
+            }),
           },
         },
         {
           provide: getModelToken(Password.name),
           useValue: {
-            findOne: jest.fn(),
-            find: jest.fn(),
-            findByIdAndUpdate: jest.fn(),
+            findOne: jest.fn().mockReturnValue({
+              exec: jest.fn(),
+            }),
+            find: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                exec: jest.fn(),
+              }),
+            }),
+            findByIdAndUpdate: jest.fn().mockReturnValue({
+              exec: jest.fn(),
+            }),
             save: jest.fn(),
           },
         },
@@ -74,7 +88,9 @@ describe('PasswordService', () => {
       const mockPasswords = [mockPassword];
       const mockSharedUsers = [{ username: 'shareduser' }];
 
-      jest.spyOn(userModel, 'findOne').mockResolvedValue(mockUser);
+      jest.spyOn(userModel, 'findOne').mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      } as any);
       jest.spyOn(passwordModel, 'find').mockReturnValue({
         select: jest.fn().mockReturnValue({
           exec: jest.fn().mockResolvedValue(mockPasswords),
@@ -105,7 +121,9 @@ describe('PasswordService', () => {
      * 3. Verify error is thrown
      */
     it('should throw error for invalid telegramId', async () => {
-      jest.spyOn(userModel, 'findOne').mockResolvedValue(null);
+      jest.spyOn(userModel, 'findOne').mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      } as any);
 
       await expect(service.findByUserTelegramId('invalid')).rejects.toThrow(
         new HttpException('telegramId is not valid', HttpStatus.BAD_REQUEST),
@@ -130,6 +148,7 @@ describe('PasswordService', () => {
             passwords: [
               { key: 'shared_key', value: 'shared_value' },
             ],
+            count: 1
           },
         ],
         userCount: 1,

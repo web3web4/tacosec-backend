@@ -150,7 +150,7 @@ export class PasswordService {
       if (!user) {
         throw new Error('telegramId is not valid');
       }
-      console.log('user', user);
+      // console.log('user', user);
       const sharedWithMe = await this.getSharedWithMe(user.telegramId);
       return sharedWithMe;
     } catch (error) {

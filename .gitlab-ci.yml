@@ -1,0 +1,58 @@
+image: node:18-alpine
+
+stages:
+  - setup
+  - test
+  - build
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+    - .npm/
+
+variables:
+  NODE_ENV: development
+
+# Install dependencies
+install_dependencies:
+  stage: setup
+  script:
+    - npm ci
+  artifacts:
+    paths:
+      - node_modules/
+    expire_in: 1 week
+
+# Run linting
+lint:
+  stage: test
+  script:
+    - npm run lint
+  dependencies:
+    - install_dependencies
+
+# Run tests
+test:
+  stage: test
+  script:
+    - npm run test
+  dependencies:
+    - install_dependencies
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+
+# Build the application
+build:
+  stage: build
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+  dependencies:
+    - install_dependencies
+  only:
+    - main
+    - develop
+    - tags

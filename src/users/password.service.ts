@@ -6,6 +6,7 @@ import { User, UserDocument } from './schemas/user.schema';
 import { CreatePasswordDto } from './dto/create-password.dto';
 import * as bcrypt from 'bcrypt';
 import { SharedWithMeResponse } from '../types/share-with-me-pass.types';
+import { passwordReturns } from '../types/password-returns.types';
 @Injectable()
 export class PasswordService {
   constructor(
@@ -13,19 +14,19 @@ export class PasswordService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
-  async create(createPasswordDto: CreatePasswordDto): Promise<Password> {
-    // const { value, ...rest } = createPasswordDto;
-    const { ...rest } = createPasswordDto;
-    const hashedData: Partial<Password> = { ...rest };
-    hashedData.isActive = true;
+  // async create(createPasswordDto: CreatePasswordDto): Promise<Password> {
+  //   // const { value, ...rest } = createPasswordDto;
+  //   const { ...rest } = createPasswordDto;
+  //   const hashedData: Partial<Password> = { ...rest };
+  //   hashedData.isActive = true;
 
-    // if (value) {
-    //   hashedData.value = await this.hashPassword(value);
-    // }
+  //   // if (value) {
+  //   //   hashedData.value = await this.hashPassword(value);
+  //   // }
 
-    const createdPassword = new this.passwordModel(hashedData);
-    return createdPassword.save();
-  }
+  //   const createdPassword = new this.passwordModel(hashedData);
+  //   return createdPassword.save();
+  // }
 
   private async hashPassword(password: string): Promise<string> {
     const salt = await bcrypt.genSalt();
@@ -44,7 +45,7 @@ export class PasswordService {
     return this.passwordModel.find({ userId, isActive: true }).exec();
   }
 
-  async findByUserTelegramId(telegramId: string): Promise<Password[]> {
+  async findByUserTelegramId(telegramId: string): Promise<passwordReturns[]> {
     try {
       if (!telegramId) {
         throw new Error('Telegram ID is required');
@@ -57,11 +58,27 @@ export class PasswordService {
       }
       const passwords = await this.passwordModel
         .find({ 'initData.telegramId': telegramId, isActive: true })
-        .select('key value -_id')
+        .select('key value sharedWith -_id')
         .exec();
-      return passwords;
+      const passwordWithSharedWithAsUsernames = await Promise.all(
+        passwords.map(async (password) => {
+          const sharedWith = await this.userModel
+            .find({
+              telegramId: { $in: password.sharedWith },
+            })
+            .select('username -_id')
+            .exec();
+          const sharedWithUsernames = sharedWith.map((user) => user.username);
+          return {
+            key: password.key,
+            value: password.value,
+            sharedWith: sharedWithUsernames,
+          };
+        }),
+      );
+      return passwordWithSharedWithAsUsernames;
     } catch (error) {
-      console.log('error', error);
+      // console.log('error', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -138,6 +155,9 @@ export class PasswordService {
 
   async getSharedWithMe(telegramId: string): Promise<SharedWithMeResponse> {
     try {
+      if (!telegramId) {
+        throw new Error('Telegram ID is required');
+      }
       // get shared passwords with me
       const sharedPasswords = await this.passwordModel
         .find({
@@ -147,7 +167,7 @@ export class PasswordService {
         .select('key value initData.telegramId -_id')
         .lean()
         .exec();
-      console.log('sharedPasswords', sharedPasswords);
+      // console.log('sharedPasswords', sharedPasswords);
       if (!sharedPasswords?.length) {
         return { sharedWithMe: [], userCount: 0 }; // return empty array if no results
       }
@@ -207,7 +227,7 @@ export class PasswordService {
 
       return { sharedWithMe: result, userCount: result.length };
     } catch (error) {
-      console.log('error', error);
+      // console.log('error', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }

@@ -121,6 +121,11 @@ export class UsersController {
     return this.passwordService.findByUserTelegramId(teleDtoData.telegramId);
   }
 
+  /**
+   * Get all users who
+   * @param req
+   * @returns
+   */
   @Get('passwords/shared-with')
   @TelegramDtoAuth()
   getUserBySharedWith(@Request() req: Request, @Body() body: { key: string }) {
@@ -133,6 +138,11 @@ export class UsersController {
     );
   }
 
+  /**
+   * Get all passwords shared with the user
+   * @param req
+   * @returns
+   */
   @Get('passwords/shared-with-me')
   @TelegramDtoAuth()
   getPasswordsSharedWithMe(@Request() req: Request) {

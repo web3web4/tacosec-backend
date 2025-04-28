@@ -33,16 +33,27 @@ export class UsersService {
   }
 
   async createOrUpdateUser(userData: Partial<User>): Promise<User> {
-    const existingUser = await this.userModel.findOne({
-      telegramId: userData.telegramId,
-    });
-    if (existingUser) {
-      return this.userModel.findByIdAndUpdate(existingUser.id, userData, {
-        new: true,
+    try {
+      const existingUser = await this.userModel.findOne({
+        telegramId: userData.telegramId,
       });
+      if (existingUser) {
+        const updatedUser = await this.userModel.findByIdAndUpdate(
+          existingUser._id,
+          userData,
+          {
+            new: true,
+          },
+        );
+        return updatedUser;
+      }
+      const newUser = new this.userModel(userData);
+      const savedUser = await newUser.save();
+      return savedUser;
+    } catch (error) {
+      // console.error('Error creating or updating user:', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
-    const newUser = new this.userModel(userData);
-    return newUser.save();
   }
 
   async createOrUpdatePassword(
@@ -76,7 +87,7 @@ export class UsersService {
         .exec();
       return users;
     } catch (error) {
-      console.error('Error finding all users:', error);
+      // console.error('Error finding all users:', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -185,7 +196,7 @@ export class UsersService {
         sharedWith: sharedWithArray,
         initData: { ...passwordData.initData, authDate },
       });
-      console.log('password', password);
+      // console.log('password', password);
       // Remove _id from the returned object
       const { userId, _id, ...passwordWithoutId } = (
         password as PasswordDocument
@@ -204,7 +215,7 @@ export class UsersService {
         sharedWith: passwordWithSharedWithUsernames,
       };
     } catch (error) {
-      console.error('Error creating password:', error);
+      // console.error('Error creating password:', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }

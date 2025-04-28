@@ -58,7 +58,9 @@ export class PasswordService {
       }
       const passwords = await this.passwordModel
         .find({ 'initData.telegramId': telegramId, isActive: true })
-        .select('key value sharedWith -_id')
+        .select(
+          'key value description updatedAt createdAt sharedWith type -_id',
+        )
         .exec();
       const passwordWithSharedWithAsUsernames = await Promise.all(
         passwords.map(async (password) => {
@@ -72,7 +74,11 @@ export class PasswordService {
           return {
             key: password.key,
             value: password.value,
+            description: password.description,
+            type: password.type,
             sharedWith: sharedWithUsernames,
+            updatedAt: password.updatedAt,
+            createdAt: password.createdAt,
           };
         }),
       );

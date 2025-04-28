@@ -31,6 +31,12 @@ export class Password {
 
   @Prop({ type: [String], required: false })
   sharedWith: string[];
+
+  @Prop({ type: Date, required: false })
+  updatedAt: Date;
+
+  @Prop({ type: Date, required: false })
+  createdAt: Date;
 }
 
 export const PasswordSchema = SchemaFactory.createForClass(Password);

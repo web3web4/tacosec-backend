@@ -18,10 +18,12 @@ variables:
 install_dependencies:
   stage: setup
   script:
+    - npm install
     - npm ci
   artifacts:
     paths:
       - node_modules/
+      - package-lock.json
     expire_in: 1 week
 
 # Run linting

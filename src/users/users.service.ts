@@ -62,8 +62,23 @@ export class UsersService {
     return newPassword.save();
   }
 
-  async findAll(): Promise<User[]> {
-    return this.userModel.find({ isActive: true }).exec();
+  async findAllExceptMe(telegramId: string): Promise<User[]> {
+    try {
+      const user = await this.userModel
+        .findOne({ telegramId, isActive: true })
+        .exec();
+      if (!user) {
+        throw new HttpException('invalid telegramId', HttpStatus.BAD_REQUEST);
+      }
+      const users = await this.userModel
+        .find({ telegramId: { $ne: telegramId }, isActive: true })
+        .select('username -_id')
+        .exec();
+      return users;
+    } catch (error) {
+      console.error('Error finding all users:', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 
   async findAllByIsActive(isActive: boolean): Promise<User[]> {

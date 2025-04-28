@@ -139,6 +139,15 @@ export class UsersController {
     );
   }
 
+  @Get()
+  @TelegramDtoAuth()
+  findAll(@Request() req: Request) {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+    return this.usersService.findAllExceptMe(teleDtoData.telegramId);
+  }
+
   @Patch(':id')
   @TelegramDtoAuth()
   update(
@@ -152,12 +161,6 @@ export class UsersController {
   @TelegramDtoAuth()
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
-  }
-
-  @Get()
-  @TelegramDtoAuth()
-  findAll() {
-    return this.usersService.findAll();
   }
 
   @Get(':id')

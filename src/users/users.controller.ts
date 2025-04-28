@@ -22,6 +22,8 @@ import { TelegramDtoAuth } from './decorators/telegram-dto-auth.decorator';
 import { TelegramDtoAuthGuard } from './guards/telegram-dto-auth.guard';
 import { Roles } from './decorators/roles.decorator';
 import { Role } from './enums/role.enum';
+import { Pagination } from './decorators/pagination.decorator';
+import { PaginationParams } from './interfaces/pagination.interface';
 
 @Controller('users')
 export class UsersController {
@@ -160,11 +162,14 @@ export class UsersController {
   @Get()
   @TelegramDtoAuth()
   @Roles(Role.ADMIN)
-  findAll(@Request() req: Request) {
+  findAll(@Request() req: Request, @Pagination() pagination: PaginationParams) {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],
     );
-    return this.usersService.findAllExceptMe(teleDtoData.telegramId);
+    return this.usersService.findAllExceptMe(
+      teleDtoData.telegramId,
+      pagination,
+    );
   }
 
   @Patch(':id')

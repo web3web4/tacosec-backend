@@ -6,6 +6,8 @@ import { PasswordService } from './password.service';
 import { TelegramInitDto } from './dto/telegram-init.dto';
 import { Password, PasswordDocument } from './schemas/password.schema';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
+import { PaginationParams } from './interfaces/pagination.interface';
+import { PaginationResponse } from './interfaces/pagination-response.interface';
 
 @Injectable()
 export class UsersService {
@@ -73,7 +75,10 @@ export class UsersService {
     return newPassword.save();
   }
 
-  async findAllExceptMe(telegramId: string): Promise<User[]> {
+  async findAllExceptMe(
+    telegramId: string,
+    pagination: PaginationParams,
+  ): Promise<PaginationResponse<User>> {
     try {
       const user = await this.userModel
         .findOne({ telegramId, isActive: true })
@@ -81,13 +86,32 @@ export class UsersService {
       if (!user) {
         throw new HttpException('invalid telegramId', HttpStatus.BAD_REQUEST);
       }
-      const users = await this.userModel
-        .find({ telegramId: { $ne: telegramId }, isActive: true })
-        .select('username -_id')
-        .exec();
-      return users;
+      const [users, total] = await Promise.all([
+        this.userModel
+          .find({
+            telegramId: { $ne: telegramId },
+            isActive: true,
+          })
+          .select('username -_id')
+          .skip(pagination.skip)
+          .limit(pagination.limit)
+          .exec(),
+        this.userModel.countDocuments({
+          telegramId: { $ne: telegramId },
+          isActive: true,
+        }),
+      ]);
+
+      const pages_count = Math.ceil(total / pagination.limit);
+
+      return {
+        data: users,
+        total,
+        pages_count,
+        current_page: pagination.page,
+        limit: pagination.limit,
+      };
     } catch (error) {
-      // console.error('Error finding all users:', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }

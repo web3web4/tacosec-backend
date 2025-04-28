@@ -3,7 +3,10 @@ import { PasswordService } from '../../src/users/password.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../src/users/schemas/user.schema';
-import { Password, PasswordDocument } from '../../src/users/schemas/password.schema';
+import {
+  Password,
+  PasswordDocument,
+} from '../../src/users/schemas/password.schema';
 import { HttpException, HttpStatus } from '@nestjs/common';
 
 describe('PasswordService', () => {
@@ -67,7 +70,9 @@ describe('PasswordService', () => {
 
     service = module.get<PasswordService>(PasswordService);
     userModel = module.get<Model<UserDocument>>(getModelToken(User.name));
-    passwordModel = module.get<Model<PasswordDocument>>(getModelToken(Password.name));
+    passwordModel = module.get<Model<PasswordDocument>>(
+      getModelToken(Password.name),
+    );
   });
 
   it('should be defined', () => {
@@ -145,17 +150,17 @@ describe('PasswordService', () => {
         sharedWithMe: [
           {
             username: 'owner',
-            passwords: [
-              { key: 'shared_key', value: 'shared_value' },
-            ],
-            count: 1
+            passwords: [{ key: 'shared_key', value: 'shared_value' }],
+            count: 1,
           },
         ],
         userCount: 1,
       };
 
       jest.spyOn(userModel, 'findOne').mockResolvedValue(mockUser);
-      jest.spyOn(service, 'getSharedWithMe').mockResolvedValue(mockSharedPasswords);
+      jest
+        .spyOn(service, 'getSharedWithMe')
+        .mockResolvedValue(mockSharedPasswords);
 
       const result = await service.findPasswordsSharedWithMe('123456');
 
@@ -172,9 +177,11 @@ describe('PasswordService', () => {
     it('should throw error for invalid telegramId', async () => {
       jest.spyOn(userModel, 'findOne').mockResolvedValue(null);
 
-      await expect(service.findPasswordsSharedWithMe('invalid')).rejects.toThrow(
+      await expect(
+        service.findPasswordsSharedWithMe('invalid'),
+      ).rejects.toThrow(
         new HttpException('telegramId is not valid', HttpStatus.BAD_REQUEST),
       );
     });
   });
-}); 
+});

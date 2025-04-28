@@ -4,7 +4,10 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../src/users/schemas/user.schema';
 import { PasswordService } from '../../src/users/password.service';
-import { Password, PasswordDocument } from '../../src/users/schemas/password.schema';
+import {
+  Password,
+  PasswordDocument,
+} from '../../src/users/schemas/password.schema';
 import { PaginationParams } from '../../src/users/interfaces/pagination.interface';
 import { TelegramInitDto } from '../../src/users/dto/telegram-init.dto';
 import { HttpException, HttpStatus } from '@nestjs/common';
@@ -85,7 +88,9 @@ describe('UsersService', () => {
     service = module.get<UsersService>(UsersService);
     userModel = module.get<Model<UserDocument>>(getModelToken(User.name));
     passwordService = module.get<PasswordService>(PasswordService);
-    passwordModel = module.get<Model<PasswordDocument>>(getModelToken(Password.name));
+    passwordModel = module.get<Model<PasswordDocument>>(
+      getModelToken(Password.name),
+    );
   });
 
   it('should be defined', () => {
@@ -101,7 +106,7 @@ describe('UsersService', () => {
      * 3. Call createAndUpdateUser
      * 4. Verify the result
      */
-    it('should create a new user when user doesn\'t exist', async () => {
+    it("should create a new user when user doesn't exist", async () => {
       jest.spyOn(userModel, 'findOne').mockReturnValue({
         exec: jest.fn().mockResolvedValue(null),
       } as any);
@@ -110,7 +115,9 @@ describe('UsersService', () => {
       const result = await service.createAndUpdateUser(mockTelegramInitDto);
       const { _id, ...expectedUser } = mockUser;
       expect(result).toEqual(expectedUser);
-      expect(userModel.findOne).toHaveBeenCalledWith({ telegramId: mockTelegramInitDto.telegramId });
+      expect(userModel.findOne).toHaveBeenCalledWith({
+        telegramId: mockTelegramInitDto.telegramId,
+      });
     });
 
     /**
@@ -159,10 +166,7 @@ describe('UsersService', () => {
      * 5. Verify the paginated response
      */
     it('should return paginated users list', async () => {
-      const mockUsers = [
-        { username: 'user1' },
-        { username: 'user2' },
-      ];
+      const mockUsers = [{ username: 'user1' }, { username: 'user2' }];
 
       jest.spyOn(userModel, 'findOne').mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockUser),
@@ -203,9 +207,11 @@ describe('UsersService', () => {
         exec: jest.fn().mockResolvedValue(null),
       } as any);
 
-      await expect(service.findAllExceptMe('invalid', mockPagination)).rejects.toThrow(
+      await expect(
+        service.findAllExceptMe('invalid', mockPagination),
+      ).rejects.toThrow(
         new HttpException('invalid telegramId', HttpStatus.BAD_REQUEST),
       );
     });
   });
-}); 
+});

@@ -246,4 +246,4 @@ describe('PasswordService - getSharedWithMe', () => {
       new HttpException('Database failure', HttpStatus.BAD_REQUEST),
     );
   });
-}); 
+});

@@ -114,15 +114,21 @@ export class UsersController {
   // }
   @Get('passwords')
   @TelegramDtoAuth()
-  getUserPasswords(@Body() body: { telegramId: string }) {
-    return this.passwordService.findByUserTelegramId(body.telegramId);
+  getUserPasswords(@Request() req: Request) {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+    return this.passwordService.findByUserTelegramId(teleDtoData.telegramId);
   }
 
   @Get('passwords/shared-with')
   @TelegramDtoAuth()
-  getUserBySharedWith(@Body() body: { telegramId: string; key: string }) {
+  getUserBySharedWith(@Request() req: Request, @Body() body: { key: string }) {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
     return this.passwordService.findSharedWithByTelegramId(
-      body.telegramId,
+      teleDtoData.telegramId,
       body.key,
     );
   }

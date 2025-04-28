@@ -3,7 +3,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Password, PasswordDocument } from './schemas/password.schema';
 import { User, UserDocument } from './schemas/user.schema';
-import { CreatePasswordDto } from './dto/create-password.dto';
 import * as bcrypt from 'bcrypt';
 import { SharedWithMeResponse } from '../types/share-with-me-pass.types';
 import { passwordReturns } from '../types/password-returns.types';

@@ -7,7 +7,6 @@ import { TelegramInitDto } from './dto/telegram-init.dto';
 import { Password, PasswordDocument } from './schemas/password.schema';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { PaginationParams } from './interfaces/pagination.interface';
-import { PaginationResponse } from './interfaces/pagination-response.interface';
 
 @Injectable()
 export class UsersService {
@@ -24,16 +23,15 @@ export class UsersService {
     if (!user) {
       user = await this.userModel.create(telegramInitDto);
     } else {
-      user = await this.userModel.findByIdAndUpdate(
-        user._id,
-        telegramInitDto,
-        { new: true },
-      ).exec();
+      user = await this.userModel
+        .findByIdAndUpdate(user._id, telegramInitDto, { new: true })
+        .exec();
     }
 
     // Convert to plain object if it's a Mongoose document
     const userObject = user.toObject ? user.toObject() : user;
-    const { _id, ...userWithoutId } = userObject;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { _id: _, ...userWithoutId } = userObject;
     return userWithoutId;
   }
 
@@ -87,7 +85,7 @@ export class UsersService {
     const [users, total] = await Promise.all([
       this.userModel
         .find({ _id: { $ne: user._id } })
-        .select('username')
+        .select('username -_id')
         .skip(pagination.skip)
         .limit(pagination.limit)
         .exec(),
@@ -209,9 +207,14 @@ export class UsersService {
       });
       // console.log('password', password);
       // Remove _id from the returned object
-      const { userId, _id, ...passwordWithoutId } = (
-        password as PasswordDocument
-      ).toObject();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        userId: _,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        _id: __,
+        ...passwordWithoutId
+      } = (password as PasswordDocument).toObject();
       const passwordWithSharedWithUsernames = await Promise.all(
         passwordWithoutId.sharedWith.map(async (telegramId) => {
           const user = await this.userModel.findOne({

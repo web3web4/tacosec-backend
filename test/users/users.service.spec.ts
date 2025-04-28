@@ -6,7 +6,7 @@ import { User, UserDocument } from '../../src/users/schemas/user.schema';
 import { PasswordService } from '../../src/users/password.service';
 import {
   Password,
-  PasswordDocument,
+  // PasswordDocument,
 } from '../../src/users/schemas/password.schema';
 import { PaginationParams } from '../../src/users/interfaces/pagination.interface';
 import { TelegramInitDto } from '../../src/users/dto/telegram-init.dto';
@@ -15,8 +15,8 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 describe('UsersService', () => {
   let service: UsersService;
   let userModel: Model<UserDocument>;
-  let passwordService: PasswordService;
-  let passwordModel: Model<PasswordDocument>;
+  // let passwordService: PasswordService;
+  // let passwordModel: Model<PasswordDocument>;
 
   // Mock data
   const mockUser = {
@@ -87,10 +87,10 @@ describe('UsersService', () => {
 
     service = module.get<UsersService>(UsersService);
     userModel = module.get<Model<UserDocument>>(getModelToken(User.name));
-    passwordService = module.get<PasswordService>(PasswordService);
-    passwordModel = module.get<Model<PasswordDocument>>(
-      getModelToken(Password.name),
-    );
+    // passwordService = module.get<PasswordService>(PasswordService);
+    // passwordModel = module.get<Model<PasswordDocument>>(
+    //   getModelToken(Password.name),
+    // );
   });
 
   it('should be defined', () => {
@@ -113,6 +113,7 @@ describe('UsersService', () => {
       jest.spyOn(userModel, 'create').mockResolvedValue(mockUser as any);
 
       const result = await service.createAndUpdateUser(mockTelegramInitDto);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { _id, ...expectedUser } = mockUser;
       expect(result).toEqual(expectedUser);
       expect(userModel.findOne).toHaveBeenCalledWith({
@@ -145,6 +146,7 @@ describe('UsersService', () => {
       } as any);
 
       const result = await service.createAndUpdateUser(mockTelegramInitDto);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { _id, ...expectedUser } = updatedUser;
       expect(result).toEqual(expectedUser);
       expect(userModel.findByIdAndUpdate).toHaveBeenCalledWith(

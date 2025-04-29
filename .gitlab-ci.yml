@@ -1,5 +1,11 @@
 image: node:18-alpine
 
+services:
+  - mongo:latest
+
+variables:
+  MONGODB_URI: mongodb://mongo:27017/taco-test
+
 stages:
   - test
 
@@ -12,11 +18,14 @@ install_dependencies:
   stage: test
   script:
     - npm install
-    - echo "MONGODB_URI=mongodb://localhost:27017/taco-test" > .env.test
+    - echo "MONGODB_URI=$MONGODB_URI" > .env.test
+    - echo "TELEGRAM_BOT_TOKEN=test-token" >> .env.test
+    - echo "NODE_ENV=test" >> .env.test
   artifacts:
     paths:
       - node_modules/
       - package-lock.json
+      - .env.test
 
 test:
   stage: test

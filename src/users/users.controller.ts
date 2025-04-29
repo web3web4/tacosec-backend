@@ -142,6 +142,15 @@ export class UsersController {
     );
   }
 
+  @Patch('passwords/:id')
+  @TelegramDtoAuth()
+  updatePassword(
+    @Param('id') id: string,
+    @Body() body: { sharedWith: string[] },
+  ) {
+    return this.passwordService.findByIdAndUpdate(id, body);
+  }
+
   /**
    * Get all passwords shared with the user
    * @param req
@@ -174,7 +183,7 @@ export class UsersController {
 
   @Patch(':id')
   @TelegramDtoAuth()
-  update(
+  updateUser(
     @Param('id') id: string,
     @Body() updateUserDto: Partial<TelegramInitDto>,
   ) {

@@ -257,6 +257,7 @@ export class PasswordService {
   ): Promise<Password> {
     return this.passwordModel
       .findByIdAndUpdate(id, update, { new: true })
+      .select('key value description type sharedWith ')
       .exec();
   }
 

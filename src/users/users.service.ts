@@ -160,40 +160,40 @@ export class UsersService {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
       // check if user is sharing password with himself
-      if (passwordData.sharedWith.includes(user.username)) {
-        throw new HttpException(
-          'User cannot share password with himself',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+      // if (passwordData.sharedWith.includes(user.username)) {
+      //   throw new HttpException(
+      //     'User cannot share password with himself',
+      //     HttpStatus.BAD_REQUEST,
+      //   );
+      // }
       // get valid auth date
       const authDate = this.getValidAuthDate(passwordData.initData.authDate);
       // get shared with array
-      const sharedWithArray = (
-        await Promise.all(
-          passwordData.sharedWith.map(async (username) => {
-            const user = await this.userModel
-              .findOne({
-                username,
-                isActive: true,
-                // telegramId: { $ne: passwordData.initData.telegramId },
-              })
-              .select('telegramId -_id')
-              .exec();
-            if (user) {
-              return user.telegramId;
-            }
-            return null;
-          }),
-        )
-      ).filter((telegramId) => telegramId !== null && telegramId !== undefined);
-      // check if all users in sharedWith array are found
-      if (sharedWithArray.length !== passwordData.sharedWith.length) {
-        throw new HttpException(
-          'some users in sharedWith array not found',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+      // const sharedWithArray = (
+      //   await Promise.all(
+      //     passwordData.sharedWith.map(async (username) => {
+      //       const user = await this.userModel
+      //         .findOne({
+      //           username,
+      //           isActive: true,
+      //           // telegramId: { $ne: passwordData.initData.telegramId },
+      //         })
+      //         .select('telegramId -_id')
+      //         .exec();
+      //       if (user) {
+      //         return user.telegramId;
+      //       }
+      //       return null;
+      //     }),
+      //   )
+      // ).filter((telegramId) => telegramId !== null && telegramId !== undefined);
+      // // check if all users in sharedWith array are found
+      // if (sharedWithArray.length !== passwordData.sharedWith.length) {
+      //   throw new HttpException(
+      //     'some users in sharedWith array not found',
+      //     HttpStatus.BAD_REQUEST,
+      //   );
+      // }
       // create password
       const password = await this.createOrUpdatePassword({
         userId: (user as UserDocument)._id as Types.ObjectId,
@@ -202,7 +202,7 @@ export class UsersService {
         description: passwordData.description,
         isActive: true,
         type: passwordData.type,
-        sharedWith: sharedWithArray,
+        sharedWith: passwordData.sharedWith, //sharedWithArray,
         initData: { ...passwordData.initData, authDate },
       });
       // console.log('password', password);
@@ -211,19 +211,20 @@ export class UsersService {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { userId: _, ...passwordWithId } = passwordObj;
 
-      const passwordWithSharedWithUsernames = await Promise.all(
-        passwordWithId.sharedWith.map(async (telegramId) => {
-          const user = await this.userModel.findOne({
-            telegramId,
-            isActive: true,
-          });
-          return user?.username;
-        }),
-      );
-      return {
-        ...passwordWithId,
-        sharedWith: passwordWithSharedWithUsernames,
-      };
+      // const passwordWithSharedWithUsernames = await Promise.all(
+      //   passwordWithId.sharedWith.map(async (telegramId) => {
+      //     const user = await this.userModel.findOne({
+      //       telegramId,
+      //       isActive: true,
+      //     });
+      //     return user?.username;
+      //   }),
+      // );
+      // return {
+      //   ...passwordWithId,
+      //   sharedWith: passwordWithSharedWithUsernames,
+      // };
+      return passwordWithId;
     } catch (error) {
       // console.error('Error creating password:', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);

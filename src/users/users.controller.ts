@@ -147,17 +147,17 @@ export class UsersController {
    * @param req
    * @returns
    */
-  @Get('passwords/shared-with-me')
-  @TelegramDtoAuth()
-  getPasswordsSharedWithMe(@Request() req: Request) {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-    console.log('teleDtoData.telegramId', teleDtoData.telegramId);
-    return this.passwordService.findPasswordsSharedWithMe(
-      teleDtoData.telegramId,
-    );
-  }
+  // @Get('passwords/shared-with-me')
+  // @TelegramDtoAuth()
+  // getPasswordsSharedWithMe(@Request() req: Request) {
+  //   const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+  //     req.headers['x-telegram-init-data'],
+  //   );
+  //   console.log('teleDtoData.telegramId', teleDtoData.telegramId);
+  //   return this.passwordService.findPasswordsSharedWithMe(
+  //     teleDtoData.telegramId,
+  //   );
+  // }
 
   @Get()
   @TelegramDtoAuth()

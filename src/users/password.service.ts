@@ -124,14 +124,16 @@ export class PasswordService {
         })
         .select('sharedWith -_id')
         .exec();
-      const sharedWithUsers = sharedWith.flatMap(
-        (password) => password.sharedWith,
-      );
-      const users = await this.userModel
-        .find({ telegramId: { $in: sharedWithUsers }, isActive: true })
-        .select('username -_id')
-        .exec();
-      return users.map((user) => user.username);
+      // const sharedWithUsers = sharedWith.flatMap(
+      //   (password) => password.sharedWith,
+      // );
+      // const users = await this.userModel
+      //   .find({ telegramId: { $in: sharedWithUsers }, isActive: true })
+      //   .select('username -_id')
+      //   .exec();
+      // return users.map((user) => user.username);
+      // Extract the sharedWith array from each password
+      return sharedWith.length > 0 ? sharedWith[0].sharedWith : [];
     } catch (error) {
       console.log('error', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);

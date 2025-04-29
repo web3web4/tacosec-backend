@@ -206,17 +206,13 @@ export class UsersService {
         initData: { ...passwordData.initData, authDate },
       });
       // console.log('password', password);
-      // Remove _id from the returned object
+      // Get the full password object including _id
+      const passwordObj = (password as PasswordDocument).toObject();
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        userId: _,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _id: __,
-        ...passwordWithoutId
-      } = (password as PasswordDocument).toObject();
+      const { userId: _, ...passwordWithId } = passwordObj;
+
       const passwordWithSharedWithUsernames = await Promise.all(
-        passwordWithoutId.sharedWith.map(async (telegramId) => {
+        passwordWithId.sharedWith.map(async (telegramId) => {
           const user = await this.userModel.findOne({
             telegramId,
             isActive: true,
@@ -225,7 +221,7 @@ export class UsersService {
         }),
       );
       return {
-        ...passwordWithoutId,
+        ...passwordWithId,
         sharedWith: passwordWithSharedWithUsernames,
       };
     } catch (error) {

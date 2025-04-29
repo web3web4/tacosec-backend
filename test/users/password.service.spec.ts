@@ -29,6 +29,10 @@ describe('PasswordService', () => {
     value: 'test_value',
     isActive: true,
     sharedWith: ['789012'],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    type: 'text',
+    description: 'test_description',
   };
 
   beforeEach(async () => {
@@ -111,6 +115,11 @@ describe('PasswordService', () => {
 
       expect(result).toEqual([
         {
+          _id: mockPassword._id,
+          createdAt: mockPassword.createdAt,
+          updatedAt: mockPassword.updatedAt,
+          type: mockPassword.type,
+          description: mockPassword.description,
           key: mockPassword.key,
           value: mockPassword.value,
           sharedWith: ['shareduser'],

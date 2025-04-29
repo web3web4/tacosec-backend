@@ -33,6 +33,8 @@ test:
     - install_dependencies
   script:
     - npm run test
+    - npm run test:integration
+    - npm run test:e2e
   artifacts:
     reports:
       junit: test-results.xml

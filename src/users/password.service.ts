@@ -61,20 +61,20 @@ export class PasswordService {
         .exec();
       const passwordWithSharedWithAsUsernames = await Promise.all(
         passwords.map(async (password) => {
-          const sharedWith = await this.userModel
-            .find({
-              telegramId: { $in: password.sharedWith },
-            })
-            .select('username -_id')
-            .exec();
-          const sharedWithUsernames = sharedWith.map((user) => user.username);
+          // const sharedWith = await this.userModel
+          //   .find({
+          //     telegramId: { $in: password.sharedWith },
+          //   })
+          //   .select('username -_id')
+          //   .exec();
+          //const sharedWithUsernames = sharedWith.map((user) => user.username);
           return {
             _id: password._id,
             key: password.key,
             value: password.value,
             description: password.description,
             type: password.type,
-            sharedWith: sharedWithUsernames,
+            sharedWith: password.sharedWith, // sharedWithUsernames,
             updatedAt: password.updatedAt,
             createdAt: password.createdAt,
           };

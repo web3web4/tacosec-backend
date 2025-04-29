@@ -122,7 +122,7 @@ describe('PasswordService', () => {
           description: mockPassword.description,
           key: mockPassword.key,
           value: mockPassword.value,
-          sharedWith: ['shareduser'],
+          sharedWith: ['789012'],
         },
       ]);
     });

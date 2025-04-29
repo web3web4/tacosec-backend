@@ -1,13 +1,11 @@
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import { AppModule } from '../src/app.module';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Connection } from 'mongoose';
-import { getConnectionToken } from '@nestjs/mongoose';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AppModule } from '../src/app.module';
 
 export async function createTestApp(): Promise<INestApplication> {
-  const moduleRef = await Test.createTestingModule({
+  const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({
         isGlobal: true,
@@ -16,18 +14,11 @@ export async function createTestApp(): Promise<INestApplication> {
       MongooseModule.forRootAsync({
         imports: [ConfigModule],
         useFactory: async (configService: ConfigService) => ({
-          uri: configService.get<string>('MONGODB_URI'),
+          uri:
+            configService.get<string>('MONGODB_URI') ||
+            'mongodb://localhost:27017/taco-test',
           useNewUrlParser: true,
           useUnifiedTopology: true,
-          connectionFactory: (connection) => {
-            connection.on('connected', () => {
-              console.log('Test database connected');
-            });
-            connection.on('disconnected', () => {
-              console.log('Test database disconnected');
-            });
-            return connection;
-          },
         }),
         inject: [ConfigService],
       }),
@@ -35,13 +26,11 @@ export async function createTestApp(): Promise<INestApplication> {
     ],
   }).compile();
 
-  const app = moduleRef.createNestApplication();
+  const app = moduleFixture.createNestApplication();
   await app.init();
   return app;
 }
 
 export async function closeTestApp(app: INestApplication): Promise<void> {
-  const connection = app.get<Connection>(getConnectionToken());
-  await connection.close();
   await app.close();
 }

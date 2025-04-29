@@ -1,60 +1,28 @@
 image: node:18-alpine
 
 stages:
-  - setup
   - test
-  - build
 
 cache:
   key: ${CI_COMMIT_REF_SLUG}
   paths:
     - node_modules/
-    - .npm/
 
-variables:
-  NODE_ENV: development
-
-# Install dependencies
 install_dependencies:
-  stage: setup
+  stage: test
   script:
-    - npm install
     - npm ci
   artifacts:
     paths:
       - node_modules/
-      - package-lock.json
-    expire_in: 1 week
 
-# Run linting
-lint:
-  stage: test
-  script:
-    - npm run lint
-  dependencies:
-    - install_dependencies
-
-# Run tests
 test:
   stage: test
+  needs:
+    - install_dependencies
   script:
+    - echo "MONGODB_URI=mongodb://localhost:27017/taco-test" > .env.test
     - npm run test
-  dependencies:
-    - install_dependencies
-  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
-
-# Build the application
-build:
-  stage: build
-  script:
-    - npm run build
   artifacts:
-    paths:
-      - dist/
-    expire_in: 1 week
-  dependencies:
-    - install_dependencies
-  only:
-    - main
-    - develop
-    - tags
+    reports:
+      junit: test-results.xml

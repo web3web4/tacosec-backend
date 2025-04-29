@@ -11,17 +11,18 @@ cache:
 install_dependencies:
   stage: test
   script:
-    - npm ci
+    - npm install
+    - echo "MONGODB_URI=mongodb://localhost:27017/taco-test" > .env.test
   artifacts:
     paths:
       - node_modules/
+      - package-lock.json
 
 test:
   stage: test
   needs:
     - install_dependencies
   script:
-    - echo "MONGODB_URI=mongodb://localhost:27017/taco-test" > .env.test
     - npm run test
   artifacts:
     reports:

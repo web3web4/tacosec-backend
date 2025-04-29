@@ -5,5 +5,12 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  }
+  },
+  "setupFilesAfterEnv": ["<rootDir>/setup.ts"],
+  "globalSetup": "<rootDir>/setup.ts",
+  "globalTeardown": "<rootDir>/teardown.ts",
+  "testTimeout": 30000,
+  "verbose": true,
+  "forceExit": true,
+  "detectOpenHandles": true
 }

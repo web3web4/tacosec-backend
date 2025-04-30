@@ -11,10 +11,13 @@ import {
 import { PaginationParams } from '../../src/users/interfaces/pagination.interface';
 import { TelegramInitDto } from '../../src/users/dto/telegram-init.dto';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { of } from 'rxjs';
 
 describe('UsersService', () => {
   let service: UsersService;
   let userModel: Model<UserDocument>;
+  let module: TestingModule;
   // let passwordService: PasswordService;
   // let passwordModel: Model<PasswordDocument>;
 
@@ -46,7 +49,7 @@ describe('UsersService', () => {
   };
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         UsersService,
         PasswordService,
@@ -80,6 +83,12 @@ describe('UsersService', () => {
             findOne: jest.fn(),
             find: jest.fn(),
             save: jest.fn(),
+          },
+        },
+        {
+          provide: HttpService,
+          useValue: {
+            get: jest.fn(() => of({ data: '<html>Telegram profile</html>' })),
           },
         },
       ],
@@ -214,6 +223,18 @@ describe('UsersService', () => {
       ).rejects.toThrow(
         new HttpException('invalid telegramId', HttpStatus.BAD_REQUEST),
       );
+    });
+  });
+
+  describe('getTelegramProfile', () => {
+    it('should return telegram profile data', async () => {
+      const mockHttpResponse = { data: '<html>Telegram profile</html>' };
+      const httpService = module.get<HttpService>(HttpService);
+      jest.spyOn(httpService, 'get').mockReturnValue(of(mockHttpResponse));
+
+      const result = await service.getTelegramProfile('johndoe');
+      expect(result).toEqual(mockHttpResponse.data);
+      expect(httpService.get).toHaveBeenCalledWith('https://t.me/johndoe');
     });
   });
 });

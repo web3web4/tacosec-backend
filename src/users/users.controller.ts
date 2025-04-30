@@ -24,6 +24,7 @@ import { Roles } from './decorators/roles.decorator';
 import { Role } from './enums/role.enum';
 import { Pagination } from './decorators/pagination.decorator';
 import { PaginationParams } from './interfaces/pagination.interface';
+import { GetTelegramProfileDto } from './dto/get-telegram-profile.dto';
 
 @Controller('users')
 export class UsersController {
@@ -140,6 +141,11 @@ export class UsersController {
       teleDtoData.telegramId,
       body.key,
     );
+  }
+
+  @Get('telegram/profile')
+  getTelegramProfile(@Query() query: GetTelegramProfileDto) {
+    return this.usersService.getTelegramProfile(query.username);
   }
 
   @Patch('passwords/:id')

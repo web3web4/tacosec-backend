@@ -1,4 +1,9 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  HttpException,
+  HttpStatus,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
@@ -7,6 +12,8 @@ import { TelegramInitDto } from './dto/telegram-init.dto';
 import { Password, PasswordDocument } from './schemas/password.schema';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { PaginationParams } from './interfaces/pagination.interface';
+import { HttpService } from '@nestjs/axios';
+import { lastValueFrom } from 'rxjs';
 
 @Injectable()
 export class UsersService {
@@ -14,6 +21,7 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private passwordService: PasswordService,
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
+    private readonly httpService: HttpService,
   ) {}
 
   async createAndUpdateUser(telegramInitDto: TelegramInitDto): Promise<User> {
@@ -258,5 +266,16 @@ export class UsersService {
 
     // return current date as default value
     return new Date();
+  }
+
+  async getTelegramProfile(username: string): Promise<string> {
+    try {
+      const response = await lastValueFrom(
+        this.httpService.get(`https://t.me/${username}`),
+      );
+      return response.data;
+    } catch (error) {
+      throw new InternalServerErrorException(error.message);
+    }
   }
 }

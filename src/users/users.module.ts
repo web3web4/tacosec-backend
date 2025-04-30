@@ -9,6 +9,7 @@ import { TelegramValidatorService } from './telegram-validator.service';
 import { TelegramAuthGuard } from './guards/telegram-auth.guard';
 import { TelegramDtoAuthGuard } from './guards/telegram-dto-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { RolesGuard } from './guards/roles.guard';
       { name: User.name, schema: UserSchema },
       { name: Password.name, schema: PasswordSchema },
     ]),
+    HttpModule,
   ],
   controllers: [UsersController],
   providers: [

@@ -13,6 +13,7 @@ import { TelegramInitDto } from '../../src/users/dto/telegram-init.dto';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { of } from 'rxjs';
+import { AxiosResponse } from 'axios';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -88,7 +89,13 @@ describe('UsersService', () => {
         {
           provide: HttpService,
           useValue: {
-            get: jest.fn(() => of({ data: '<html>Telegram profile</html>' })),
+            get: jest.fn(() => of({
+              data: '<html>Telegram profile</html>',
+              status: 200,
+              statusText: 'OK',
+              headers: {},
+              config: { url: 'https://t.me/johndoe' } as any
+            })),
           },
         },
       ],
@@ -228,7 +235,13 @@ describe('UsersService', () => {
 
   describe('getTelegramProfile', () => {
     it('should return telegram profile data', async () => {
-      const mockHttpResponse = { data: '<html>Telegram profile</html>' };
+      const mockHttpResponse: AxiosResponse = {
+        data: '<html>Telegram profile</html>',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: { url: 'https://t.me/johndoe' } as any
+      };
       const httpService = module.get<HttpService>(HttpService);
       jest.spyOn(httpService, 'get').mockReturnValue(of(mockHttpResponse));
 

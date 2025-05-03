@@ -4,10 +4,20 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { TelegramValidatorService } from '../telegram-validator.service';
 import { Request } from 'express';
-import { TelegramInitDto } from '../dto/telegram-init.dto';
-import { TelegramUser } from '../interfaces/telegram-user-init-data.interface';
+import { TelegramInitDto } from './telegram-init.dto';
+import { TelegramValidatorService } from '../telegram-validator.service';
+
+export interface TelegramUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date?: number;
+  hash?: string;
+}
+
 @Injectable()
 export class TelegramDtoAuthGuard implements CanActivate {
   constructor(private telegramValidator: TelegramValidatorService) {}
@@ -66,8 +76,6 @@ export class TelegramDtoAuthGuard implements CanActivate {
             return true;
           }
         }
-
-        // return true;
       } else {
         console.log('Raw Telegram data is invalid');
         throw new UnauthorizedException('Invalid Telegram data');

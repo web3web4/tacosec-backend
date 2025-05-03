@@ -1,12 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PasswordService } from '../../src/users/password.service';
+import { PasswordService } from '../../src/passwords/password.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../src/users/schemas/user.schema';
 import {
   Password,
   PasswordDocument,
-} from '../../src/users/schemas/password.schema';
+} from '../../src/passwords/schemas/password.schema';
 import { HttpException, HttpStatus } from '@nestjs/common';
 
 describe('PasswordService', () => {

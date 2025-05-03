@@ -4,19 +4,14 @@ import {
   IsBoolean,
   IsEnum,
   IsArray,
-  IsMongoId,
   ValidateNested,
 } from 'class-validator';
 import { Type as TransformType } from 'class-transformer';
-import { Types } from 'mongoose';
-import { TelegramInitDto } from './telegram-init.dto';
+import { TelegramInitDto } from '../../telegram/dto/telegram-init.dto';
 import { Type } from '../enums/type.enum';
 
-// For internal use with the complete model
-export class CreatePasswordDto {
-  @IsMongoId()
-  userId: Types.ObjectId;
-
+// For use in the controller to receive only the necessary fields from the request
+export class CreatePasswordRequestDto {
   @IsString()
   key: string;
 
@@ -41,4 +36,8 @@ export class CreatePasswordDto {
   @ValidateNested()
   @TransformType(() => TelegramInitDto)
   initData: TelegramInitDto;
+
+  @IsString()
+  @IsOptional()
+  initDataRaw?: string;
 }

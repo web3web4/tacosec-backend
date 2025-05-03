@@ -7,11 +7,13 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
-import { PasswordService } from './password.service';
-import { TelegramInitDto } from './dto/telegram-init.dto';
-import { Password, PasswordDocument } from './schemas/password.schema';
-import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
-import { PaginationParams } from './interfaces/pagination.interface';
+import { PasswordService } from '../passwords/password.service';
+import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
+import {
+  Password,
+  PasswordDocument,
+} from '../passwords/schemas/password.schema';
+import { PaginationParams } from '../decorators/pagination.decorator';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
 
@@ -154,128 +156,16 @@ export class UsersService {
       .exec();
   }
 
-  async addPassword(passwordData: CreatePasswordRequestDto) {
-    try {
-      // get user by telegramId
-      const user = await this.userModel
-        .findOne({
-          telegramId: passwordData.initData.telegramId,
-          isActive: true,
-        })
-        .exec();
-
-      if (!user) {
-        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-      }
-      // check if user is sharing password with himself
-      // if (passwordData.sharedWith.includes(user.username)) {
-      //   throw new HttpException(
-      //     'User cannot share password with himself',
-      //     HttpStatus.BAD_REQUEST,
-      //   );
-      // }
-      // get valid auth date
-      const authDate = this.getValidAuthDate(passwordData.initData.authDate);
-      // get shared with array
-      // const sharedWithArray = (
-      //   await Promise.all(
-      //     passwordData.sharedWith.map(async (username) => {
-      //       const user = await this.userModel
-      //         .findOne({
-      //           username,
-      //           isActive: true,
-      //           // telegramId: { $ne: passwordData.initData.telegramId },
-      //         })
-      //         .select('telegramId -_id')
-      //         .exec();
-      //       if (user) {
-      //         return user.telegramId;
-      //       }
-      //       return null;
-      //     }),
-      //   )
-      // ).filter((telegramId) => telegramId !== null && telegramId !== undefined);
-      // // check if all users in sharedWith array are found
-      // if (sharedWithArray.length !== passwordData.sharedWith.length) {
-      //   throw new HttpException(
-      //     'some users in sharedWith array not found',
-      //     HttpStatus.BAD_REQUEST,
-      //   );
-      // }
-      // create password
-      const password = await this.createOrUpdatePassword({
-        userId: (user as UserDocument)._id as Types.ObjectId,
-        key: passwordData.key,
-        value: passwordData.value,
-        description: passwordData.description,
-        isActive: true,
-        type: passwordData.type,
-        sharedWith: passwordData.sharedWith, //sharedWithArray,
-        initData: { ...passwordData.initData, authDate },
-      });
-      // console.log('password', password);
-      // Get the full password object including _id
-      const passwordObj = (password as PasswordDocument).toObject();
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { userId: _, ...passwordWithId } = passwordObj;
-
-      // const passwordWithSharedWithUsernames = await Promise.all(
-      //   passwordWithId.sharedWith.map(async (telegramId) => {
-      //     const user = await this.userModel.findOne({
-      //       telegramId,
-      //       isActive: true,
-      //     });
-      //     return user?.username;
-      //   }),
-      // );
-      // return {
-      //   ...passwordWithId,
-      //   sharedWith: passwordWithSharedWithUsernames,
-      // };
-      return passwordWithId;
-    } catch (error) {
-      // console.error('Error creating password:', error);
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-    }
-  }
-
-  private getValidAuthDate(authDateInput: any): Date {
-    // check if input is number (timestamp)
-    if (typeof authDateInput === 'number') {
-      return new Date(authDateInput * 1000); // convert timestamp to milliseconds
-    }
-
-    // check if input is string and try to convert it to number
-    if (typeof authDateInput === 'string') {
-      const timestamp = parseInt(authDateInput, 10);
-      if (!isNaN(timestamp)) {
-        return new Date(timestamp * 1000);
-      }
-
-      // try to convert string directly to date
-      const date = new Date(authDateInput);
-      if (!isNaN(date.getTime())) {
-        return date;
-      }
-    }
-
-    // if input is date and valid
-    if (authDateInput instanceof Date && !isNaN(authDateInput.getTime())) {
-      return authDateInput;
-    }
-
-    // return current date as default value
-    return new Date();
-  }
-
   async getTelegramProfile(username: string): Promise<string> {
     try {
-      const response = await lastValueFrom(
+      const profile = await lastValueFrom(
         this.httpService.get(`https://t.me/${username}`),
       );
-      return response.data;
+      return profile.data;
     } catch (error) {
-      throw new InternalServerErrorException(error.message);
+      throw new InternalServerErrorException(
+        error.response?.data || error.message,
+      );
     }
   }
 }

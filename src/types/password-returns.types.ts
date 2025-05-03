@@ -1,4 +1,4 @@
-import { Type } from '../users/enums/type.enum';
+import { Type } from '../passwords/enums/type.enum';
 export type passwordReturns = {
   key: string;
   value: string;

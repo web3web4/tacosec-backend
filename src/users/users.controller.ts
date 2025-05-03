@@ -6,24 +6,20 @@ import {
   Patch,
   Param,
   Delete,
-  HttpException,
-  HttpStatus,
   Query,
   Request,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { PasswordService } from './password.service';
-import { Types } from 'mongoose';
-import { TelegramInitDto } from './dto/telegram-init.dto';
-import { VerifyPasswordData } from './interfaces/verify-password.interface';
-import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
-import { TelegramAuth } from './decorators/telegram-auth.decorator';
-import { TelegramDtoAuth } from './decorators/telegram-dto-auth.decorator';
-import { TelegramDtoAuthGuard } from './guards/telegram-dto-auth.guard';
-import { Roles } from './decorators/roles.decorator';
-import { Role } from './enums/role.enum';
-import { Pagination } from './decorators/pagination.decorator';
-import { PaginationParams } from './interfaces/pagination.interface';
+import { PasswordService } from '../passwords/password.service';
+import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
+import { TelegramAuth } from '../decorators/telegram-auth.decorator';
+import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
+import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
+import { Roles, Role } from '../decorators/roles.decorator';
+import {
+  Pagination,
+  PaginationParams,
+} from '../decorators/pagination.decorator';
 import { GetTelegramProfileDto } from './dto/get-telegram-profile.dto';
 
 @Controller('users')
@@ -73,106 +69,10 @@ export class UsersController {
     return this.usersService.createAndUpdateUser(createUserDto);
   }
 
-  /**
-   * Create a new password
-   * Requires Telegram init data for authentication
-   * You can send raw Telegram init data in one of the following ways:
-   * 1. In header: X-Telegram-Init-Data
-   * 2. In body: initDataRaw
-   * 3. In query parameter: tgInitData
-   */
-  @Post('/passwords-initData')
-  // @TelegramAuth()
-  @TelegramDtoAuth()
-  createPasswordInitData(@Body() createPasswordDto: CreatePasswordRequestDto) {
-    return this.usersService.addPassword(createPasswordDto);
-  }
-
-  /**
-   * Alternative way to create a new password using structured DTO
-   * The authentication is done by validating the hash in the initData against the TELEGRAM_BOT_TOKEN
-   *
-   * Example of usage:
-   * POST /users/passwords-dto
-   * {
-   *   "key": "my_password",
-   *   "value": "secure_password",
-   *   "type": "CREDENTIALS",
-   *   "initData": {
-   *     "telegramId": "123456789",
-   *     "authDate": 1619493727,
-   *     "hash": "fa92cf66f6a65f793fe5c18ad2e8c68b62ef9a7e68956d361f8364a4895a7eb8"
-   *   }
-   * }
-   */
-  @Post('/passwords')
-  @TelegramDtoAuth()
-  createPasswordDto(@Body() createPasswordDto: CreatePasswordRequestDto) {
-    return this.usersService.addPassword(createPasswordDto);
-  }
-
-  // @Post('/passwords-without-auth')
-  // createPasswordWithoutAuth(
-  //   @Body() createPasswordDto: CreatePasswordRequestDto,
-  // ) {
-  //   return this.usersService.addPassword(createPasswordDto);
-  // }
-  @Get('passwords')
-  @TelegramDtoAuth()
-  getUserPasswords(@Request() req: Request) {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-    return this.passwordService.findByUserTelegramId(teleDtoData.telegramId);
-  }
-
-  /**
-   * Get all users who
-   * @param req
-   * @returns
-   */
-  @Get('passwords/shared-with')
-  @TelegramDtoAuth()
-  getUserBySharedWith(@Request() req: Request, @Body() body: { key: string }) {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-    return this.passwordService.findSharedWithByTelegramId(
-      teleDtoData.telegramId,
-      body.key,
-    );
-  }
-
   @Get('telegram/profile')
   getTelegramProfile(@Query() query: GetTelegramProfileDto) {
     return this.usersService.getTelegramProfile(query.username);
   }
-
-  @Patch('passwords/:id')
-  @TelegramDtoAuth()
-  updatePassword(
-    @Param('id') id: string,
-    @Body() body: { sharedWith: string[] },
-  ) {
-    return this.passwordService.findByIdAndUpdate(id, body);
-  }
-
-  /**
-   * Get all passwords shared with the user
-   * @param req
-   * @returns
-   */
-  // @Get('passwords/shared-with-me')
-  // @TelegramDtoAuth()
-  // getPasswordsSharedWithMe(@Request() req: Request) {
-  //   const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-  //     req.headers['x-telegram-init-data'],
-  //   );
-  //   console.log('teleDtoData.telegramId', teleDtoData.telegramId);
-  //   return this.passwordService.findPasswordsSharedWithMe(
-  //     teleDtoData.telegramId,
-  //   );
-  // }
 
   @Get()
   @TelegramDtoAuth()
@@ -214,40 +114,11 @@ export class UsersController {
     return this.usersService.findByTelegramId(telegramId);
   }
 
-  @Post(':id/passwords/verify')
-  @TelegramDtoAuth()
-  async verifyPassword(
-    @Param('id') userId: string,
-    @Body() verifyData: VerifyPasswordData,
-  ) {
-    const password = await this.passwordService.findByUserId(
-      new Types.ObjectId(userId),
-    );
-    const targetPassword = password.find(
-      (p) => p._id.toString() === verifyData.passwordId,
-    );
-
-    if (!targetPassword) {
-      throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
-    }
-
-    const hashedPassword = targetPassword.value;
-
-    if (!hashedPassword) {
-      throw new HttpException('Password type not found', HttpStatus.NOT_FOUND);
-    }
-
-    const isValid = await this.passwordService.verifyPassword(
-      hashedPassword,
-      verifyData.password,
-    );
-
-    return { isValid };
-  }
-
   @Get('search')
   @TelegramDtoAuth()
   async findAllByQuery(@Query('query') query: string) {
-    return this.usersService.findByQuery(JSON.parse(query));
+    return this.usersService.findByQuery({
+      username: { $regex: query, $options: 'i' },
+    });
   }
 }

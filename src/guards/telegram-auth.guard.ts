@@ -4,8 +4,8 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { TelegramValidatorService } from '../telegram-validator.service';
 import { Request } from 'express';
+import { TelegramValidatorService } from '../telegram/telegram-validator.service';
 
 @Injectable()
 export class TelegramAuthGuard implements CanActivate {

@@ -2,30 +2,18 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Password, PasswordDocument } from './schemas/password.schema';
-import { User, UserDocument } from './schemas/user.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import * as bcrypt from 'bcrypt';
 import { SharedWithMeResponse } from '../types/share-with-me-pass.types';
 import { passwordReturns } from '../types/password-returns.types';
+import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
+
 @Injectable()
 export class PasswordService {
   constructor(
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
-
-  // async create(createPasswordDto: CreatePasswordDto): Promise<Password> {
-  //   // const { value, ...rest } = createPasswordDto;
-  //   const { ...rest } = createPasswordDto;
-  //   const hashedData: Partial<Password> = { ...rest };
-  //   hashedData.isActive = true;
-
-  //   // if (value) {
-  //   //   hashedData.value = await this.hashPassword(value);
-  //   // }
-
-  //   const createdPassword = new this.passwordModel(hashedData);
-  //   return createdPassword.save();
-  // }
 
   private async hashPassword(password: string): Promise<string> {
     const salt = await bcrypt.genSalt();
@@ -61,20 +49,13 @@ export class PasswordService {
         .exec();
       const passwordWithSharedWithAsUsernames = await Promise.all(
         passwords.map(async (password) => {
-          // const sharedWith = await this.userModel
-          //   .find({
-          //     telegramId: { $in: password.sharedWith },
-          //   })
-          //   .select('username -_id')
-          //   .exec();
-          //const sharedWithUsernames = sharedWith.map((user) => user.username);
           return {
             _id: password._id,
             key: password.key,
             value: password.value,
             description: password.description,
             type: password.type,
-            sharedWith: password.sharedWith, // sharedWithUsernames,
+            sharedWith: password.sharedWith,
             updatedAt: password.updatedAt,
             createdAt: password.createdAt,
           };
@@ -86,7 +67,6 @@ export class PasswordService {
       );
       return passwordWithSharedWithAsUsernames;
     } catch (error) {
-      // console.log('error', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -124,15 +104,6 @@ export class PasswordService {
         })
         .select('sharedWith -_id')
         .exec();
-      // const sharedWithUsers = sharedWith.flatMap(
-      //   (password) => password.sharedWith,
-      // );
-      // const users = await this.userModel
-      //   .find({ telegramId: { $in: sharedWithUsers }, isActive: true })
-      //   .select('username -_id')
-      //   .exec();
-      // return users.map((user) => user.username);
-      // Extract the sharedWith array from each password
       return sharedWith.length > 0 ? sharedWith[0].sharedWith : [];
     } catch (error) {
       console.log('error', error);
@@ -154,7 +125,6 @@ export class PasswordService {
       if (!user) {
         throw new Error('telegramId is not valid');
       }
-      // console.log('user', user);
       const sharedWithMe = await this.getSharedWithMe(user.telegramId);
       return sharedWithMe;
     } catch (error) {
@@ -168,7 +138,6 @@ export class PasswordService {
       if (!telegramId) {
         throw new Error('Telegram ID is required');
       }
-      // get shared passwords with me
       const sharedPasswords = await this.passwordModel
         .find({
           sharedWith: { $in: [telegramId] },
@@ -177,12 +146,10 @@ export class PasswordService {
         .select('key value initData.telegramId -_id')
         .lean()
         .exec();
-      // console.log('sharedPasswords', sharedPasswords);
       if (!sharedPasswords?.length) {
-        return { sharedWithMe: [], userCount: 0 }; // return empty array if no results
+        return { sharedWithMe: [], userCount: 0 };
       }
 
-      // 1. resolve passwords with usernames
       const resolvedPasswords = await Promise.all(
         sharedPasswords.map(async (password) => {
           const user = await this.userModel.findOne({
@@ -190,16 +157,14 @@ export class PasswordService {
             isActive: true,
           });
 
-          // return password with username
           return {
             key: password.key,
             value: password.value,
-            username: user?.username || 'unknown', // handle empty values
+            username: user?.username || 'unknown',
           } as { key: string; value: string; username: string };
         }),
       );
 
-      // 2. fix type of reduce
       const groupedByOwner = resolvedPasswords.reduce(
         (
           acc: Record<string, Array<{ key: string; value: string }>>,
@@ -223,21 +188,18 @@ export class PasswordService {
         {},
       );
 
-      // 3. convert object to array with filter for unknown owners
       const result = Object.entries(groupedByOwner)
-        .filter(([username]) => username !== 'unknown') // exclude unknown owners
+        .filter(([username]) => username !== 'unknown')
         .map(([username, passwords]) => ({
           username,
           passwords,
-          count: passwords.length, // add number of passwords for each owner
+          count: passwords.length,
         }));
 
-      // 4. sort results by number of passwords (descending)
       result.sort((a, b) => b.count - a.count);
 
       return { sharedWithMe: result, userCount: result.length };
     } catch (error) {
-      // console.log('error', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -257,7 +219,6 @@ export class PasswordService {
   ): Promise<Password> {
     return this.passwordModel
       .findByIdAndUpdate(id, update, { new: true })
-      .select('key value description type sharedWith ')
       .exec();
   }
 
@@ -273,24 +234,30 @@ export class PasswordService {
     id: string,
     updatePasswordDto: Partial<Password>,
   ): Promise<Password> {
-    // const { value, ...rest } = updatePasswordDto;
-    const { ...rest } = updatePasswordDto;
-    const updateData: Partial<Password> = { ...rest };
-    updateData.isActive = true;
-
-    // if (value) {
-    //   updateData.value = await this.hashPassword(value);
-    // }
-
-    return this.passwordModel
-      .findByIdAndUpdate(id, updateData, { new: true })
-      .exec();
+    try {
+      const password = await this.passwordModel.findById(id).exec();
+      if (!password) {
+        throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+      }
+      const updatedPassword = await this.passwordModel
+        .findByIdAndUpdate(id, updatePasswordDto, { new: true })
+        .exec();
+      return updatedPassword;
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 
   async delete(id: string): Promise<Password> {
-    return this.passwordModel
-      .findByIdAndUpdate(id, { isActive: false }, { new: true })
-      .exec();
+    try {
+      const password = await this.findByIdAndDelete(id);
+      if (!password) {
+        throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+      }
+      return password;
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 
   async verifyPassword(
@@ -298,5 +265,91 @@ export class PasswordService {
     plainPassword: string,
   ): Promise<boolean> {
     return bcrypt.compare(plainPassword, hashedPassword);
+  }
+
+  async createOrUpdatePassword(
+    passwordData: Partial<Password>,
+  ): Promise<Password> {
+    const existingPassword = await this.findOne({
+      userId: passwordData.userId,
+      key: passwordData.key,
+    });
+    if (existingPassword) {
+      return this.findByIdAndUpdate(
+        existingPassword._id.toString(),
+        passwordData,
+      );
+    }
+    const newPassword = new this.passwordModel(passwordData);
+    return newPassword.save();
+  }
+
+  // Moved from UsersService
+  async addPassword(passwordData: CreatePasswordRequestDto) {
+    try {
+      // get user by telegramId
+      const user = await this.userModel
+        .findOne({
+          telegramId: passwordData.initData.telegramId,
+          isActive: true,
+        })
+        .exec();
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // get valid auth date
+      const authDate = this.getValidAuthDate(passwordData.initData.authDate);
+
+      // create password
+      const password = await this.createOrUpdatePassword({
+        userId: (user as UserDocument)._id as Types.ObjectId,
+        key: passwordData.key,
+        value: passwordData.value,
+        description: passwordData.description,
+        isActive: true,
+        type: passwordData.type,
+        sharedWith: passwordData.sharedWith,
+        initData: { ...passwordData.initData, authDate },
+      });
+
+      // Get the full password object including _id
+      const passwordObj = (password as PasswordDocument).toObject();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { userId: _, ...passwordWithId } = passwordObj;
+
+      return passwordWithId;
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  private getValidAuthDate(authDateInput: any): Date {
+    // check if input is number (timestamp)
+    if (typeof authDateInput === 'number') {
+      return new Date(authDateInput * 1000); // convert timestamp to milliseconds
+    }
+
+    // check if input is string and try to convert it to number
+    if (typeof authDateInput === 'string') {
+      const timestamp = parseInt(authDateInput, 10);
+      if (!isNaN(timestamp)) {
+        return new Date(timestamp * 1000);
+      }
+      // try to parse as date string directly
+      const date = new Date(authDateInput);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+
+    // if authDateInput is already a Date object
+    if (authDateInput instanceof Date) {
+      return authDateInput;
+    }
+
+    // fallback to current date
+    return new Date();
   }
 }

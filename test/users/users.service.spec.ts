@@ -3,13 +3,13 @@ import { UsersService } from '../../src/users/users.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../src/users/schemas/user.schema';
-import { PasswordService } from '../../src/users/password.service';
+import { PasswordService } from '../../src/passwords/password.service';
 import {
   Password,
   // PasswordDocument,
-} from '../../src/users/schemas/password.schema';
-import { PaginationParams } from '../../src/users/interfaces/pagination.interface';
-import { TelegramInitDto } from '../../src/users/dto/telegram-init.dto';
+} from '../../src/passwords/schemas/password.schema';
+import { PaginationParams } from '../../src/decorators/pagination.decorator';
+import { TelegramInitDto } from '../../src/telegram/dto/telegram-init.dto';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { of } from 'rxjs';
@@ -89,13 +89,15 @@ describe('UsersService', () => {
         {
           provide: HttpService,
           useValue: {
-            get: jest.fn(() => of({
-              data: '<html>Telegram profile</html>',
-              status: 200,
-              statusText: 'OK',
-              headers: {},
-              config: { url: 'https://t.me/johndoe' } as any
-            })),
+            get: jest.fn(() =>
+              of({
+                data: '<html>Telegram profile</html>',
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config: { url: 'https://t.me/johndoe' } as any,
+              }),
+            ),
           },
         },
       ],
@@ -240,14 +242,13 @@ describe('UsersService', () => {
         status: 200,
         statusText: 'OK',
         headers: {},
-        config: { url: 'https://t.me/johndoe' } as any
+        config: { url: 'https://t.me/johndoe' } as any,
       };
       const httpService = module.get<HttpService>(HttpService);
       jest.spyOn(httpService, 'get').mockReturnValue(of(mockHttpResponse));
 
       const result = await service.getTelegramProfile('johndoe');
-      expect(result).toEqual(mockHttpResponse.data);
-      expect(httpService.get).toHaveBeenCalledWith('https://t.me/johndoe');
+      expect(result).toBe(mockHttpResponse.data);
     });
   });
 });

@@ -1,6 +1,7 @@
 export type SharedPassword = {
   key: string;
   value: string;
+  description: string;
 };
 
 export type OwnerPasswords = {

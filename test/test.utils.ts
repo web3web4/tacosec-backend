@@ -1,5 +1,6 @@
 import { getConnectionToken } from '@nestjs/mongoose';
 import { INestApplication } from '@nestjs/common';
+import * as mongoose from 'mongoose';
 
 export async function clearDatabase(app: INestApplication): Promise<void> {
   try {
@@ -9,12 +10,17 @@ export async function clearDatabase(app: INestApplication): Promise<void> {
     }
 
     const connection = app.get(getConnectionToken());
-    const collections = connection.collections;
+    if (!connection) {
+      console.warn('Database connection not found');
+      return;
+    }
 
+    const collections = connection.collections;
     for (const key in collections) {
       const collection = collections[key];
       await collection.deleteMany({});
     }
+    console.log('Database cleared successfully');
   } catch (error) {
     console.error('Error clearing database:', error);
     // Don't throw, allow tests to continue
@@ -36,6 +42,7 @@ export async function closeDatabaseConnection(
     if (connection && connection.readyState === 1) {
       // 1 = connected
       await connection.close();
+      console.log('Database connection closed successfully');
     }
   } catch (error) {
     console.error('Error closing database connection:', error);
@@ -44,12 +51,39 @@ export async function closeDatabaseConnection(
 }
 
 export async function setupTestDatabase(): Promise<void> {
-  // Add any additional test database setup here
-  // For example, creating indexes or setting up test data
-  console.log('Setting up test database...');
+  try {
+    // Make sure any existing connections are closed
+    await mongoose.disconnect();
+    
+    // Connect to the test database if not already connected
+    if (mongoose.connection.readyState !== 1) {
+      const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/taco-test';
+      await mongoose.connect(uri);
+      console.log(`Connected to test database: ${uri}`);
+    }
+    
+    // Clear all collections
+    const collections = mongoose.connection.collections;
+    for (const key in collections) {
+      await collections[key].deleteMany({});
+    }
+    
+    console.log('Test database setup complete');
+  } catch (error) {
+    console.error('Error setting up test database:', error);
+    throw error; // Fail test setup if database connection fails
+  }
 }
 
 export async function teardownTestDatabase(): Promise<void> {
-  // Add any additional test database cleanup here
-  console.log('Tearing down test database...');
+  try {
+    // Close any open MongoDB connections
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close();
+      console.log('Test database connection closed');
+    }
+  } catch (error) {
+    console.error('Error tearing down test database:', error);
+    throw error;
+  }
 }

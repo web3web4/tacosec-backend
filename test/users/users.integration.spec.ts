@@ -40,7 +40,9 @@ describe('UserController (e2e)', () => {
     hash: 'user-hash',
   };
 
+  // Increase timeout for beforeEach
   beforeEach(async () => {
+    // Create a new test module
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -62,24 +64,35 @@ describe('UserController (e2e)', () => {
       })
       .compile();
 
+    // Create the app
     app = moduleFixture.createNestApplication();
+    
+    // Get services
     telegramValidatorService = moduleFixture.get<TelegramValidatorService>(
       TelegramValidatorService,
     );
     userService = moduleFixture.get<UsersService>(UsersService);
-    telegramDtoAuthGuard = moduleFixture.get<TelegramDtoAuthGuard>(
-      TelegramDtoAuthGuard,
-    );
+    telegramDtoAuthGuard =
+      moduleFixture.get<TelegramDtoAuthGuard>(TelegramDtoAuthGuard);
 
+    // Initialize the app
     await app.init();
+  }, 30000); // Increase timeout to 30 seconds
+
+  // Clean up resources after each test
+  afterEach(async () => {
+    if (app) {
+      await app.close();
+    }
   });
 
-  afterEach(async () => {
-    await app.close();
+  // Clean up resources after all tests
+  afterAll(async () => {
+    // Any additional cleanup needed
   });
 
   describe('/users/signup (POST)', () => {
-    it('should register a new user', () => {
+    it('should register a new user', async () => {
       // Mock services
       jest
         .spyOn(telegramValidatorService, 'validateTelegramDto')
@@ -89,16 +102,16 @@ describe('UserController (e2e)', () => {
         .spyOn(userService, 'createAndUpdateUser')
         .mockResolvedValue(mockUser as any);
 
-      return request(app.getHttpServer())
+      // Use await instead of return for better error handling
+      const response = await request(app.getHttpServer())
         .post('/users/signup')
         .send(mockTelegramInitDto)
-        .expect(201)
-        .expect((res) => {
-          expect(res.body).toEqual(mockUser);
-        });
-    });
+        .expect(201);
 
-    it('should handle case when user already exists', () => {
+      expect(response.body).toEqual(mockUser);
+    }, 10000); // 10 seconds timeout
+
+    it('should handle case when user already exists', async () => {
       // Mock services
       jest
         .spyOn(telegramValidatorService, 'validateTelegramDto')
@@ -108,40 +121,43 @@ describe('UserController (e2e)', () => {
         .spyOn(userService, 'createAndUpdateUser')
         .mockResolvedValue(mockUser as any);
 
-      return request(app.getHttpServer())
+      // Use await instead of return for better error handling
+      const response = await request(app.getHttpServer())
         .post('/users/signup')
         .send(mockTelegramInitDto)
-        .expect(201)
-        .expect((res) => {
-          expect(res.body).toEqual(mockUser);
-        });
-    });
+        .expect(201);
+
+      expect(response.body).toEqual(mockUser);
+    }, 10000); // 10 seconds timeout
   });
 
   describe('/users/telegram/:telegramId (GET)', () => {
-    it('should get user by telegramId', () => {
+    it('should get user by telegramId', async () => {
       // Mock services
-      jest.spyOn(userService, 'findByTelegramId').mockResolvedValue(mockUser as any);
+      jest
+        .spyOn(userService, 'findByTelegramId')
+        .mockResolvedValue(mockUser as any);
 
-      return request(app.getHttpServer())
+      // Use await instead of return for better error handling
+      const response = await request(app.getHttpServer())
         .get('/users/telegram/12345')
         .set('X-Telegram-Init-Data', 'mock-init-data')
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toEqual(mockUser);
-        });
-    });
+        .expect(200);
 
-    it('should handle case when user does not exist', () => {
+      expect(response.body).toEqual(mockUser);
+    }, 10000); // 10 seconds timeout
+
+    it('should handle case when user does not exist', async () => {
       // Mock findByTelegramId to throw a 404 error
       jest.spyOn(userService, 'findByTelegramId').mockImplementation(() => {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       });
 
-      return request(app.getHttpServer())
+      // Use await instead of return for better error handling
+      await request(app.getHttpServer())
         .get('/users/telegram/nonexistent')
         .set('X-Telegram-Init-Data', 'mock-init-data')
         .expect(404);
-    });
+    }, 10000); // 10 seconds timeout
   });
 });

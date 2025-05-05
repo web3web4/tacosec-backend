@@ -16,6 +16,7 @@ import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
 import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
 import { Types } from 'mongoose';
 import { VerifyPasswordData } from './interfaces/verify-password.interface';
+import { Password } from './schemas/password.schema';
 
 @Controller('passwords')
 export class PasswordController {
@@ -53,10 +54,7 @@ export class PasswordController {
 
   @Patch(':id')
   @TelegramDtoAuth()
-  updatePassword(
-    @Param('id') id: string,
-    @Body() body: { sharedWith: string[] },
-  ) {
+  updatePassword(@Param('id') id: string, @Body() body: Partial<Password>) {
     return this.passwordService.findByIdAndUpdate(id, body);
   }
 
@@ -66,9 +64,7 @@ export class PasswordController {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],
     );
-    return this.passwordService.findPasswordsSharedWithMe(
-      teleDtoData.telegramId,
-    );
+    return this.passwordService.findPasswordsSharedWithMe(teleDtoData.username);
   }
 
   @Delete(':id')

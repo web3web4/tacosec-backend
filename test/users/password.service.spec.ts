@@ -149,47 +149,48 @@ describe('PasswordService', () => {
     /**
      * Test Case: Should return passwords shared with user
      * Steps:
-     * 1. Mock userModel.findOne to return user
-     * 2. Mock getSharedWithMe to return shared passwords
-     * 3. Call findPasswordsSharedWithMe
-     * 4. Verify the result
+     * 1. Mock getSharedWithMe to return shared passwords
+     * 2. Call findPasswordsSharedWithMe
+     * 3. Verify the result
      */
     it('should return passwords shared with user', async () => {
       const mockSharedPasswords = {
         sharedWithMe: [
           {
             username: 'owner',
-            passwords: [{ key: 'shared_key', value: 'shared_value' }],
+            passwords: [{ key: 'shared_key', value: 'shared_value', description: '' }],
             count: 1,
           },
         ],
         userCount: 1,
       };
-
-      jest.spyOn(userModel, 'findOne').mockResolvedValue(mockUser);
+      
       jest
         .spyOn(service, 'getSharedWithMe')
         .mockResolvedValue(mockSharedPasswords);
 
-      const result = await service.findPasswordsSharedWithMe('123456');
+      const result = await service.findPasswordsSharedWithMe('testuser');
 
       expect(result).toEqual(mockSharedPasswords);
+      expect(service.getSharedWithMe).toHaveBeenCalledWith('testuser');
     });
 
     /**
-     * Test Case: Should throw error for invalid telegramId
+     * Test Case: Should throw error if username is not provided
      * Steps:
-     * 1. Mock userModel.findOne to return null
+     * 1. Mock getSharedWithMe to throw an error
      * 2. Call findPasswordsSharedWithMe
      * 3. Verify error is thrown
      */
-    it('should throw error for invalid telegramId', async () => {
-      jest.spyOn(userModel, 'findOne').mockResolvedValue(null);
+    it('should throw error if username is not provided', async () => {
+      jest
+        .spyOn(service, 'getSharedWithMe')
+        .mockRejectedValue(new HttpException('Username is required', HttpStatus.BAD_REQUEST));
 
       await expect(
-        service.findPasswordsSharedWithMe('invalid'),
+        service.findPasswordsSharedWithMe(''),
       ).rejects.toThrow(
-        new HttpException('telegramId is not valid', HttpStatus.BAD_REQUEST),
+        new HttpException('Username is required', HttpStatus.BAD_REQUEST),
       );
     });
   });

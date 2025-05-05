@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { Type } from '../enums/type.enum';
+import { SharedWithDto } from '../dto/shared-with.dto';
 
 export type PasswordDocument = Password & Document;
 
@@ -29,8 +30,8 @@ export class Password {
   @Prop({ type: String, enum: Type, required: false })
   type: Type;
 
-  @Prop({ type: [String], required: false })
-  sharedWith: string[];
+  @Prop({ type: [SharedWithDto], required: false })
+  sharedWith: SharedWithDto[];
 
   @Prop({ type: Date, required: false })
   updatedAt: Date;

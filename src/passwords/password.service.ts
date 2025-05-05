@@ -7,7 +7,7 @@ import * as bcrypt from 'bcrypt';
 import { SharedWithMeResponse } from '../types/share-with-me-pass.types';
 import { passwordReturns } from '../types/password-returns.types';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
-
+import { SharedWithDto } from './dto/shared-with.dto';
 @Injectable()
 export class PasswordService {
   constructor(
@@ -74,7 +74,7 @@ export class PasswordService {
   async findSharedWithByTelegramId(
     telegramId: string,
     key: string,
-  ): Promise<string[]> {
+  ): Promise<SharedWithDto[]> {
     try {
       if (!telegramId) {
         throw new Error('Telegram ID is required');
@@ -104,7 +104,7 @@ export class PasswordService {
         })
         .select('sharedWith -_id')
         .exec();
-      return sharedWith.length > 0 ? sharedWith[0].sharedWith : [];
+      return sharedWith.length > 0 ? sharedWith[0].sharedWith : null;
     } catch (error) {
       console.log('error', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
@@ -112,20 +112,20 @@ export class PasswordService {
   }
 
   async findPasswordsSharedWithMe(
-    telegramId: string,
+    username: string,
   ): Promise<SharedWithMeResponse> {
     try {
-      if (!telegramId) {
-        throw new Error('Telegram ID is required');
+      if (!username) {
+        throw new Error('Username is required');
       }
-      const user = await this.userModel.findOne({
-        telegramId,
-        isActive: true,
-      });
-      if (!user) {
-        throw new Error('telegramId is not valid');
-      }
-      const sharedWithMe = await this.getSharedWithMe(user.telegramId);
+      // const user = await this.userModel.findOne({
+      //   username,
+      //   isActive: true,
+      // });
+      // if (!user) {
+      //   throw new Error('username is not valid');
+      // }
+      const sharedWithMe = await this.getSharedWithMe(username);
       return sharedWithMe;
     } catch (error) {
       console.log('error', error);
@@ -133,17 +133,17 @@ export class PasswordService {
     }
   }
 
-  async getSharedWithMe(telegramId: string): Promise<SharedWithMeResponse> {
+  async getSharedWithMe(username: string): Promise<SharedWithMeResponse> {
     try {
-      if (!telegramId) {
-        throw new Error('Telegram ID is required');
+      if (!username) {
+        throw new Error('Username is required');
       }
       const sharedPasswords = await this.passwordModel
         .find({
-          sharedWith: { $in: [telegramId] },
+          'sharedWith.username': { $in: [username] },
           isActive: true,
         })
-        .select('key value initData.telegramId -_id')
+        .select('key value description initData.username -_id')
         .lean()
         .exec();
       if (!sharedPasswords?.length) {
@@ -152,22 +152,32 @@ export class PasswordService {
 
       const resolvedPasswords = await Promise.all(
         sharedPasswords.map(async (password) => {
-          const user = await this.userModel.findOne({
-            telegramId: password.initData.telegramId,
-            isActive: true,
-          });
+          // const user = await this.userModel.findOne({
+          //   telegramId: password.initData.telegramId,
+          //   isActive: true,
+          // });
 
           return {
             key: password.key,
             value: password.value,
-            username: user?.username || 'unknown',
-          } as { key: string; value: string; username: string };
+            description: password.description,
+            // username: user?.username || 'unknown',
+            username: password.initData.username,
+          } as {
+            key: string;
+            value: string;
+            description: string;
+            username: string;
+          };
         }),
       );
 
       const groupedByOwner = resolvedPasswords.reduce(
         (
-          acc: Record<string, Array<{ key: string; value: string }>>,
+          acc: Record<
+            string,
+            Array<{ key: string; value: string; description: string }>
+          >,
           password,
         ) => {
           const ownerUsername = password.username;
@@ -180,6 +190,7 @@ export class PasswordService {
             acc[ownerUsername].push({
               key: password.key,
               value: password.value,
+              description: password.description,
             });
           }
 

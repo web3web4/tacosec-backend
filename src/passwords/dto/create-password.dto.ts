@@ -10,7 +10,9 @@ import {
 import { Type as TransformType } from 'class-transformer';
 import { Types } from 'mongoose';
 import { TelegramInitDto } from '../../telegram/dto/telegram-init.dto';
-import { Type } from '../enums/type.enum';
+import { Type as TypeEnum } from '../enums/type.enum';
+import { SharedWithDto } from './shared-with.dto';
+import { Type } from 'class-transformer';
 
 // For internal use with the complete model
 export class CreatePasswordDto {
@@ -31,12 +33,15 @@ export class CreatePasswordDto {
   @IsOptional()
   isActive: boolean;
 
-  @IsEnum(Type)
-  type: Type;
+  @IsEnum(TypeEnum)
+  @IsOptional()
+  type: TypeEnum;
 
   @IsArray()
   @IsOptional()
-  sharedWith: string[];
+  @ValidateNested()
+  @Type(() => SharedWithDto)
+  sharedWith: SharedWithDto[];
 
   @ValidateNested()
   @TransformType(() => TelegramInitDto)

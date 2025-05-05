@@ -41,25 +41,25 @@ describe('PasswordService - getSharedWithMe', () => {
     service = module.get<PasswordService>(PasswordService);
   });
 
-  it('should throw an error if telegramId is not provided', async () => {
+  it('should throw an error if username is not provided', async () => {
     // Act & Assert
     await expect(service.getSharedWithMe('')).rejects.toThrow(
-      new HttpException('Telegram ID is required', HttpStatus.BAD_REQUEST),
+      new HttpException('Username is required', HttpStatus.BAD_REQUEST),
     );
   });
 
   it('should return empty result if no shared passwords are found', async () => {
     // Arrange
-    const userId = 'user123';
+    const username = 'user123';
 
     passwordModel.exec.mockResolvedValue([]);
 
     // Act
-    const result = await service.getSharedWithMe(userId);
+    const result = await service.getSharedWithMe(username);
 
     // Assert
     expect(passwordModel.find).toHaveBeenCalledWith({
-      sharedWith: { $in: [userId] },
+      'sharedWith.username': { $in: [username] },
       isActive: true,
     });
     expect(result).toEqual({ sharedWithMe: [], userCount: 0 });
@@ -67,43 +67,40 @@ describe('PasswordService - getSharedWithMe', () => {
 
   it('should group passwords by owner correctly', async () => {
     // Arrange
-    const userId = 'user123';
+    const username = 'user123';
     const sharedPasswords = [
       {
         key: 'facebook',
         value: 'password123',
-        initData: { telegramId: 'owner1' },
+        description: 'Facebook password',
+        initData: { username: 'alice' },
       },
       {
         key: 'twitter',
         value: 'twitter123',
-        initData: { telegramId: 'owner1' },
+        description: 'Twitter password',
+        initData: { username: 'alice' },
       },
       {
         key: 'instagram',
         value: 'insta123',
-        initData: { telegramId: 'owner2' },
+        description: 'Instagram password',
+        initData: { username: 'bob' },
       },
     ];
 
     passwordModel.exec.mockResolvedValue(sharedPasswords);
 
-    // Mock user lookups
-    userModel.findOne
-      .mockResolvedValueOnce({ username: 'alice' })
-      .mockResolvedValueOnce({ username: 'alice' })
-      .mockResolvedValueOnce({ username: 'bob' });
-
     // Act
-    const result = await service.getSharedWithMe(userId);
+    const result = await service.getSharedWithMe(username);
 
     // Assert
     expect(passwordModel.find).toHaveBeenCalledWith({
-      sharedWith: { $in: [userId] },
+      'sharedWith.username': { $in: [username] },
       isActive: true,
     });
 
-    expect(userModel.findOne).toHaveBeenCalledTimes(3);
+    expect(passwordModel.select).toHaveBeenCalledWith('key value description initData.username -_id');
 
     expect(result.sharedWithMe).toHaveLength(2); // Two unique owners
     expect(result.userCount).toBe(2);
@@ -118,10 +115,12 @@ describe('PasswordService - getSharedWithMe', () => {
     expect(alicePasswords.passwords).toContainEqual({
       key: 'facebook',
       value: 'password123',
+      description: 'Facebook password',
     });
     expect(alicePasswords.passwords).toContainEqual({
       key: 'twitter',
       value: 'twitter123',
+      description: 'Twitter password',
     });
 
     const bobPasswords = result.sharedWithMe.find(
@@ -133,56 +132,54 @@ describe('PasswordService - getSharedWithMe', () => {
     expect(bobPasswords.passwords).toContainEqual({
       key: 'instagram',
       value: 'insta123',
+      description: 'Instagram password',
     });
   });
 
   it('should handle owners with unknown usernames', async () => {
     // Arrange
-    const userId = 'user123';
+    const username = 'user123';
     const sharedPasswords = [
-      { key: 'site1', value: 'pass1', initData: { telegramId: 'owner1' } },
-      { key: 'site2', value: 'pass2', initData: { telegramId: 'unknown' } },
+      { key: 'site1', value: 'pass1', description: 'Site 1', initData: { username: 'known_user' } },
+      { key: 'site2', value: 'pass2', description: 'Site 2', initData: { username: 'unknown' } },
     ];
 
     passwordModel.exec.mockResolvedValue(sharedPasswords);
 
-    // First user found, second user returns null (unknown)
-    userModel.findOne
-      .mockResolvedValueOnce({ username: 'known_user' })
-      .mockResolvedValueOnce(null);
-
     // Act
-    const result = await service.getSharedWithMe(userId);
+    const result = await service.getSharedWithMe(username);
 
     // Assert
+    // The implementation removes 'unknown' usernames, so we expect 1 in the result
     expect(result.sharedWithMe).toHaveLength(1);
     expect(result.userCount).toBe(1);
 
-    // Only the known user's password should be included
-    const knownUserPasswords = result.sharedWithMe[0];
-    expect(knownUserPasswords.username).toBe('known_user');
+    // The known user's password should be included
+    const knownUserPasswords = result.sharedWithMe.find(
+      (owner) => owner.username === 'known_user',
+    );
+    expect(knownUserPasswords).toBeDefined();
     expect(knownUserPasswords.passwords).toHaveLength(1);
     expect(knownUserPasswords.passwords[0]).toEqual({
       key: 'site1',
       value: 'pass1',
+      description: 'Site 1',
     });
   });
 
   it('should handle passwords with missing key or value', async () => {
     // Arrange
-    const userId = 'user123';
+    const username = 'user123';
     const sharedPasswords = [
-      { key: 'site1', value: 'pass1', initData: { telegramId: 'owner1' } },
-      { key: '', value: 'pass2', initData: { telegramId: 'owner1' } }, // Missing key
-      { key: 'site3', value: '', initData: { telegramId: 'owner1' } }, // Missing value
+      { key: 'site1', value: 'pass1', description: 'Site 1', initData: { username: 'user1' } },
+      { key: '', value: 'pass2', description: 'Site 2', initData: { username: 'user1' } }, // Missing key
+      { key: 'site3', value: '', description: 'Site 3', initData: { username: 'user1' } }, // Missing value
     ];
 
     passwordModel.exec.mockResolvedValue(sharedPasswords);
 
-    userModel.findOne.mockResolvedValue({ username: 'user1' });
-
     // Act
-    const result = await service.getSharedWithMe(userId);
+    const result = await service.getSharedWithMe(username);
 
     // Assert
     // Only the password with both key and value should be included
@@ -191,35 +188,26 @@ describe('PasswordService - getSharedWithMe', () => {
     expect(result.sharedWithMe[0].passwords[0]).toEqual({
       key: 'site1',
       value: 'pass1',
+      description: 'Site 1',
     });
   });
 
   it('should sort owners by number of shared passwords', async () => {
     // Arrange
-    const userId = 'user123';
+    const username = 'user123';
     const sharedPasswords = [
-      { key: 'site1', value: 'pass1', initData: { telegramId: 'owner1' } },
-      { key: 'site2', value: 'pass2', initData: { telegramId: 'owner2' } },
-      { key: 'site3', value: 'pass3', initData: { telegramId: 'owner2' } },
-      { key: 'site4', value: 'pass4', initData: { telegramId: 'owner2' } },
-      { key: 'site5', value: 'pass5', initData: { telegramId: 'owner3' } },
-      { key: 'site6', value: 'pass6', initData: { telegramId: 'owner3' } },
+      { key: 'site1', value: 'pass1', description: 'Site 1', initData: { username: 'alice' } },
+      { key: 'site2', value: 'pass2', description: 'Site 2', initData: { username: 'bob' } },
+      { key: 'site3', value: 'pass3', description: 'Site 3', initData: { username: 'bob' } },
+      { key: 'site4', value: 'pass4', description: 'Site 4', initData: { username: 'bob' } },
+      { key: 'site5', value: 'pass5', description: 'Site 5', initData: { username: 'charlie' } },
+      { key: 'site6', value: 'pass6', description: 'Site 6', initData: { username: 'charlie' } },
     ];
 
     passwordModel.exec.mockResolvedValue(sharedPasswords);
 
-    // Mock the usernames for each owner
-    userModel.findOne.mockImplementation((query) => {
-      const mapping = {
-        owner1: { username: 'alice' },
-        owner2: { username: 'bob' },
-        owner3: { username: 'charlie' },
-      };
-      return Promise.resolve(mapping[query.telegramId]);
-    });
-
     // Act
-    const result = await service.getSharedWithMe(userId);
+    const result = await service.getSharedWithMe(username);
 
     // Assert
     expect(result.sharedWithMe).toHaveLength(3);
@@ -237,12 +225,12 @@ describe('PasswordService - getSharedWithMe', () => {
 
   it('should handle errors during execution', async () => {
     // Arrange
-    const userId = 'user123';
+    const username = 'user123';
 
     passwordModel.exec.mockRejectedValue(new Error('Database failure'));
 
     // Act & Assert
-    await expect(service.getSharedWithMe(userId)).rejects.toThrow(
+    await expect(service.getSharedWithMe(username)).rejects.toThrow(
       new HttpException('Database failure', HttpStatus.BAD_REQUEST),
     );
   });

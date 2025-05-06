@@ -8,7 +8,6 @@ variables:
 
 stages:
   - test
-  - deploy
 
 cache:
   key: ${CI_COMMIT_REF_SLUG}
@@ -39,17 +38,3 @@ test:
   artifacts:
     reports:
       junit: test-results.xml
-
-deploy_to_vercel:
-  stage: deploy
-  only:
-    - main
-    - T1-Auth
-  needs:
-    - test
-  script:
-    - npm install -g vercel
-    - vercel --prod --token ${VERCEL_TOKEN} --confirm
-  environment:
-    name: production
-    url: ${VERCEL_DEPLOYMENT_URL}

@@ -8,7 +8,7 @@ import {
   PasswordDocument,
 } from '../../src/passwords/schemas/password.schema';
 import { HttpException, HttpStatus } from '@nestjs/common';
-
+import { SharedWithMeResponse } from '../../src/types/share-with-me-pass.types';
 describe('PasswordService', () => {
   let service: PasswordService;
   let userModel: Model<UserDocument>;
@@ -158,16 +158,22 @@ describe('PasswordService', () => {
         sharedWithMe: [
           {
             username: 'owner',
-            passwords: [{ key: 'shared_key', value: 'shared_value', description: '' }],
-            count: 1,
+            passwords: [
+              {
+                id: '1',
+                key: 'shared_key',
+                value: 'shared_value',
+                description: '',
+              },
+            ],
           },
         ],
         userCount: 1,
       };
-      
+
       jest
         .spyOn(service, 'getSharedWithMe')
-        .mockResolvedValue(mockSharedPasswords);
+        .mockResolvedValue(mockSharedPasswords as SharedWithMeResponse);
 
       const result = await service.findPasswordsSharedWithMe('testuser');
 
@@ -185,11 +191,11 @@ describe('PasswordService', () => {
     it('should throw error if username is not provided', async () => {
       jest
         .spyOn(service, 'getSharedWithMe')
-        .mockRejectedValue(new HttpException('Username is required', HttpStatus.BAD_REQUEST));
+        .mockRejectedValue(
+          new HttpException('Username is required', HttpStatus.BAD_REQUEST),
+        );
 
-      await expect(
-        service.findPasswordsSharedWithMe(''),
-      ).rejects.toThrow(
+      await expect(service.findPasswordsSharedWithMe('')).rejects.toThrow(
         new HttpException('Username is required', HttpStatus.BAD_REQUEST),
       );
     });

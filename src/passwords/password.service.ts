@@ -143,7 +143,7 @@ export class PasswordService {
           'sharedWith.username': { $in: [username] },
           isActive: true,
         })
-        .select('key value description initData.username -_id')
+        .select(' _id key value description initData.username ')
         .lean()
         .exec();
       if (!sharedPasswords?.length) {
@@ -158,12 +158,14 @@ export class PasswordService {
           // });
 
           return {
+            id: password._id.toString(),
             key: password.key,
             value: password.value,
             description: password.description,
             // username: user?.username || 'unknown',
             username: password.initData.username,
           } as {
+            id: string;
             key: string;
             value: string;
             description: string;
@@ -176,7 +178,12 @@ export class PasswordService {
         (
           acc: Record<
             string,
-            Array<{ key: string; value: string; description: string }>
+            Array<{
+              id: string;
+              key: string;
+              value: string;
+              description: string;
+            }>
           >,
           password,
         ) => {
@@ -188,6 +195,7 @@ export class PasswordService {
 
           if (password.key && password.value) {
             acc[ownerUsername].push({
+              id: password.id,
               key: password.key,
               value: password.value,
               description: password.description,

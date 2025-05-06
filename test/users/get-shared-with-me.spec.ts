@@ -70,18 +70,21 @@ describe('PasswordService - getSharedWithMe', () => {
     const username = 'user123';
     const sharedPasswords = [
       {
+        _id: '1',
         key: 'facebook',
         value: 'password123',
         description: 'Facebook password',
         initData: { username: 'alice' },
       },
       {
+        _id: '2',
         key: 'twitter',
         value: 'twitter123',
         description: 'Twitter password',
         initData: { username: 'alice' },
       },
       {
+        _id: '3',
         key: 'instagram',
         value: 'insta123',
         description: 'Instagram password',
@@ -100,7 +103,9 @@ describe('PasswordService - getSharedWithMe', () => {
       isActive: true,
     });
 
-    expect(passwordModel.select).toHaveBeenCalledWith('key value description initData.username -_id');
+    expect(passwordModel.select).toHaveBeenCalledWith(
+      ' _id key value description initData.username ',
+    );
 
     expect(result.sharedWithMe).toHaveLength(2); // Two unique owners
     expect(result.userCount).toBe(2);
@@ -113,11 +118,13 @@ describe('PasswordService - getSharedWithMe', () => {
     expect(alicePasswords.count).toBe(2);
     expect(alicePasswords.passwords).toHaveLength(2);
     expect(alicePasswords.passwords).toContainEqual({
+      id: '1',
       key: 'facebook',
       value: 'password123',
       description: 'Facebook password',
     });
     expect(alicePasswords.passwords).toContainEqual({
+      id: '2',
       key: 'twitter',
       value: 'twitter123',
       description: 'Twitter password',
@@ -130,6 +137,7 @@ describe('PasswordService - getSharedWithMe', () => {
     expect(bobPasswords.count).toBe(1);
     expect(bobPasswords.passwords).toHaveLength(1);
     expect(bobPasswords.passwords).toContainEqual({
+      id: '3',
       key: 'instagram',
       value: 'insta123',
       description: 'Instagram password',
@@ -140,8 +148,20 @@ describe('PasswordService - getSharedWithMe', () => {
     // Arrange
     const username = 'user123';
     const sharedPasswords = [
-      { key: 'site1', value: 'pass1', description: 'Site 1', initData: { username: 'known_user' } },
-      { key: 'site2', value: 'pass2', description: 'Site 2', initData: { username: 'unknown' } },
+      {
+        _id: '1',
+        key: 'site1',
+        value: 'pass1',
+        description: 'Site 1',
+        initData: { username: 'known_user' },
+      },
+      {
+        _id: '2',
+        key: 'site2',
+        value: 'pass2',
+        description: 'Site 2',
+        initData: { username: 'unknown' },
+      },
     ];
 
     passwordModel.exec.mockResolvedValue(sharedPasswords);
@@ -161,6 +181,7 @@ describe('PasswordService - getSharedWithMe', () => {
     expect(knownUserPasswords).toBeDefined();
     expect(knownUserPasswords.passwords).toHaveLength(1);
     expect(knownUserPasswords.passwords[0]).toEqual({
+      id: '1',
       key: 'site1',
       value: 'pass1',
       description: 'Site 1',
@@ -171,9 +192,27 @@ describe('PasswordService - getSharedWithMe', () => {
     // Arrange
     const username = 'user123';
     const sharedPasswords = [
-      { key: 'site1', value: 'pass1', description: 'Site 1', initData: { username: 'user1' } },
-      { key: '', value: 'pass2', description: 'Site 2', initData: { username: 'user1' } }, // Missing key
-      { key: 'site3', value: '', description: 'Site 3', initData: { username: 'user1' } }, // Missing value
+      {
+        _id: '1',
+        key: 'site1',
+        value: 'pass1',
+        description: 'Site 1',
+        initData: { username: 'user1' },
+      },
+      {
+        _id: '2',
+        key: '',
+        value: 'pass2',
+        description: 'Site 2',
+        initData: { username: 'user1' },
+      }, // Missing key
+      {
+        _id: '3',
+        key: 'site3',
+        value: '',
+        description: 'Site 3',
+        initData: { username: 'user1' },
+      }, // Missing value
     ];
 
     passwordModel.exec.mockResolvedValue(sharedPasswords);
@@ -186,6 +225,7 @@ describe('PasswordService - getSharedWithMe', () => {
     expect(result.sharedWithMe).toHaveLength(1);
     expect(result.sharedWithMe[0].passwords).toHaveLength(1);
     expect(result.sharedWithMe[0].passwords[0]).toEqual({
+      id: '1',
       key: 'site1',
       value: 'pass1',
       description: 'Site 1',
@@ -196,12 +236,48 @@ describe('PasswordService - getSharedWithMe', () => {
     // Arrange
     const username = 'user123';
     const sharedPasswords = [
-      { key: 'site1', value: 'pass1', description: 'Site 1', initData: { username: 'alice' } },
-      { key: 'site2', value: 'pass2', description: 'Site 2', initData: { username: 'bob' } },
-      { key: 'site3', value: 'pass3', description: 'Site 3', initData: { username: 'bob' } },
-      { key: 'site4', value: 'pass4', description: 'Site 4', initData: { username: 'bob' } },
-      { key: 'site5', value: 'pass5', description: 'Site 5', initData: { username: 'charlie' } },
-      { key: 'site6', value: 'pass6', description: 'Site 6', initData: { username: 'charlie' } },
+      {
+        _id: '1',
+        key: 'site1',
+        value: 'pass1',
+        description: 'Site 1',
+        initData: { username: 'alice' },
+      },
+      {
+        _id: '2',
+        key: 'site2',
+        value: 'pass2',
+        description: 'Site 2',
+        initData: { username: 'bob' },
+      },
+      {
+        _id: '3',
+        key: 'site3',
+        value: 'pass3',
+        description: 'Site 3',
+        initData: { username: 'bob' },
+      },
+      {
+        _id: '4',
+        key: 'site4',
+        value: 'pass4',
+        description: 'Site 4',
+        initData: { username: 'bob' },
+      },
+      {
+        _id: '5',
+        key: 'site5',
+        value: 'pass5',
+        description: 'Site 5',
+        initData: { username: 'charlie' },
+      },
+      {
+        _id: '6',
+        key: 'site6',
+        value: 'pass6',
+        description: 'Site 6',
+        initData: { username: 'charlie' },
+      },
     ];
 
     passwordModel.exec.mockResolvedValue(sharedPasswords);

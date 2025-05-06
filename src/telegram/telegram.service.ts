@@ -26,7 +26,7 @@ export class TelegramService {
           text: message,
         }),
       );
-
+      console.log('message sent response', response.data);
       return response.data.ok === true;
     } catch (error) {
       console.error('Failed to send message:', error.response?.data);

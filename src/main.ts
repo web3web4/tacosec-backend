@@ -5,6 +5,15 @@ import { ValidationPipe } from '@nestjs/common';
 let app;
 
 async function bootstrap() {
+  // Validate critical environment variables
+  if (!process.env.TELEGRAM_BOT_TOKEN) {
+    console.error('ERROR: TELEGRAM_BOT_TOKEN environment variable is not set!');
+    if (process.env.NODE_ENV === 'production') {
+      console.error('Exiting application in production mode due to missing required environment variables.');
+      process.exit(1);
+    }
+  }
+
   if (!app) {
     app = await NestFactory.create(AppModule);
     app.enableCors();

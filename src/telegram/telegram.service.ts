@@ -20,6 +20,7 @@ export class TelegramService {
     const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
 
     try {
+      console.log('message sent response1');
       const response = await firstValueFrom(
         this.httpService.post(url, {
           chat_id: userId, // user.id is the same as chat_id in private conversations

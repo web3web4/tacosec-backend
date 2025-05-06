@@ -8,11 +8,13 @@ import { SharedWithMeResponse } from '../types/share-with-me-pass.types';
 import { passwordReturns } from '../types/password-returns.types';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { SharedWithDto } from './dto/shared-with.dto';
+import { TelegramService } from '../telegram/telegram.service';
 @Injectable()
 export class PasswordService {
   constructor(
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private readonly telegramService: TelegramService,
   ) {}
 
   private async hashPassword(password: string): Promise<string> {
@@ -236,6 +238,11 @@ export class PasswordService {
     id: string,
     update: Partial<Password>,
   ): Promise<Password> {
+    const password = await this.passwordModel.findById(id).exec();
+    if (!password) {
+      throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+    }
+    await this.sendMessageToUsersBySharedWith(password);
     return this.passwordModel
       .findByIdAndUpdate(id, update, { new: true })
       .exec();
@@ -300,7 +307,12 @@ export class PasswordService {
       );
     }
     const newPassword = new this.passwordModel(passwordData);
-    return newPassword.save();
+    const savedPassword = await newPassword.save();
+    if (savedPassword) {
+      console.log('sending message to users by shared with');
+      await this.sendMessageToUsersBySharedWith(savedPassword);
+    }
+    return savedPassword;
   }
 
   // Moved from UsersService
@@ -333,6 +345,7 @@ export class PasswordService {
         initData: { ...passwordData.initData, authDate },
       });
 
+
       // Get the full password object including _id
       const passwordObj = (password as PasswordDocument).toObject();
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -342,6 +355,31 @@ export class PasswordService {
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
+  }
+
+  async sendMessageToUsersBySharedWith(passwordUser: Password) {
+    console.log('sending message to users by shared with internally');
+    const user = await this.userModel.findOne({
+      telegramId: passwordUser.initData.telegramId,
+      isActive: true,
+    });
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+    passwordUser.sharedWith.map(async (sharedWith) => {
+      const sharedWithUser = await this.userModel.findOne({
+        username: sharedWith.username,
+        isActive: true,
+      });
+      if (sharedWithUser) {
+        // console.log('sharedWithUser', sharedWithUser);
+        await this.telegramService.sendMessage(
+          Number(sharedWithUser.telegramId),
+          `User (${user.username}) has shared his ${passwordUser.key} password with you. 
+          You can view it by clicking shared with me tab.`,
+        );
+      }
+    });
   }
 
   private getValidAuthDate(authDateInput: any): Date {

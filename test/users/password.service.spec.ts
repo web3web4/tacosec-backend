@@ -9,10 +9,13 @@ import {
 } from '../../src/passwords/schemas/password.schema';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { SharedWithMeResponse } from '../../src/types/share-with-me-pass.types';
+import { TelegramService } from '../../src/telegram/telegram.service';
+
 describe('PasswordService', () => {
   let service: PasswordService;
   let userModel: Model<UserDocument>;
   let passwordModel: Model<PasswordDocument>;
+  let telegramServiceMock;
 
   // Mock data
   const mockUser = {
@@ -36,6 +39,10 @@ describe('PasswordService', () => {
   };
 
   beforeEach(async () => {
+    telegramServiceMock = {
+      sendMessage: jest.fn().mockResolvedValue({}),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PasswordService,
@@ -68,6 +75,10 @@ describe('PasswordService', () => {
             }),
             save: jest.fn(),
           },
+        },
+        {
+          provide: TelegramService,
+          useValue: telegramServiceMock,
         },
       ],
     }).compile();

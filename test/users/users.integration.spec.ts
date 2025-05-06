@@ -8,12 +8,14 @@ import { TelegramValidatorService } from '../../src/telegram/telegram-validator.
 import { getModelToken } from '@nestjs/mongoose';
 import { User } from '../../src/users/schemas/user.schema';
 import { TelegramDtoAuthGuard } from '../../src/telegram/dto/telegram-dto-auth.guard';
+import { TelegramService } from '../../src/telegram/telegram.service';
 
 describe('UserController (e2e)', () => {
   let app: INestApplication;
   let telegramValidatorService: TelegramValidatorService;
   let userService: UsersService;
   let telegramDtoAuthGuard: TelegramDtoAuthGuard;
+  let telegramServiceMock;
 
   // Fixed authDate to avoid JSON serialization differences
   const fixedDate = new Date().toISOString();
@@ -42,6 +44,10 @@ describe('UserController (e2e)', () => {
 
   // Increase timeout for beforeEach
   beforeEach(async () => {
+    telegramServiceMock = {
+      sendMessage: jest.fn().mockResolvedValue({}),
+    };
+
     // Create a new test module
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -62,6 +68,8 @@ describe('UserController (e2e)', () => {
         findOne: jest.fn(),
         create: jest.fn(),
       })
+      .overrideProvider(TelegramService)
+      .useValue(telegramServiceMock)
       .compile();
 
     // Create the app
@@ -84,7 +92,7 @@ describe('UserController (e2e)', () => {
     if (app) {
       await app.close();
     }
-  });
+  }, 30000); // Increase timeout to 30 seconds
 
   // Clean up resources after all tests
   afterAll(async () => {

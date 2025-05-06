@@ -4,11 +4,13 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Password } from '../../src/passwords/schemas/password.schema';
 import { User } from '../../src/users/schemas/user.schema';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { TelegramService } from '../../src/telegram/telegram.service';
 
 describe('PasswordService - getSharedWithMe', () => {
   let service: PasswordService;
   let passwordModel;
   let userModel;
+  let telegramServiceMock;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -24,6 +26,10 @@ describe('PasswordService - getSharedWithMe', () => {
       findOne: jest.fn(),
     };
 
+    telegramServiceMock = {
+      sendMessage: jest.fn().mockResolvedValue({}),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PasswordService,
@@ -34,6 +40,10 @@ describe('PasswordService - getSharedWithMe', () => {
         {
           provide: getModelToken(User.name),
           useValue: userModel,
+        },
+        {
+          provide: TelegramService,
+          useValue: telegramServiceMock,
         },
       ],
     }).compile();

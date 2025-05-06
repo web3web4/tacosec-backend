@@ -14,11 +14,13 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { of } from 'rxjs';
 import { AxiosResponse } from 'axios';
+import { TelegramService } from '../../src/telegram/telegram.service';
 
 describe('UsersService', () => {
   let service: UsersService;
   let userModel: Model<UserDocument>;
   let module: TestingModule;
+  let telegramServiceMock;
   // let passwordService: PasswordService;
   // let passwordModel: Model<PasswordDocument>;
 
@@ -50,6 +52,10 @@ describe('UsersService', () => {
   };
 
   beforeEach(async () => {
+    telegramServiceMock = {
+      sendMessage: jest.fn().mockResolvedValue({}),
+    };
+
     module = await Test.createTestingModule({
       providers: [
         UsersService,
@@ -99,6 +105,10 @@ describe('UsersService', () => {
               }),
             ),
           },
+        },
+        {
+          provide: TelegramService,
+          useValue: telegramServiceMock,
         },
       ],
     }).compile();

@@ -345,7 +345,6 @@ export class PasswordService {
         initData: { ...passwordData.initData, authDate },
       });
 
-
       // Get the full password object including _id
       const passwordObj = (password as PasswordDocument).toObject();
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -358,28 +357,85 @@ export class PasswordService {
   }
 
   async sendMessageToUsersBySharedWith(passwordUser: Password) {
-    console.log('sending message to users by shared with internally');
-    const user = await this.userModel.findOne({
-      telegramId: passwordUser.initData.telegramId,
-      isActive: true,
-    });
-    if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-    }
-    passwordUser.sharedWith.map(async (sharedWith) => {
-      const sharedWithUser = await this.userModel.findOne({
-        username: sharedWith.username,
+    try {
+      console.log('sending message to users by shared with internally');
+      const user = await this.userModel.findOne({
+        telegramId: passwordUser.initData.telegramId,
         isActive: true,
       });
-      if (sharedWithUser) {
-        // console.log('sharedWithUser', sharedWithUser);
-        await this.telegramService.sendMessage(
-          Number(sharedWithUser.telegramId),
-          `User (${user.username}) has shared his ${passwordUser.key} password with you. 
-          You can view it by clicking shared with me tab.`,
+
+      if (!user) {
+        console.error(
+          'User not found when trying to send shared password messages',
         );
+        return; // Don't throw exception, just return to prevent breaking the main flow
       }
-    });
+
+      if (!passwordUser.sharedWith || passwordUser.sharedWith.length === 0) {
+        console.log('No shared with users to notify');
+        return;
+      }
+
+      console.log(
+        `Attempting to send messages to ${passwordUser.sharedWith.length} users`,
+      );
+
+      // Use Promise.all to properly wait for all messages and handle errors
+      const messagePromises = passwordUser.sharedWith.map(
+        async (sharedWith) => {
+          try {
+            if (!sharedWith.username) {
+              console.log(
+                'Skipping notification - shared user has no username',
+              );
+              return;
+            }
+
+            const sharedWithUser = await this.userModel.findOne({
+              username: sharedWith.username,
+              isActive: true,
+            });
+
+            if (!sharedWithUser || !sharedWithUser.telegramId) {
+              console.log(
+                `User ${sharedWith.username} not found or has no Telegram ID`,
+              );
+              return;
+            }
+
+            console.log(
+              `Sending notification to ${sharedWithUser.username} (${sharedWithUser.telegramId})`,
+            );
+
+            const message = `User (${user.username}) has shared his ${passwordUser.key} password with you. You can view it by clicking shared with me tab.`;
+
+            const result = await this.telegramService.sendMessage(
+              Number(sharedWithUser.telegramId),
+              message,
+            );
+
+            console.log(
+              `Message to ${sharedWithUser.username} sent result: ${result}`,
+            );
+            return result;
+          } catch (error) {
+            console.error(
+              `Failed to send notification to ${sharedWith.username}:`,
+              error.message,
+            );
+            // Don't rethrow to prevent breaking other notifications
+            return false;
+          }
+        },
+      );
+
+      // Wait for all messages to be sent, but don't fail if some fail
+      await Promise.all(messagePromises);
+      console.log('All notifications processed');
+    } catch (error) {
+      console.error('Error in sendMessageToUsersBySharedWith:', error.message);
+      // Don't rethrow to prevent breaking the main operation
+    }
   }
 
   private getValidAuthDate(authDateInput: any): Date {

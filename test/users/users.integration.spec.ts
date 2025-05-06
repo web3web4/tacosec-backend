@@ -66,7 +66,7 @@ describe('UserController (e2e)', () => {
 
     // Create the app
     app = moduleFixture.createNestApplication();
-    
+
     // Get services
     telegramValidatorService = moduleFixture.get<TelegramValidatorService>(
       TelegramValidatorService,

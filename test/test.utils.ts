@@ -54,20 +54,21 @@ export async function setupTestDatabase(): Promise<void> {
   try {
     // Make sure any existing connections are closed
     await mongoose.disconnect();
-    
+
     // Connect to the test database if not already connected
     if (mongoose.connection.readyState !== 1) {
-      const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/taco-test';
+      const uri =
+        process.env.MONGODB_URI || 'mongodb://localhost:27017/taco-test';
       await mongoose.connect(uri);
       console.log(`Connected to test database: ${uri}`);
     }
-    
+
     // Clear all collections
     const collections = mongoose.connection.collections;
     for (const key in collections) {
       await collections[key].deleteMany({});
     }
-    
+
     console.log('Test database setup complete');
   } catch (error) {
     console.error('Error setting up test database:', error);

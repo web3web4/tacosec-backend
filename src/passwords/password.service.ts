@@ -242,10 +242,13 @@ export class PasswordService {
     if (!password) {
       throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
     }
-    await this.sendMessageToUsersBySharedWith(password);
-    return this.passwordModel
+    const updatedPassword = await this.passwordModel
       .findByIdAndUpdate(id, update, { new: true })
       .exec();
+    if (updatedPassword) {
+      await this.sendMessageToUsersBySharedWith(updatedPassword);
+    }
+    return updatedPassword;
   }
 
   async findOneAndDelete(filter: Partial<Password>): Promise<Password> {

@@ -1,7 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+// import { TelegramValidatorService } from './telegram-validator.service';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class TelegramService {
@@ -10,6 +17,9 @@ export class TelegramService {
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    // private readonly telegramValidatorService: TelegramValidatorService,
+    @Inject(forwardRef(() => UsersService))
+    private readonly usersService: UsersService,
   ) {
     this.botToken =
       this.configService.get<string>('TELEGRAM_BOT_TOKEN') ||
@@ -18,6 +28,34 @@ export class TelegramService {
     if (!this.botToken) {
       console.error('WARNING: TELEGRAM_BOT_TOKEN is not set or invalid!');
     }
+  }
+
+  async validateTelegramUser(
+    telegramInitData: string,
+    telegramUsername: string,
+  ): Promise<{ isValid: boolean }> {
+    // Validate that both parameters are provided
+    if (!telegramInitData || !telegramUsername) {
+      throw new UnauthorizedException('Missing required parameters');
+    }
+    // Parse the init data to extract information
+    const searchParams = new URLSearchParams(telegramInitData);
+    const user = JSON.parse(searchParams.get('user'));
+
+    // Check if the username in the init data matches the provided username
+    if (user.username !== telegramUsername) {
+      return { isValid: false };
+    }
+
+    // Find the user in the database
+    const dbUser = await this.usersService.findByTelegramId(user.id);
+
+    // Check if user exists and is active
+    if (!dbUser || !dbUser.isActive) {
+      return { isValid: false };
+    }
+    // Return the validated user
+    return { isValid: true };
   }
 
   async sendMessage(

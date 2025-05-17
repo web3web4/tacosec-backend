@@ -69,6 +69,15 @@ export class UsersController {
     return this.usersService.createAndUpdateUser(createUserDto);
   }
 
+  @Patch(':id')
+  @TelegramDtoAuth()
+  updateUser(
+    @Param('id') id: string,
+    @Body() updateUserDto: Partial<TelegramInitDto>,
+  ) {
+    return this.usersService.update(id, updateUserDto);
+  }
+
   @Get('telegram/profile')
   getTelegramProfile(@Query() query: GetTelegramProfileDto) {
     return this.usersService.getTelegramProfile(query.username);
@@ -85,21 +94,6 @@ export class UsersController {
       teleDtoData.telegramId,
       pagination,
     );
-  }
-
-  @Patch(':id')
-  @TelegramDtoAuth()
-  updateUser(
-    @Param('id') id: string,
-    @Body() updateUserDto: Partial<TelegramInitDto>,
-  ) {
-    return this.usersService.update(id, updateUserDto);
-  }
-
-  @Delete(':id')
-  @TelegramDtoAuth()
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
   }
 
   @Get(':id')
@@ -120,5 +114,11 @@ export class UsersController {
     return this.usersService.findByQuery({
       username: { $regex: query, $options: 'i' },
     });
+  }
+
+  @Delete(':id')
+  @TelegramDtoAuth()
+  remove(@Param('id') id: string) {
+    return this.usersService.remove(id);
   }
 }

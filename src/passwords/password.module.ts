@@ -6,8 +6,7 @@ import { User, UserSchema } from '../users/schemas/user.schema';
 import { Password, PasswordSchema } from './schemas/password.schema';
 import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
 import { HttpModule } from '@nestjs/axios';
-import { TelegramValidatorService } from '../telegram/telegram-validator.service';
-import { TelegramService } from '../telegram/telegram.service';
+import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
 import { ConfigModule } from '@nestjs/config';
 
@@ -20,13 +19,12 @@ import { ConfigModule } from '@nestjs/config';
     ConfigModule,
     HttpModule,
     forwardRef(() => UsersModule),
+    forwardRef(() => TelegramModule),
   ],
   controllers: [PasswordController],
   providers: [
     PasswordService,
     TelegramDtoAuthGuard,
-    TelegramValidatorService,
-    TelegramService,
   ],
   exports: [PasswordService],
 })

@@ -1,4 +1,4 @@
-import { Controller, Get, Headers } from '@nestjs/common';
+import { Controller, Get, Headers, Query } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
 import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 
@@ -6,16 +6,15 @@ import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 export class TelegramController {
   constructor(private readonly telegramService: TelegramService) {}
 
-  @Get('validate')
+  @Get('verify')
   @TelegramAuth()
   async validateTelegramUser(
     @Headers('X-Telegram-Init-Data') telegramInitData: string,
-    @Headers('TelegramUsername') telegramUsername: string,
+    @Query('TelegramUsername') telegramUsernames: string[],
   ) {
-    // Call the service method with the headers data
     return this.telegramService.validateTelegramUser(
       telegramInitData,
-      telegramUsername,
+      telegramUsernames,
     );
   }
 }

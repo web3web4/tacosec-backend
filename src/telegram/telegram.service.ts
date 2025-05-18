@@ -32,18 +32,23 @@ export class TelegramService {
 
   async validateTelegramUser(
     telegramInitData: string,
-    telegramUsername: string,
+    telegramUsernames: string[],
   ): Promise<{ isValid: boolean }> {
     // Validate that both parameters are provided
-    if (!telegramInitData || !telegramUsername) {
+    if (
+      !telegramInitData ||
+      !telegramUsernames ||
+      telegramUsernames.length === 0
+    ) {
       throw new UnauthorizedException('Missing required parameters');
     }
+
     // Parse the init data to extract information
     const searchParams = new URLSearchParams(telegramInitData);
     const user = JSON.parse(searchParams.get('user'));
 
-    // Check if the username in the init data matches the provided username
-    if (user.username !== telegramUsername) {
+    // Check if the username in the init data is in the provided array of usernames
+    if (!telegramUsernames.includes(user.username)) {
       return { isValid: false };
     }
 
@@ -54,6 +59,7 @@ export class TelegramService {
     if (!dbUser || !dbUser.isActive) {
       return { isValid: false };
     }
+
     // Return the validated user
     return { isValid: true };
   }

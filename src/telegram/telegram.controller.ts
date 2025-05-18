@@ -10,7 +10,7 @@ export class TelegramController {
   @TelegramAuth()
   async validateTelegramUser(
     @Headers('X-Telegram-Init-Data') telegramInitData: string,
-    @Query('TelegramUsername') telegramUsernames: string[],
+    @Query('TelegramUsernames') telegramUsernames: string[],
   ) {
     return this.telegramService.validateTelegramUser(
       telegramInitData,

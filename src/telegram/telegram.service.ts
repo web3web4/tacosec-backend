@@ -35,6 +35,9 @@ export class TelegramService {
     telegramUsernames: string[],
   ): Promise<{ isValid: boolean }> {
     // Validate that both parameters are provided
+    // console.log('telegramInitData', telegramInitData);
+    // console.log('telegramUsernames', telegramUsernames);
+    // console.log('telegramUsernames.length', telegramUsernames.length);
     if (
       !telegramInitData ||
       !telegramUsernames ||

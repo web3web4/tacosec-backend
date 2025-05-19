@@ -7,7 +7,7 @@ export class TelegramController {
   constructor(private readonly telegramService: TelegramService) {}
 
   @Get('verify')
-  @TelegramAuth()
+  // @TelegramAuth()
   async validateTelegramUser(
     @Headers('authorizationToken') telegramInitData: string,
     @Query('TelegramUsernames') telegramUsernames: string[],

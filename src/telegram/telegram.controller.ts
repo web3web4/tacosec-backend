@@ -1,10 +1,16 @@
 import { Controller, Get, Headers, Query } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
-import { TelegramAuth } from '../decorators/telegram-auth.decorator';
+// import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 
 @Controller('telegram')
 export class TelegramController {
   constructor(private readonly telegramService: TelegramService) {}
+
+  @Get('verify-true')
+  // @TelegramAuth()
+  async validateTelegramUserTrue() {
+    return { isValid: true };
+  }
 
   @Get('verify')
   // @TelegramAuth()

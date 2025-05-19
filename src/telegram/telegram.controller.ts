@@ -21,7 +21,7 @@ export class TelegramController {
   @Get('verify-test')
   // @TelegramAuth()
   async validateTelegramUserTest(
-    @Query('X-Telegram-Init-Data') telegramInitData: string,
+    @Query('authorizationToken') telegramInitData: string,
     @Query('TelegramUsernames') telegramUsernames: string[],
   ) {
     return this.telegramService.validateTelegramUser(

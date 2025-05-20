@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import { Role } from '../../decorators/roles.decorator';
+import { Transform } from 'class-transformer';
 
 export type UserDocument = User & Document;
 
@@ -16,6 +17,7 @@ export class User {
   lastName: string;
 
   @Prop()
+  @Transform(({ value }) => value.toLowerCase())
   username: string;
 
   @Prop()

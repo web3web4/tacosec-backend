@@ -136,19 +136,19 @@ describe('UsersService', () => {
       (userModel.findOne as jest.Mock).mockReturnValue({
         exec: jest.fn().mockResolvedValue(null),
       });
-      
+
       (userModel.create as jest.Mock).mockResolvedValue(createdUser);
-      
+
       // Create a spy to track if the method runs without errors
       try {
         // Call the method
         await service.createAndUpdateUser(mockTelegramInitDto);
-        
+
         // If we got here, the test passed - no need to check the return value
         // The implementation details may vary but we verified:
         // 1. The method ran without throwing an error
         // 2. The expected database operations were called
-        
+
         // Verify the model calls
         expect(userModel.findOne).toHaveBeenCalledWith({
           telegramId: mockTelegramInitDto.telegramId,
@@ -168,7 +168,7 @@ describe('UsersService', () => {
         ...mockUser,
         username: 'oldjohndoe', // Different username
       };
-      
+
       const updatedUser = {
         ...mockUser,
         username: 'johndoe', // New username matching mockTelegramInitDto
@@ -182,31 +182,34 @@ describe('UsersService', () => {
       (userModel.findOne as jest.Mock).mockReturnValue({
         exec: jest.fn().mockResolvedValue(existingUser),
       });
-      
+
       (userModel.findByIdAndUpdate as jest.Mock).mockReturnValue({
         exec: jest.fn().mockResolvedValue(updatedUser),
       });
 
       // Call the method
       const result = await service.createAndUpdateUser(mockTelegramInitDto);
-      
+
       // Just verify the method ran without errors
       expect(result).toBeDefined();
-      
+
       // Verify the Telegram message was sent
       expect(telegramServiceMock.sendMessage).toHaveBeenCalledWith(
         Number(existingUser.telegramId),
         expect.stringContaining('changed your (User Name)'),
       );
-      
+
       // Verify update was called with correct parameters
       expect(userModel.findByIdAndUpdate).toHaveBeenCalledWith(
         existingUser._id,
-        {...mockTelegramInitDto, username: mockTelegramInitDto.username.toLowerCase()},
+        {
+          ...mockTelegramInitDto,
+          username: mockTelegramInitDto.username.toLowerCase(),
+        },
         { new: true },
       );
     });
-    
+
     it('should update existing user without notification when username is the same', async () => {
       // Create a mock user with the same username
       const existingUser = {
@@ -222,16 +225,16 @@ describe('UsersService', () => {
       (userModel.findOne as jest.Mock).mockReturnValue({
         exec: jest.fn().mockResolvedValue(existingUser),
       });
-      
+
       // Call the method
       const result = await service.createAndUpdateUser(mockTelegramInitDto);
-      
+
       // Just verify the method ran without errors
       expect(result).toBeDefined();
-      
+
       // Verify no telegram message was sent
       expect(telegramServiceMock.sendMessage).not.toHaveBeenCalled();
-      
+
       // Verify no update was performed
       expect(userModel.findByIdAndUpdate).not.toHaveBeenCalled();
     });
@@ -244,7 +247,7 @@ describe('UsersService', () => {
       (userModel.findOne as jest.Mock).mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockUser),
       });
-      
+
       (userModel.find as jest.Mock).mockReturnValue({
         select: jest.fn().mockReturnValue({
           skip: jest.fn().mockReturnValue({
@@ -254,7 +257,7 @@ describe('UsersService', () => {
           }),
         }),
       });
-      
+
       (userModel.countDocuments as jest.Mock).mockReturnValue({
         exec: jest.fn().mockResolvedValue(20),
       });

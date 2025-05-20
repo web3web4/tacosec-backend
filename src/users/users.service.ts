@@ -28,6 +28,10 @@ export class UsersService {
 
   async createAndUpdateUser(telegramInitDto: TelegramInitDto): Promise<User> {
     const { telegramId } = telegramInitDto;
+    // Convert username to lowercase if it exists
+    if (telegramInitDto.username) {
+      telegramInitDto.username = telegramInitDto.username.toLowerCase();
+    }
     let user = await this.userModel.findOne({ telegramId }).exec();
 
     if (!user) {
@@ -47,6 +51,10 @@ export class UsersService {
 
   async createOrUpdateUser(userData: Partial<User>): Promise<User> {
     try {
+      // Convert username to lowercase if it exists
+      if (userData.username) {
+        userData.username = userData.username.toLowerCase();
+      }
       const existingUser = await this.userModel.findOne({
         telegramId: userData.telegramId,
       });
@@ -145,6 +153,10 @@ export class UsersService {
     id: string,
     updateUserDto: Partial<TelegramInitDto>,
   ): Promise<User> {
+    // Convert username to lowercase if it exists
+    if (updateUserDto.username) {
+      updateUserDto.username = updateUserDto.username.toLowerCase();
+    }
     return this.userModel
       .findByIdAndUpdate(id, updateUserDto, { new: true })
       .exec();

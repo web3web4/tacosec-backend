@@ -69,7 +69,7 @@ describe('PasswordService - getSharedWithMe', () => {
 
     // Assert
     expect(passwordModel.find).toHaveBeenCalledWith({
-      'sharedWith.username': { $in: [username] },
+      'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') },
       isActive: true,
     });
     expect(result).toEqual({ sharedWithMe: [], userCount: 0 });
@@ -109,7 +109,7 @@ describe('PasswordService - getSharedWithMe', () => {
 
     // Assert
     expect(passwordModel.find).toHaveBeenCalledWith({
-      'sharedWith.username': { $in: [username] },
+      'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') },
       isActive: true,
     });
 
@@ -251,42 +251,42 @@ describe('PasswordService - getSharedWithMe', () => {
         key: 'site1',
         value: 'pass1',
         description: 'Site 1',
-        initData: { username: 'alice' },
+        initData: { username: 'userA' },
       },
       {
         _id: '2',
         key: 'site2',
         value: 'pass2',
         description: 'Site 2',
-        initData: { username: 'bob' },
+        initData: { username: 'userB' },
       },
       {
         _id: '3',
         key: 'site3',
         value: 'pass3',
         description: 'Site 3',
-        initData: { username: 'bob' },
+        initData: { username: 'userB' },
       },
       {
         _id: '4',
         key: 'site4',
         value: 'pass4',
         description: 'Site 4',
-        initData: { username: 'bob' },
+        initData: { username: 'userB' },
       },
       {
         _id: '5',
         key: 'site5',
         value: 'pass5',
         description: 'Site 5',
-        initData: { username: 'charlie' },
+        initData: { username: 'userC' },
       },
       {
         _id: '6',
         key: 'site6',
         value: 'pass6',
         description: 'Site 6',
-        initData: { username: 'charlie' },
+        initData: { username: 'userC' },
       },
     ];
 
@@ -296,16 +296,13 @@ describe('PasswordService - getSharedWithMe', () => {
     const result = await service.getSharedWithMe(username);
 
     // Assert
+    // userB (3 passwords) should be first, then userC (2 passwords), then userA (1 password)
     expect(result.sharedWithMe).toHaveLength(3);
-
-    // The result should be sorted by count (descending)
-    expect(result.sharedWithMe[0].username).toBe('bob'); // 3 passwords
+    expect(result.sharedWithMe[0].username).toBe('userB');
     expect(result.sharedWithMe[0].count).toBe(3);
-
-    expect(result.sharedWithMe[1].username).toBe('charlie'); // 2 passwords
+    expect(result.sharedWithMe[1].username).toBe('userC');
     expect(result.sharedWithMe[1].count).toBe(2);
-
-    expect(result.sharedWithMe[2].username).toBe('alice'); // 1 password
+    expect(result.sharedWithMe[2].username).toBe('userA');
     expect(result.sharedWithMe[2].count).toBe(1);
   });
 

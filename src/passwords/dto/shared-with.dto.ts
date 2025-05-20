@@ -1,9 +1,9 @@
 import { IsString, IsBoolean, IsArray, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
-
+import { Transform, Type } from 'class-transformer';
 // For internal use with the complete model
 export class SharedWithDto {
   @IsString()
+  @Transform(({ value }) => value.toLowerCase())
   username: string;
 
   @IsBoolean()

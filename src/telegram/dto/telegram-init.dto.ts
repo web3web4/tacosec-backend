@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsNumber, IsNotEmpty } from 'class-validator';
-
+import { Transform } from 'class-transformer';
 export class TelegramInitDto {
   @IsString()
   @IsNotEmpty()
@@ -15,6 +15,7 @@ export class TelegramInitDto {
 
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => value.toLowerCase())
   username?: string;
 
   @IsString()

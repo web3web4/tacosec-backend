@@ -22,10 +22,7 @@ import { ConfigModule } from '@nestjs/config';
     forwardRef(() => TelegramModule),
   ],
   controllers: [PasswordController],
-  providers: [
-    PasswordService,
-    TelegramDtoAuthGuard,
-  ],
+  providers: [PasswordService, TelegramDtoAuthGuard],
   exports: [PasswordService],
 })
 export class PasswordModule {}

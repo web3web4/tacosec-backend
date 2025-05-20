@@ -16,6 +16,7 @@ import {
 import { PaginationParams } from '../decorators/pagination.decorator';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { TelegramService } from '../telegram/telegram.service';
 
 @Injectable()
 export class UsersService {
@@ -24,6 +25,7 @@ export class UsersService {
     private passwordService: PasswordService,
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
     private readonly httpService: HttpService,
+    private readonly telegramService: TelegramService,
   ) {}
 
   async createAndUpdateUser(telegramInitDto: TelegramInitDto): Promise<User> {
@@ -37,18 +39,30 @@ export class UsersService {
     if (!user) {
       user = await this.userModel.create(telegramInitDto);
     } else {
-      user = await this.userModel
-        .findByIdAndUpdate(user._id, telegramInitDto, { new: true })
-        .exec();
+      if (
+        telegramInitDto.username.toLowerCase() !== user.username.toLowerCase()
+      ) {
+        this.telegramService.sendMessage(
+          Number(user.telegramId),
+          `It appears you've recently changed your (User Name).
+          so. while you can still view your old passwords, they can no longer be decrypted.
+          You will also lose access to any passwords shared with you by other users.
+          Your old username: ${user.username},
+          Your new username: ${telegramInitDto.username}
+          Sorry about this! To recover your passwords, you must use your old username again.`,
+        );
+
+        user = await this.userModel
+          .findByIdAndUpdate(user._id, telegramInitDto, { new: true })
+          .exec();
+      }
+      // Convert to plain object if it's a Mongoose document
+      const userObject = user.toObject ? user.toObject() : user;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { _id: _, ...userWithoutId } = userObject;
+      return userWithoutId;
     }
-
-    // Convert to plain object if it's a Mongoose document
-    const userObject = user.toObject ? user.toObject() : user;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _id: _, ...userWithoutId } = userObject;
-    return userWithoutId;
   }
-
   async createOrUpdateUser(userData: Partial<User>): Promise<User> {
     try {
       // Convert username to lowercase if it exists
@@ -59,6 +73,20 @@ export class UsersService {
         telegramId: userData.telegramId,
       });
       if (existingUser) {
+        if (
+          userData.username.toLowerCase() !==
+          existingUser.username.toLowerCase()
+        ) {
+          this.telegramService.sendMessage(
+            Number(existingUser.telegramId),
+            `It appears you've recently changed your (User Name).
+          so. while you can still view your old passwords, they can no longer be decrypted.
+          You will also lose access to any passwords shared with you by other users.
+          Your old username: ${existingUser.username},
+          Your new username: ${userData.username}
+          Sorry about this! To recover your passwords, you must use your old username again.`,
+          );
+        }
         const updatedUser = await this.userModel.findByIdAndUpdate(
           existingUser._id,
           userData,

@@ -11,6 +11,7 @@ import { HttpModule } from '@nestjs/axios';
 import { PasswordModule } from '../passwords/password.module';
 import { TelegramValidatorService } from '../telegram/telegram-validator.service';
 import { ConfigModule } from '@nestjs/config';
+import { TelegramModule } from '../telegram/telegram.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ConfigModule } from '@nestjs/config';
     ConfigModule,
     HttpModule,
     forwardRef(() => PasswordModule),
+    forwardRef(() => TelegramModule),
   ],
   controllers: [UsersController],
   providers: [

@@ -142,7 +142,8 @@ export class PasswordService {
       }
       const sharedPasswords = await this.passwordModel
         .find({
-          'sharedWith.username': { $in: [username] },
+          // 'sharedWith.username': { $in: [username] },
+          'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') }, //case insensitive
           isActive: true,
         })
         .select(' _id key value description initData.username ')

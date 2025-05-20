@@ -49,9 +49,14 @@ export class TelegramService {
     // Parse the init data to extract information
     const searchParams = new URLSearchParams(telegramInitData);
     const user = JSON.parse(searchParams.get('user'));
-
+    const lowerCaseTelegramUsernames = await Promise.all(
+      telegramUsernames.map(async (username) => {
+        console.log('username', username);
+        return username.toLowerCase();
+      }),
+    );
     // Check if the username in the init data is in the provided array of usernames
-    if (!telegramUsernames.includes(user.username)) {
+    if (!lowerCaseTelegramUsernames.includes(user.username.toLowerCase())) {
       return { isValid: false };
     }
 

@@ -1,5 +1,6 @@
 import { Controller, Get, Headers, Query } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
+import { GetUsersDto } from './dto/get-users.dto';
 // import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 
 @Controller('telegram')
@@ -16,23 +17,20 @@ export class TelegramController {
   // @TelegramAuth()
   async validateTelegramUser(
     @Headers('authorizationToken') telegramInitData: string,
-    @Query('TelegramUsernames') telegramUsernames: string[],
+    @Query() getUsersDto: GetUsersDto,
   ) {
     return this.telegramService.validateTelegramUser(
       telegramInitData,
-      telegramUsernames,
+      getUsersDto.TelegramUsernames,
     );
   }
 
   @Get('verify-test')
   // @TelegramAuth()
-  async validateTelegramUserTest(
-    @Query('authorizationToken') telegramInitData: string,
-    @Query('TelegramUsernames') telegramUsernames: string[],
-  ) {
+  async validateTelegramUserTest(@Query() getUsersDto: GetUsersDto) {
     return this.telegramService.validateTelegramUser(
-      telegramInitData,
-      telegramUsernames,
+      getUsersDto.authorizationToken,
+      getUsersDto.TelegramUsernames,
     );
   }
 }

@@ -25,6 +25,7 @@ export interface ApiResponse<T> {
   data: T;
   total?: number;
   duplicatesSkipped?: number;
+  internalDuplicatesRemoved?: number;
   message?: string;
 }
 
@@ -52,10 +53,16 @@ export class PublicAddressesService {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
 
-      // First, check if any of the addresses already exist in the system
+      // First, remove any duplicates within the input array itself
+      const originalLength = createDto.publicAddresses.length;
+      const uniqueInputAddresses = [...new Set(createDto.publicAddresses)];
+      const internalDuplicatesRemoved =
+        originalLength - uniqueInputAddresses.length;
+
+      // Next, check if any of the addresses already exist in the system
       const existingAddresses = await this.publicAddressModel
         .find({
-          publicAddress: { $in: createDto.publicAddresses },
+          publicAddress: { $in: uniqueInputAddresses },
         })
         .exec();
 
@@ -65,7 +72,7 @@ export class PublicAddressesService {
       );
 
       // Filter out duplicates to get only new unique addresses
-      const uniqueAddresses = createDto.publicAddresses.filter(
+      const uniqueAddresses = uniqueInputAddresses.filter(
         (address) => !existingAddressList.includes(address),
       );
 
@@ -74,7 +81,8 @@ export class PublicAddressesService {
         return {
           success: true,
           data: [],
-          duplicatesSkipped: createDto.publicAddresses.length,
+          duplicatesSkipped: uniqueInputAddresses.length,
+          internalDuplicatesRemoved,
           message: 'All addresses were duplicates and have been skipped.',
         };
       }
@@ -94,7 +102,9 @@ export class PublicAddressesService {
       // Transform the response to include userTelegramId and exclude userId
       const responseData = createdAddresses.map((address) => {
         const addressObj = address.toObject();
-        const { userId,__v, ...addressWithoutUserId } = addressObj;
+        // Destructuring but not using these variables is intentional for exclusion
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { userId, __v, ...addressWithoutUserId } = addressObj;
         return {
           ...addressWithoutUserId,
           userTelegramId: (user as any).telegramId,
@@ -104,9 +114,13 @@ export class PublicAddressesService {
       return {
         success: true,
         data: responseData,
-        duplicatesSkipped:
-          createDto.publicAddresses.length - uniqueAddresses.length,
-        message: `Successfully added ${responseData.length} unique addresses.`,
+        duplicatesSkipped: uniqueInputAddresses.length - uniqueAddresses.length,
+        internalDuplicatesRemoved,
+        message: `Successfully added ${responseData.length} unique addresses.${
+          internalDuplicatesRemoved > 0
+            ? ` ${internalDuplicatesRemoved} duplicates were removed from your request.`
+            : ''
+        }`,
       };
     } catch (error) {
       if (error instanceof HttpException) {
@@ -132,7 +146,9 @@ export class PublicAddressesService {
       // Transform the response to include userTelegramId and exclude userId
       const responseData = addresses.map((address) => {
         const addressObj = address.toObject();
-        const { userId,__v, ...addressWithoutUserId } = addressObj;
+        // Destructuring but not using these variables is intentional for exclusion
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { userId, __v, ...addressWithoutUserId } = addressObj;
         return {
           ...addressWithoutUserId,
           userTelegramId: user.telegramId,
@@ -176,7 +192,9 @@ export class PublicAddressesService {
       // Transform the response to include userTelegramId and exclude userId
       const responseData = addresses.map((address) => {
         const addressObj = address.toObject();
-        const { userId,__v, ...addressWithoutUserId } = addressObj;
+        // Destructuring but not using these variables is intentional for exclusion
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { userId, __v, ...addressWithoutUserId } = addressObj;
         return {
           ...addressWithoutUserId,
           userTelegramId: user.telegramId,

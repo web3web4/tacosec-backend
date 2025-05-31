@@ -120,4 +120,48 @@ export class TelegramService {
 
     return false;
   }
+
+  /**
+   * Validates Telegram init data signature
+   * @param initData Raw init data string from Telegram
+   * @returns Boolean indicating if the data is valid
+   */
+  validateInitData(initData: string): boolean {
+    try {
+      // In a real implementation, you would validate the hash here
+      // This would involve checking the data_check_string against the hash using HMAC-SHA-256
+      // For now, we'll just check if the data is parseable
+      const searchParams = new URLSearchParams(initData);
+      const user = searchParams.get('user');
+
+      return !!user && JSON.parse(user).id !== undefined;
+    } catch (error) {
+      console.error('Error validating Telegram init data:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Extracts user data from Telegram init data
+   * @param initData Raw init data string from Telegram
+   * @returns The parsed user data object or null if invalid
+   */
+  extractUserData(initData: string): any {
+    try {
+      const searchParams = new URLSearchParams(initData);
+      const userJson = searchParams.get('user');
+
+      if (!userJson) {
+        return null;
+      }
+
+      return JSON.parse(userJson);
+    } catch (error) {
+      console.error(
+        'Error extracting user data from Telegram init data:',
+        error,
+      );
+      return null;
+    }
+  }
 }

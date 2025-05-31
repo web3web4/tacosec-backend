@@ -25,21 +25,21 @@ export class TelegramDtoAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
 
-    console.log('Request body:', JSON.stringify(request.body));
+    // console.log('Request body:', JSON.stringify(request.body));
 
     // First try to extract raw Telegram data if it's included
     const rawTelegramData = this.extractRawTelegramData(request);
     if (rawTelegramData) {
-      console.log('Found raw Telegram data in the request');
+      // console.log('Found raw Telegram data in the request');
       // If raw data is found, validate it directly
       const isRawValid =
         this.telegramValidator.validateTelegramInitData(rawTelegramData);
       if (isRawValid) {
-        console.log('Raw Telegram data is valid');
+        // console.log('Raw Telegram data is valid');
         const telegramDataDto = this.parseTelegramInitData(rawTelegramData);
-        console.log('Telegram data DTO:', telegramDataDto);
+        // console.log('Telegram data DTO:', telegramDataDto);
         const telegramDataBody = request.body;
-        console.log('Telegram data body:', telegramDataBody);
+        // console.log('Telegram data body:', telegramDataBody);
         if (
           telegramDataBody.telegramId &&
           telegramDataBody.hash &&
@@ -54,7 +54,7 @@ export class TelegramDtoAuthGuard implements CanActivate {
           ) {
             throw new UnauthorizedException('Invalid Telegram data');
           } else {
-            console.log('Telegram data is valid');
+            // console.log('Telegram data is valid');
             return true;
           }
         } else {
@@ -68,16 +68,16 @@ export class TelegramDtoAuthGuard implements CanActivate {
             ) {
               throw new UnauthorizedException('Invalid Telegram data');
             } else {
-              console.log('Telegram data is valid');
+              // console.log('Telegram data is valid');
               return true;
             }
           } else {
-            console.log('Telegram data is valid');
+            // console.log('Telegram data is valid');
             return true;
           }
         }
       } else {
-        console.log('Raw Telegram data is invalid');
+        // console.log('Raw Telegram data is invalid');
         throw new UnauthorizedException('Invalid Telegram data');
       }
     }
@@ -86,7 +86,7 @@ export class TelegramDtoAuthGuard implements CanActivate {
     const telegramData = this.extractTelegramDto(request);
 
     if (!telegramData) {
-      console.log('No Telegram data found in the request');
+      // console.log('No Telegram data found in the request');
       throw new UnauthorizedException('Missing Telegram authentication data');
     }
 
@@ -96,11 +96,11 @@ export class TelegramDtoAuthGuard implements CanActivate {
     const isValid = this.telegramValidator.validateTelegramDto(telegramData);
 
     if (!isValid) {
-      console.log('Structured Telegram data is invalid');
+      // console.log('Structured Telegram data is invalid');
       throw new UnauthorizedException('Invalid Telegram data');
     }
 
-    console.log('Structured Telegram data is valid');
+    // console.log('Structured Telegram data is valid');
     return true;
   }
 

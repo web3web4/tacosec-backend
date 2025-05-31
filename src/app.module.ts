@@ -6,6 +6,7 @@ import { UsersModule } from './users/users.module';
 import { DatabaseModule } from './database/database.module';
 import { PasswordModule } from './passwords/password.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { PublicAddressesModule } from './public-addresses/public-addresses.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TelegramModule } from './telegram/telegram.module';
     UsersModule,
     PasswordModule,
     TelegramModule,
+    PublicAddressesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

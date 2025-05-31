@@ -19,11 +19,11 @@ export class TelegramValidatorService {
         return false;
       }
 
-      console.log('Validating raw init data:', initData);
+      // console.log('Validating raw init data:', initData);
 
       const telegramBotToken =
         this.configService.get<string>('TELEGRAM_BOT_TOKEN');
-      console.log('telegramBotToken', telegramBotToken);
+      // console.log('telegramBotToken', telegramBotToken);
 
       if (!telegramBotToken) {
         console.error('TELEGRAM_BOT_TOKEN is not defined in .env file');
@@ -66,7 +66,7 @@ export class TelegramValidatorService {
       // Sort the data alphabetically as required by Telegram documentation
       const dataCheckString = this.sortURLSearchParams(searchParams);
 
-      console.log('Check string:', dataCheckString);
+      // console.log('Check string:', dataCheckString);
 
       // Create the secret key using HMAC-SHA256
       const secretKey = crypto
@@ -80,8 +80,8 @@ export class TelegramValidatorService {
         .update(dataCheckString)
         .digest('hex');
 
-      console.log('Calculated hash:', calculatedHash);
-      console.log('Received hash:', hash);
+      // console.log('Calculated hash:', calculatedHash);
+      // console.log('Received hash:', hash);
 
       // Compare the calculated hash with the received hash
       return calculatedHash === hash;
@@ -150,7 +150,7 @@ export class TelegramValidatorService {
       dataCheckArray.sort();
       const dataCheckString = dataCheckArray.join('\n');
 
-      console.log('Check string:', dataCheckString);
+      // console.log('Check string:', dataCheckString);
 
       // Create a secret key by applying HMAC-SHA256 to the bot token using the literal "WebAppData" as the key
       const secretKey = crypto
@@ -164,8 +164,8 @@ export class TelegramValidatorService {
         .update(dataCheckString)
         .digest('hex');
 
-      console.log('Calculated hash:', calculatedHash);
-      console.log('Received hash:', data.hash);
+      // console.log('Calculated hash:', calculatedHash);
+      // console.log('Received hash:', data.hash);
 
       // Compare with received hash
       return calculatedHash === data.hash;

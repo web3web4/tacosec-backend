@@ -196,6 +196,50 @@ export class UsersService {
       .exec();
   }
 
+  /**
+   * Gets a user from Telegram init data
+   * @param telegramInitData The raw telegram init data string
+   * @returns The user document if found
+   */
+  async getUserFromTelegramInitData(telegramInitData: string): Promise<User> {
+    try {
+      // Validate and parse the telegram init data
+      const isValid = this.telegramService.validateInitData(telegramInitData);
+      if (!isValid) {
+        throw new HttpException(
+          'Invalid Telegram init data',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Extract the user data
+      const userData = this.telegramService.extractUserData(telegramInitData);
+      if (!userData || !userData.id) {
+        throw new HttpException(
+          'Unable to extract user data',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Find the user by telegram ID
+      const user = await this.userModel
+        .findOne({ telegramId: userData.id.toString() })
+        .exec();
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      return user;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Error processing Telegram init data',
+      );
+    }
+  }
+
   async getTelegramProfile(username: string): Promise<string> {
     try {
       const profile = await lastValueFrom(

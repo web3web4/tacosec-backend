@@ -6,17 +6,22 @@ import {
   PublicAddressDocument,
 } from './schemas/public-address.schema';
 import { UsersService } from '../users/users.service';
-import { CreatePublicAddressDto } from './dto/create-public-address.dto';
+import {
+  CreatePublicAddressDto,
+  WalletEntryDto,
+} from './dto/create-public-address.dto';
 // import { v4 as uuidv4 } from 'uuid';
 import { UserDocument } from '../users/schemas/user.schema';
+import { CryptoUtil } from '../utils/crypto.util';
 
 // Interface for the response that includes telegram_id
 export interface PublicAddressResponse {
-  id?: string;
-  publicAddress: string;
+  _id: any;
+  publicKey: string;
+  secret?: string;
   userTelegramId: string;
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Interface for standardized API responses
@@ -35,10 +40,12 @@ export class PublicAddressesService {
     @InjectModel(PublicAddress.name)
     private publicAddressModel: Model<PublicAddressDocument>,
     private readonly usersService: UsersService,
+    private readonly cryptoUtil: CryptoUtil,
   ) {}
 
   /**
-   * Adds multiple public addresses for a user identified by telegram init data
+   * Adds multiple public addresses with encrypted secrets for a user
+   * identified by telegram init data
    * Ensures each address is unique across the entire system
    */
   async addPublicAddresses(
@@ -53,27 +60,46 @@ export class PublicAddressesService {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
 
-      // First, remove any duplicates within the input array itself
+      // Validate that no entries have null or empty public key
+      if (
+        createDto.publicAddresses.some((entry) => !entry['public-key']?.trim())
+      ) {
+        throw new HttpException(
+          'Public key cannot be null or empty',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // First, remove any duplicates within the input array itself (based on public-key)
       const originalLength = createDto.publicAddresses.length;
-      const uniqueInputAddresses = [...new Set(createDto.publicAddresses)];
+      const uniquePublicKeys = new Set<string>();
+      const uniqueInputAddresses: WalletEntryDto[] = [];
+
+      for (const entry of createDto.publicAddresses) {
+        if (!uniquePublicKeys.has(entry['public-key'])) {
+          uniquePublicKeys.add(entry['public-key']);
+          uniqueInputAddresses.push(entry);
+        }
+      }
+
       const internalDuplicatesRemoved =
         originalLength - uniqueInputAddresses.length;
 
-      // Next, check if any of the addresses already exist in the system
+      // Next, check if any of the public keys already exist in the system
       const existingAddresses = await this.publicAddressModel
         .find({
-          publicAddress: { $in: uniqueInputAddresses },
+          publicKey: { $in: Array.from(uniquePublicKeys) },
         })
         .exec();
 
-      // Extract the list of addresses that already exist
-      const existingAddressList = existingAddresses.map(
-        (addr) => addr.publicAddress,
+      // Extract the list of public keys that already exist
+      const existingPublicKeys = new Set(
+        existingAddresses.map((addr) => addr.publicKey),
       );
 
       // Filter out duplicates to get only new unique addresses
       const uniqueAddresses = uniqueInputAddresses.filter(
-        (address) => !existingAddressList.includes(address),
+        (entry) => !existingPublicKeys.has(entry['public-key']),
       );
 
       // If all addresses were duplicates, return an empty array with message
@@ -89,11 +115,18 @@ export class PublicAddressesService {
 
       // Create a public address for each unique address in the array
       const createdAddresses = await Promise.all(
-        uniqueAddresses.map(async (address) => {
+        uniqueAddresses.map(async (entry) => {
+          // Encrypt the secret if it exists
+          const encryptedSecret = entry.secret
+            ? this.cryptoUtil.encrypt(entry.secret)
+            : null;
+
           const newAddress = new this.publicAddressModel({
+            // id: uuidv4(),
             // Cast to UserDocument to access _id
             userId: (user as UserDocument)._id,
-            publicAddress: address,
+            publicKey: entry['public-key'],
+            encryptedSecret,
           });
           return newAddress.save();
         }),
@@ -101,13 +134,21 @@ export class PublicAddressesService {
 
       // Transform the response to include userTelegramId and exclude userId
       const responseData = createdAddresses.map((address) => {
-        const addressObj = address.toObject();
-        // Destructuring but not using these variables is intentional for exclusion
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { userId, __v, ...addressWithoutUserId } = addressObj;
+        const addressObj = address.toObject() as any;
+
+        // Decrypt the secret if it exists
+        const secret = addressObj.encryptedSecret
+          ? this.cryptoUtil.decrypt(addressObj.encryptedSecret)
+          : undefined;
+
+        // Return the fields in the desired order
         return {
-          ...addressWithoutUserId,
+          _id: addressObj._id,
+          publicKey: addressObj.publicKey,
+          secret,
           userTelegramId: (user as any).telegramId,
+          createdAt: addressObj.createdAt,
+          updatedAt: addressObj.updatedAt,
         };
       });
 
@@ -123,11 +164,51 @@ export class PublicAddressesService {
         }`,
       };
     } catch (error) {
+      // Handle duplicate key errors with a more specific message
+      if (error.message?.includes('E11000 duplicate key error')) {
+        // Extract the duplicated key if possible
+        // Check for both old and new field names in error message
+        const keyMatchPublicKey = error.message.match(
+          /dup key: \{ publicKey: "(.*?)" }/,
+        );
+        const keyMatchPublicAddress = error.message.match(
+          /dup key: \{ publicAddress: "(.*?)" }/,
+        );
+        const keyMatchNull = error.message.match(
+          /dup key: \{ (publicKey|publicAddress): null }/,
+        );
+
+        let duplicateKey = 'unknown';
+        if (keyMatchPublicKey) {
+          duplicateKey = keyMatchPublicKey[1];
+        } else if (keyMatchPublicAddress) {
+          duplicateKey = keyMatchPublicAddress[1];
+        } else if (keyMatchNull) {
+          duplicateKey = 'null (empty value)';
+        }
+
+        throw new HttpException(
+          {
+            success: false,
+            message: `Duplicate public key: ${duplicateKey}. This key is already registered in the system.`,
+            error: 'Conflict',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      // If it's already an HttpException, just pass it through
       if (error instanceof HttpException) {
         throw error;
       }
+
+      // Generic error handler
       throw new HttpException(
-        error.message || 'Failed to add public addresses',
+        {
+          success: false,
+          message: error.message || 'Failed to add public addresses',
+          error: 'Bad Request',
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -145,13 +226,21 @@ export class PublicAddressesService {
 
       // Transform the response to include userTelegramId and exclude userId
       const responseData = addresses.map((address) => {
-        const addressObj = address.toObject();
-        // Destructuring but not using these variables is intentional for exclusion
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { userId, __v, ...addressWithoutUserId } = addressObj;
+        const addressObj = address.toObject() as any;
+
+        // Decrypt the secret if it exists
+        const secret = addressObj.encryptedSecret
+          ? this.cryptoUtil.decrypt(addressObj.encryptedSecret)
+          : undefined;
+
+        // Return the fields in the desired order
         return {
-          ...addressWithoutUserId,
+          _id: addressObj._id,
+          publicKey: addressObj.publicKey,
+          secret,
           userTelegramId: user.telegramId,
+          createdAt: addressObj.createdAt,
+          updatedAt: addressObj.updatedAt,
         };
       });
 
@@ -161,11 +250,18 @@ export class PublicAddressesService {
         total: responseData.length,
       };
     } catch (error) {
+      // If it's already an HttpException, just pass it through
       if (error instanceof HttpException) {
         throw error;
       }
+
+      // Generic error handler
       throw new HttpException(
-        error.message || 'Failed to retrieve addresses',
+        {
+          success: false,
+          message: error.message || 'Failed to retrieve addresses',
+          error: 'Bad Request',
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -181,7 +277,14 @@ export class PublicAddressesService {
       // Find the user by telegramId first
       const user = await this.usersService.findByTelegramId(telegramId);
       if (!user) {
-        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          {
+            success: false,
+            message: 'User not found',
+            error: 'Not Found',
+          },
+          HttpStatus.NOT_FOUND,
+        );
       }
 
       // Then get their addresses
@@ -191,13 +294,21 @@ export class PublicAddressesService {
 
       // Transform the response to include userTelegramId and exclude userId
       const responseData = addresses.map((address) => {
-        const addressObj = address.toObject();
-        // Destructuring but not using these variables is intentional for exclusion
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { userId, __v, ...addressWithoutUserId } = addressObj;
+        const addressObj = address.toObject() as any;
+
+        // Decrypt the secret if it exists
+        const secret = addressObj.encryptedSecret
+          ? this.cryptoUtil.decrypt(addressObj.encryptedSecret)
+          : undefined;
+
+        // Return the fields in the desired order
         return {
-          ...addressWithoutUserId,
+          _id: addressObj._id,
+          publicKey: addressObj.publicKey,
+          secret,
           userTelegramId: user.telegramId,
+          createdAt: addressObj.createdAt,
+          updatedAt: addressObj.updatedAt,
         };
       });
 
@@ -207,11 +318,18 @@ export class PublicAddressesService {
         total: responseData.length,
       };
     } catch (error) {
+      // If it's already an HttpException, just pass it through
       if (error instanceof HttpException) {
         throw error;
       }
+
+      // Generic error handler
       throw new HttpException(
-        error.message || 'Failed to retrieve addresses',
+        {
+          success: false,
+          message: error.message || 'Failed to retrieve addresses',
+          error: 'Bad Request',
+        },
         HttpStatus.BAD_REQUEST,
       );
     }

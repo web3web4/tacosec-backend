@@ -97,3 +97,8 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+create ENCRYPTION_KEY
+npx ts-node src/utils/generate-key.ts
+
+npx ts-node src/scripts/cleanup-null-keys.ts

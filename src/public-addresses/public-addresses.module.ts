@@ -9,6 +9,7 @@ import { PublicAddressesService } from './public-addresses.service';
 import { UsersModule } from '../users/users.module';
 import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
 import { TelegramModule } from '../telegram/telegram.module';
+import { CryptoModule } from '../utils/crypto.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { TelegramModule } from '../telegram/telegram.module';
     ]),
     UsersModule,
     TelegramModule,
+    CryptoModule,
   ],
   controllers: [PublicAddressesController],
   providers: [PublicAddressesService, TelegramDtoAuthGuard],

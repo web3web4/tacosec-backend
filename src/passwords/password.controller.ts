@@ -14,7 +14,7 @@ import { PasswordService } from './password.service';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
 import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
-import { TelegramService } from '../telegram/telegram.service';
+// import { TelegramService } from '../telegram/telegram.service';
 // import { Types } from 'mongoose';
 // import { VerifyPasswordData } from './interfaces/verify-password.interface';
 import { Password } from './schemas/password.schema';
@@ -24,29 +24,13 @@ export class PasswordController {
   constructor(
     private readonly passwordService: PasswordService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
-    private readonly telegramService: TelegramService,
+    // private readonly telegramService: TelegramService,
   ) {}
 
   @Post()
   @TelegramDtoAuth()
   createPassword(@Body() createPasswordDto: CreatePasswordRequestDto) {
     return this.passwordService.addPassword(createPasswordDto);
-  }
-
-  @Post('send')
-  @TelegramDtoAuth()
-  async sendMessage(
-    @Request() req: Request,
-    @Body() body: { message: string },
-  ): Promise<{ success: boolean }> {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-    const success = await this.telegramService.sendMessage(
-      Number(teleDtoData.telegramId),
-      body.message,
-    );
-    return { success };
   }
 
   @Patch(':id')

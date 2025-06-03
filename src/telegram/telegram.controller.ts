@@ -1,11 +1,24 @@
-import { Controller, Get, Headers, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Post,
+  Query,
+  Request,
+} from '@nestjs/common';
 import { TelegramService } from './telegram.service';
 import { GetUsersDto } from './dto/get-users.dto';
+import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
+import { TelegramDtoAuthGuard } from './dto/telegram-dto-auth.guard';
 // import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 
 @Controller('telegram')
 export class TelegramController {
-  constructor(private readonly telegramService: TelegramService) {}
+  constructor(
+    private readonly telegramService: TelegramService,
+    private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
+  ) {}
 
   @Get('verify-true')
   // @TelegramAuth()
@@ -32,5 +45,24 @@ export class TelegramController {
       getUsersDto.authorizationToken,
       getUsersDto.TelegramUsernames,
     );
+  }
+
+  /**
+   * Send a message to a Telegram user
+   */
+  @Post('send')
+  @TelegramDtoAuth()
+  async sendMessage(
+    @Request() req: Request,
+    @Body() body: { message: string },
+  ): Promise<{ success: boolean }> {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+    const success = await this.telegramService.sendMessage(
+      Number(teleDtoData.telegramId),
+      body.message,
+    );
+    return { success };
   }
 }

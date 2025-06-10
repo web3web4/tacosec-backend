@@ -14,7 +14,7 @@ import { PasswordService } from './password.service';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
 import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
-// import { TelegramService } from '../telegram/telegram.service';
+import { TelegramService } from '../telegram/telegram.service';
 // import { Types } from 'mongoose';
 // import { VerifyPasswordData } from './interfaces/verify-password.interface';
 import { Password } from './schemas/password.schema';
@@ -24,7 +24,7 @@ export class PasswordController {
   constructor(
     private readonly passwordService: PasswordService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
-    // private readonly telegramService: TelegramService,
+    private readonly telegramService: TelegramService,
   ) {}
 
   @Post()
@@ -73,6 +73,18 @@ export class PasswordController {
   @TelegramDtoAuth()
   remove(@Param('id') id: string) {
     return this.passwordService.delete(id);
+  }
+
+  @Delete('owner/:id')
+  @TelegramDtoAuth()
+  deleteByOwner(@Param('id') id: string, @Request() req: Request) {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+    return this.passwordService.deletePasswordByOwner(
+      id,
+      teleDtoData.telegramId,
+    );
   }
 
   // @Post('verify')

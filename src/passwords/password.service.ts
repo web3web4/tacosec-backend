@@ -469,4 +469,45 @@ export class PasswordService {
     // fallback to current date
     return new Date();
   }
+
+  /**
+   * Delete a password only if the authenticated user is the owner
+   * @param id The ID of the password to delete
+   * @param telegramId The Telegram ID of the authenticated user
+   * @returns The deleted password document
+   * @throws HttpException if the password is not found or user is not the owner
+   */
+  async deletePasswordByOwner(
+    id: string,
+    telegramId: string,
+  ): Promise<Password> {
+    try {
+      // Find the password by ID
+      const password = await this.passwordModel.findById(id).exec();
+
+      // Check if password exists
+      if (!password) {
+        throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if the authenticated user is the owner of the password
+      if (password.initData?.telegramId !== telegramId) {
+        throw new HttpException(
+          'You are not authorized to delete this password',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      // Delete the password
+      const deletedPassword = await this.passwordModel
+        .findByIdAndDelete(id)
+        .exec();
+      return deletedPassword;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
 }

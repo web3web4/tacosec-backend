@@ -83,6 +83,12 @@ export class UsersController {
     return this.usersService.getTelegramProfile(query.username);
   }
 
+  @Get('username/:username')
+  @TelegramDtoAuth()
+  findByUsername(@Param('username') username: string) {
+    return this.usersService.findByUsername(username);
+  }
+
   @Get()
   @TelegramDtoAuth()
   @Roles(Role.ADMIN)

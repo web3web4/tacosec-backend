@@ -177,6 +177,18 @@ export class UsersService {
     return this.userModel.findOne({ telegramId, isActive: true }).exec();
   }
 
+  async findByUsername(username: string): Promise<boolean> {
+    const usernameLower = username.toLowerCase();
+    const user = await this.userModel
+      .findOne({ username: usernameLower, isActive: true })
+      .exec();
+    if (!user) {
+      return false;
+    } else {
+      return true;
+    }
+  }
+
   async update(
     id: string,
     updateUserDto: Partial<TelegramInitDto>,

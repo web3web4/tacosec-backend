@@ -5,6 +5,7 @@ services:
 
 variables:
   MONGODB_URI: mongodb://mongo:27017/taco-test
+  ENCRYPTION_KEY: test-encryption-key-for-ci
 
 stages:
   - test
@@ -21,6 +22,7 @@ install_dependencies:
     - echo "MONGODB_URI=$MONGODB_URI" > .env.test
     - echo "TELEGRAM_BOT_TOKEN=test-token" >> .env.test
     - echo "NODE_ENV=test" >> .env.test
+    - echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" >> .env.test
   artifacts:
     paths:
       - node_modules/

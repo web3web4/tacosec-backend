@@ -1,38 +1,35 @@
-import { setupTestDatabase } from './test.utils';
-import * as dotenv from 'dotenv';
-import * as fs from 'fs';
-import * as path from 'path';
+import { config } from 'dotenv';
+import * as mongoose from 'mongoose';
+import { disconnect } from 'mongoose';
 
-module.exports = async () => {
-  console.log('Setting up test environment...');
+// Load environment variables from .env file
+config();
 
-  // Load test environment variables
-  const envTestPath = path.resolve(process.cwd(), '.env.test');
-  const envPath = path.resolve(process.cwd(), '.env');
+export default async function setup() {
+  try {
+    // Set encryption key for testing if not already set
+    if (!process.env.ENCRYPTION_KEY) {
+      process.env.ENCRYPTION_KEY = 'test-encryption-key-for-testing';
+    }
 
-  if (fs.existsSync(envTestPath)) {
-    console.log('.env.test file found, loading environment variables');
-    dotenv.config({ path: envTestPath });
-  } else if (fs.existsSync(envPath)) {
-    console.log('.env file found, loading environment variables');
-    dotenv.config({ path: envPath });
-  } else {
-    console.log('No .env files found, using default environment variables');
-    // Set default test environment variables if no env files exist
-    process.env.MONGODB_URI =
+    // Connect to the database - use regular connection instead of in-memory for CI
+    const uri =
       process.env.MONGODB_URI || 'mongodb://localhost:27017/taco-test';
-    process.env.TELEGRAM_BOT_TOKEN =
-      process.env.TELEGRAM_BOT_TOKEN || 'test-token';
+    await mongoose.connect(uri);
+  } catch (error) {
+    console.error('Error in test setup:', error);
   }
+}
 
-  process.env.NODE_ENV = 'test';
+// Add a global teardown function to close resources properly
+global.afterAll(async () => {
+  try {
+    // Disconnect from MongoDB
+    await disconnect();
 
-  // Log environment variables for debugging
-  console.log(`MONGODB_URI: ${process.env.MONGODB_URI}`);
-  console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-
-  // Setup test database
-  await setupTestDatabase();
-
-  console.log('Test environment setup complete');
-};
+    // Add a small delay to ensure all resources are properly released
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  } catch (error) {
+    console.error('Error in test teardown:', error);
+  }
+});

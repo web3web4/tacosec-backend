@@ -77,4 +77,4 @@ describe('ReportService', () => {
       expect(service.getAllReportedUsers).toBeDefined();
     });
   });
-}); 
+});

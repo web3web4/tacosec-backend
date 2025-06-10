@@ -45,10 +45,19 @@ export class PasswordService {
       if (!user) {
         throw new Error('telegramId is not valid');
       }
+
+      // Find passwords that are active and either not hidden or hidden field doesn't exist
       const passwords = await this.passwordModel
-        .find({ 'initData.telegramId': telegramId, isActive: true })
-        .select('key value description updatedAt createdAt sharedWith type ')
+        .find({
+          'initData.telegramId': telegramId,
+          isActive: true,
+          $or: [{ hidden: false }, { hidden: { $exists: false } }],
+        })
+        .select(
+          'key value description updatedAt createdAt sharedWith type hidden',
+        )
         .exec();
+
       const passwordWithSharedWithAsUsernames = await Promise.all(
         passwords.map(async (password) => {
           return {
@@ -60,6 +69,7 @@ export class PasswordService {
             sharedWith: password.sharedWith,
             updatedAt: password.updatedAt,
             createdAt: password.createdAt,
+            hidden: password.hidden || false,
           };
         }),
       );
@@ -243,6 +253,12 @@ export class PasswordService {
     if (!password) {
       throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
     }
+
+    // Ensure hidden field is maintained or set to false if it doesn't exist
+    if (update.hidden === undefined) {
+      update.hidden = password.hidden || false;
+    }
+
     const updatedPassword = await this.passwordModel
       .findByIdAndUpdate(id, update, { new: true })
       .exec();
@@ -269,6 +285,12 @@ export class PasswordService {
       if (!password) {
         throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
       }
+
+      // Ensure hidden field is maintained or set to false if it doesn't exist
+      if (updatePasswordDto.hidden === undefined) {
+        updatePasswordDto.hidden = password.hidden || false;
+      }
+
       const updatedPassword = await this.passwordModel
         .findByIdAndUpdate(id, updatePasswordDto, { new: true })
         .exec();
@@ -310,6 +332,12 @@ export class PasswordService {
         passwordData,
       );
     }
+
+    // Ensure hidden field is set to false when creating a new password
+    if (passwordData.hidden === undefined) {
+      passwordData.hidden = false;
+    }
+
     const newPassword = new this.passwordModel(passwordData);
     const savedPassword = await newPassword.save();
     if (savedPassword) {
@@ -346,6 +374,7 @@ export class PasswordService {
         isActive: true,
         type: passwordData.type,
         sharedWith: passwordData.sharedWith,
+        hidden: false, // Explicitly set hidden to false
         initData: { ...passwordData.initData, authDate },
       });
 
@@ -503,6 +532,47 @@ export class PasswordService {
         .findByIdAndDelete(id)
         .exec();
       return deletedPassword;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Set the hidden field of a password to true
+   * Creates the field if it doesn't exist
+   * Only the owner of the password can perform this action
+   * @param id The ID of the password to hide
+   * @param telegramId The Telegram ID of the authenticated user
+   * @returns The updated password document
+   * @throws HttpException if the password is not found or user is not the owner
+   */
+  async hidePassword(id: string, telegramId: string): Promise<Password> {
+    try {
+      // Find the password by ID
+      const password = await this.passwordModel.findById(id).exec();
+
+      // Check if password exists
+      if (!password) {
+        throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if the authenticated user is the owner of the password
+      if (password.initData?.telegramId !== telegramId) {
+        throw new HttpException(
+          'You are not authorized to modify this password',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      // Set the hidden field to true
+      const updatedPassword = await this.passwordModel
+        .findByIdAndUpdate(id, { hidden: true }, { new: true })
+        .exec();
+
+      return updatedPassword;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;

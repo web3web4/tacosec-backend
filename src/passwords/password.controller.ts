@@ -87,6 +87,15 @@ export class PasswordController {
     );
   }
 
+  @Patch('hide/:id')
+  @TelegramDtoAuth()
+  hidePassword(@Param('id') id: string, @Request() req: Request) {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+    return this.passwordService.hidePassword(id, teleDtoData.telegramId);
+  }
+
   // @Post('verify')
   // @TelegramDtoAuth()
   // async verifyPassword(

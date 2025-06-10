@@ -33,6 +33,9 @@ export class Password {
   @Prop({ type: [SharedWithDto], required: false })
   sharedWith: SharedWithDto[];
 
+  @Prop({ default: false })
+  hidden: boolean;
+
   @Prop({ type: Date, required: false })
   updatedAt: Date;
 

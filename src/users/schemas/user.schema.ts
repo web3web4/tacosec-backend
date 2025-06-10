@@ -34,6 +34,12 @@ export class User {
 
   @Prop({ type: String, enum: Role, default: Role.USER })
   role: Role;
+
+  @Prop({ default: false })
+  sharingRestricted: boolean;
+
+  @Prop({ default: 0 })
+  reportCount: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

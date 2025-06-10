@@ -8,6 +8,7 @@ import { PasswordModule } from './passwords/password.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { PublicAddressesModule } from './public-addresses/public-addresses.module';
 import { CryptoModule } from './utils/crypto.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { CryptoModule } from './utils/crypto.module';
     TelegramModule,
     PublicAddressesModule,
     CryptoModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

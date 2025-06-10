@@ -36,6 +36,7 @@ describe('PasswordService', () => {
     updatedAt: new Date(),
     type: 'text',
     description: 'test_description',
+    hidden: false,
   };
 
   beforeEach(async () => {
@@ -134,6 +135,7 @@ describe('PasswordService', () => {
           key: mockPassword.key,
           value: mockPassword.value,
           sharedWith: ['789012'],
+          hidden: mockPassword.hidden,
         },
       ]);
     });

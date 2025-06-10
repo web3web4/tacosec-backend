@@ -9,6 +9,7 @@ import { HttpModule } from '@nestjs/axios';
 import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
 import { ConfigModule } from '@nestjs/config';
+import { ReportsModule } from '../reports/reports.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ConfigModule } from '@nestjs/config';
     HttpModule,
     forwardRef(() => UsersModule),
     forwardRef(() => TelegramModule),
+    forwardRef(() => ReportsModule),
   ],
   controllers: [PasswordController],
   providers: [PasswordService, TelegramDtoAuthGuard],

@@ -254,6 +254,18 @@ export class PasswordService {
       throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
     }
 
+    // If sharedWith is being updated, check for sharing restrictions
+    if (update.sharedWith && update.sharedWith.length > 0) {
+      const user = await this.userModel.findOne({
+        telegramId: password.initData?.telegramId,
+        isActive: true,
+      });
+
+      if (user && user.sharingRestricted) {
+        await this.validateSharingRestrictions(user, update.sharedWith);
+      }
+    }
+
     // Ensure hidden field is maintained or set to false if it doesn't exist
     if (update.hidden === undefined) {
       update.hidden = password.hidden || false;
@@ -362,6 +374,12 @@ export class PasswordService {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
 
+      // Check if user is restricted from sharing passwords
+      if (user.sharingRestricted && passwordData.sharedWith?.length > 0) {
+        // If user is restricted, we need to validate each user they're trying to share with
+        await this.validateSharingRestrictions(user, passwordData.sharedWith);
+      }
+
       // get valid auth date
       const authDate = this.getValidAuthDate(passwordData.initData.authDate);
 
@@ -386,6 +404,45 @@ export class PasswordService {
       return passwordWithId;
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Validates if a restricted user can share passwords with specific users
+   * A restricted user can only share with users who have shared passwords with them
+   * @param user The user who wants to share passwords
+   * @param sharedWith Array of users to share with
+   * @throws HttpException if sharing is not allowed
+   */
+  private async validateSharingRestrictions(
+    user: UserDocument,
+    sharedWith: { username: string }[],
+  ): Promise<void> {
+    // Get all passwords shared with this user
+    const passwordsSharedWithUser = await this.passwordModel.find({
+      'sharedWith.username': user.username,
+      isActive: true,
+    });
+
+    // Extract unique usernames of people who shared passwords with this user
+    const usersWhoSharedWithThisUser = new Set(
+      passwordsSharedWithUser
+        .map((p) => p.initData?.username?.toLowerCase())
+        .filter(Boolean),
+    );
+
+    // Check each user they're trying to share with
+    for (const shareTarget of sharedWith) {
+      const targetUsername = shareTarget.username.toLowerCase();
+
+      // If this user doesn't have any passwords shared with the restricted user,
+      // then the restricted user cannot share with them
+      if (!usersWhoSharedWithThisUser.has(targetUsername)) {
+        throw new HttpException(
+          `Due to sharing restrictions, you can only share passwords with users who have shared passwords with you. User ${shareTarget.username} has not shared any passwords with you.`,
+          HttpStatus.FORBIDDEN,
+        );
+      }
     }
   }
 

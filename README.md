@@ -98,6 +98,42 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
+## User Reporting System
+
+The application includes a comprehensive user reporting system that allows users to report inappropriate behavior. This system helps maintain community standards and protect users.
+
+### Features
+
+- **User Reporting**: Users can report other users by username for inappropriate behavior with a specific reason.
+- **Report Management**: Administrators can view and manage reports through dedicated endpoints.
+- **Automatic Restrictions**: When a user receives 10 or more unresolved reports, they are automatically restricted from sharing passwords.
+- **Restricted Sharing**: Users with sharing restrictions can only share passwords with users who have previously shared passwords with them.
+- **Report Resolution**: Administrators can resolve reports, which automatically recalculates the user's report count and removes restrictions if appropriate.
+
+### API Endpoints
+
+- `POST /reports`: Submit a report against another user by username
+- `GET /reports/user/:telegramId`: (Admin only) Get all reports for a specific user
+- `GET /reports/is-restricted/:telegramId`: Check if a user has sharing restrictions
+- `PATCH /reports/resolve/:id`: (Admin only) Resolve a report
+- `GET /reports/admin/reported-users`: (Admin only) Get all reported users with their details and reports
+
+### Implementation Details
+
+The reporting system is implemented as a separate module (`ReportsModule`) with its own schema, service, and controller. It integrates with the password sharing functionality to enforce sharing restrictions when necessary.
+
+When a user attempts to share a password, the system checks if they have any sharing restrictions. If they do, it verifies that they're only sharing with users who have previously shared passwords with them.
+
+Users are reported by username, which is then resolved to the corresponding telegramId internally. This makes the reporting process more user-friendly, as users can report others by their visible username rather than needing to know their telegramId.
+
+### Security Considerations
+
+- Users cannot report themselves
+- Users cannot report the same user multiple times (only unresolved reports count)
+- Only administrators can view all reports and resolve them
+- Sharing restrictions are automatically removed when the number of unresolved reports falls below the threshold
+- Username lookups are case-insensitive for better user experience
+
 create ENCRYPTION_KEY
 npx ts-node src/utils/generate-key.ts
 

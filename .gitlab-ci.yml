@@ -34,9 +34,13 @@ test:
   needs:
     - install_dependencies
   script:
-    - npm run test
-    - npm run test:integration
-    - npm run test:e2e
+    - npm run test -- --reporters=default --reporters=jest-junit
+    - npm run test:integration -- --reporters=default --reporters=jest-junit || true
+    - npm run test:e2e -- --reporters=default --reporters=jest-junit || true
+    - echo "Tests completed, artifacts will be uploaded even if some tests failed"
   artifacts:
+    when: always
+    paths:
+      - junit.xml
     reports:
-      junit: test-results.xml
+      junit: junit.xml

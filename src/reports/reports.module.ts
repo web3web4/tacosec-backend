@@ -9,17 +9,14 @@ import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
 import { RolesGuard } from '../guards/roles.guard';
 import { ConfigModule } from '@nestjs/config';
-import {
-  PublicAddress,
-  PublicAddressSchema,
-} from '../public-addresses/schemas/public-address.schema';
+import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Report.name, schema: ReportSchema },
       { name: User.name, schema: UserSchema },
-      { name: PublicAddress.name, schema: PublicAddressSchema },
+      { name: Password.name, schema: PasswordSchema },
     ]),
     forwardRef(() => TelegramModule),
     forwardRef(() => UsersModule),

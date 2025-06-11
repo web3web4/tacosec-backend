@@ -6,9 +6,9 @@ import { User, UserDocument } from '../users/schemas/user.schema';
 import { ReportUserDto } from './dto/report-user.dto';
 import { ConfigService } from '@nestjs/config';
 import {
-  PublicAddress,
-  PublicAddressDocument,
-} from '../public-addresses/schemas/public-address.schema';
+  Password,
+  PasswordDocument,
+} from '../passwords/schemas/password.schema';
 
 @Injectable()
 export class ReportService {
@@ -17,8 +17,8 @@ export class ReportService {
   constructor(
     @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
-    @InjectModel(PublicAddress.name)
-    private publicAddressModel: Model<PublicAddressDocument>,
+    @InjectModel(Password.name)
+    private passwordModel: Model<PasswordDocument>,
     private configService: ConfigService,
   ) {
     // Get the maximum number of reports before ban from environment variables
@@ -31,7 +31,7 @@ export class ReportService {
 
   /**
    * Report a user for inappropriate behavior
-   * Only allows reporting users who have shared their secret with the reporter
+   * Only allows reporting users who have shared their passwords with the reporter
    * @param reporterTelegramId The Telegram ID of the user making the report
    * @param reportData The report data containing reported username and reason
    * @returns The created report
@@ -89,38 +89,32 @@ export class ReportService {
         );
       }
 
-      // Verify that the reported user has shared a secret with the reporter
-      // First, find the reporter's MongoDB ID
-      const reporterMongoId = reporter._id;
-
-      // Find if the reported user has shared any secrets with the reporter
-      // This is checked by looking for public addresses where:
-      // 1. The address belongs to the reported user
-      // 2. The address has a non-null encrypted secret
-      // 3. The reporter has accessed this address (implementation depends on your system design)
-
-      // For this implementation, we'll assume that if a user can view another user's address with a secret,
-      // then that secret has been shared with them
-      // In a real system, you might have a separate table tracking which users have shared secrets with whom
-
-      // Get all addresses from the reported user that have secrets
-      const reportedUserAddresses = await this.publicAddressModel.find({
+      // Verify that the reported user has shared a password with the reporter
+      // Find all passwords belonging to the reported user
+      const reportedUserPasswords = await this.passwordModel.find({
         userId: reportedUser._id,
-        encryptedSecret: { $ne: null },
+        isActive: true,
       });
 
-      // If no addresses with secrets found, the user hasn't shared any secrets
-      if (!reportedUserAddresses || reportedUserAddresses.length === 0) {
+      // Check if any of the reported user's passwords have been shared with the reporter
+      const hasSharedPassword = reportedUserPasswords.some((password) => {
+        // Check if the sharedWith array exists and contains the reporter's username
+        return (
+          password.sharedWith &&
+          password.sharedWith.some(
+            (shared) =>
+              shared.username.toLowerCase() === reporter.username.toLowerCase()
+          )
+        );
+      });
+
+      // If no passwords have been shared with the reporter, throw an error
+      if (!hasSharedPassword) {
         throw new HttpException(
-          'You can only report users who have shared their secrets with you',
+          'You can only report users who have shared their passwords with you',
           HttpStatus.FORBIDDEN,
         );
       }
-
-      // In a more sophisticated system, you would check if any of these addresses
-      // were specifically shared with the reporter. For now, we're assuming that
-      // if a user has any addresses with secrets, they've been shared with the reporter.
-      // This is a simplification and should be improved in a production system.
 
       // Create the report
       const report = new this.reportModel({

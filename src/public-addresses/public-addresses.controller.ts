@@ -16,7 +16,8 @@ export class PublicAddressesController {
   ) {}
 
   /**
-   * Adds new public addresses for a user
+   * Adds a new public address for a user
+   * Accepts a single publicKey with an optional secret
    */
   @Post()
   @TelegramDtoAuth()
@@ -28,7 +29,7 @@ export class PublicAddressesController {
     createDto.telegramInitData = req.headers['x-telegram-init-data'];
 
     // The service now handles all error scenarios and response formatting
-    return this.publicAddressesService.addPublicAddresses(createDto);
+    return this.publicAddressesService.addPublicAddress(createDto);
   }
 
   /**

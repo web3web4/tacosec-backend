@@ -8,6 +8,7 @@ import {
 import { UsersService } from '../users/users.service';
 import {
   CreatePublicAddressDto,
+  CreateMultiplePublicAddressesDto,
   WalletEntryDto,
 } from './dto/create-public-address.dto';
 // import { v4 as uuidv4 } from 'uuid';
@@ -44,12 +45,136 @@ export class PublicAddressesService {
   ) {}
 
   /**
+   * Adds a single public address with optional encrypted secret for a user
+   * identified by telegram init data
+   * Ensures the address is unique across the entire system
+   */
+  async addPublicAddress(
+    createDto: CreatePublicAddressDto,
+  ): Promise<ApiResponse<PublicAddressResponse[]>> {
+    try {
+      // Extract user from telegram init data
+      const user = await this.usersService.getUserFromTelegramInitData(
+        createDto.telegramInitData,
+      );
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Validate that publicKey is not null or empty
+      if (!createDto.publicKey?.trim()) {
+        throw new HttpException(
+          'Public key cannot be null or empty',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Check if the public key already exists in the system
+      const existingAddress = await this.publicAddressModel
+        .findOne({
+          publicKey: createDto.publicKey,
+        })
+        .exec();
+
+      // If the address already exists, return an empty array with message
+      if (existingAddress) {
+        return {
+          success: true,
+          data: [],
+          duplicatesSkipped: 1,
+          message: 'This address already exists and has been skipped.',
+        };
+      }
+
+      // Encrypt the secret if it exists
+      const encryptedSecret = createDto.secret
+        ? this.cryptoUtil.encrypt(createDto.secret)
+        : null;
+
+      // Create the new public address
+      const newAddress = new this.publicAddressModel({
+        userId: (user as UserDocument)._id,
+        publicKey: createDto.publicKey,
+        encryptedSecret,
+      });
+
+      const savedAddress = await newAddress.save();
+
+      // Transform the response to include userTelegramId and exclude userId
+      const addressObj = savedAddress.toObject() as any;
+
+      // Decrypt the secret if it exists
+      const secret = addressObj.encryptedSecret
+        ? this.cryptoUtil.decrypt(addressObj.encryptedSecret)
+        : undefined;
+
+      // Prepare the response data
+      const responseData = [
+        {
+          _id: addressObj._id,
+          publicKey: addressObj.publicKey,
+          secret,
+          userTelegramId: (user as any).telegramId,
+          createdAt: addressObj.createdAt,
+          updatedAt: addressObj.updatedAt,
+        },
+      ];
+
+      return {
+        success: true,
+        data: responseData,
+        message: 'Successfully added the address.',
+      };
+    } catch (error) {
+      // Handle duplicate key errors with a more specific message
+      if (error.message?.includes('E11000 duplicate key error')) {
+        // Extract the duplicated key if possible
+        const keyMatchPublicKey = error.message.match(
+          /dup key: \{ publicKey: "(.*?)" }/,
+        );
+
+        let duplicateKey = 'unknown';
+        if (keyMatchPublicKey) {
+          duplicateKey = keyMatchPublicKey[1];
+        }
+
+        throw new HttpException(
+          {
+            success: false,
+            message: `Duplicate public key: ${duplicateKey}. This key is already registered in the system.`,
+            error: 'Conflict',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      // If it's already an HttpException, just pass it through
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // Otherwise, log and throw a generic error
+      console.error('Error adding public address:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Failed to add public address',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * Adds multiple public addresses with encrypted secrets for a user
    * identified by telegram init data
    * Ensures each address is unique across the entire system
+   * @deprecated Use addPublicAddress instead which accepts a single address
    */
   async addPublicAddresses(
-    createDto: CreatePublicAddressDto,
+    // eslint-disable-next-line
+    createDto: CreateMultiplePublicAddressesDto,
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
     try {
       // Extract user from telegram init data

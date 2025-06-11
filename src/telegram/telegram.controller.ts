@@ -65,4 +65,20 @@ export class TelegramController {
     );
     return { success };
   }
+
+  /**
+   * Test endpoint to send a message directly to a Telegram user
+   * This endpoint is for testing purposes only and should be secured or removed in production
+   */
+  @Post('test-send')
+  async testSendMessage(
+    @Body() body: { telegramId: number; message: string },
+  ): Promise<{ success: boolean }> {
+    console.log('Received test message request:', body);
+    const success = await this.telegramService.sendMessage(
+      body.telegramId,
+      body.message,
+    );
+    return { success };
+  }
 }

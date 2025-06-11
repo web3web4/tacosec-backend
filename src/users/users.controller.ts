@@ -21,6 +21,7 @@ import {
   PaginationParams,
 } from '../decorators/pagination.decorator';
 import { GetTelegramProfileDto } from './dto/get-telegram-profile.dto';
+import { TelegramService } from '../telegram/telegram.service';
 
 @Controller('users')
 export class UsersController {
@@ -28,6 +29,7 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly passwordService: PasswordService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
+    private readonly telegramService: TelegramService,
   ) {}
 
   /**
@@ -126,5 +128,49 @@ export class UsersController {
   @TelegramDtoAuth()
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
+  }
+
+  /**
+   * Test endpoint to manually trigger a username change notification
+   * This endpoint is for testing purposes only and should be secured or removed in production
+   */
+  @Post('test-username-change')
+  async testUsernameChange(
+    @Body()
+    body: {
+      telegramId: string;
+      oldUsername: string;
+      newUsername: string;
+    },
+  ): Promise<{ success: boolean }> {
+    try {
+      console.log('Testing username change notification:', body);
+      
+      // Manually trigger the notification
+      const result = await this.telegramService.sendMessage(
+        Number(body.telegramId),
+        `<b>🔄 Username Changed</b>
+
+It appears that you've recently changed your username 🧑‍💻.
+
+As a result:
+<ul>
+  <li>✅ You can still <b>view</b> your old passwords.</li>
+  <li>🔐 However, they can <b>no longer be decrypted</b>.</li>
+  <li>🚫 You will also <b>lose access</b> to any passwords shared with you by other users.</li>
+</ul>
+
+<b>Old username:</b> <code>${body.oldUsername}</code><br>
+<b>New username:</b> <code>${body.newUsername}</code>
+
+<i>😞 We're sorry for the inconvenience.</i><br>
+🔁 To recover your passwords, please log in again using your old username.`,
+      );
+      
+      return { success: result };
+    } catch (error) {
+      console.error('Error in test username change:', error);
+      return { success: false };
+    }
   }
 }

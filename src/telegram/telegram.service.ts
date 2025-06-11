@@ -78,32 +78,45 @@ export class TelegramService {
     retries = 3,
   ): Promise<boolean> {
     const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+    
+    console.log('Attempting to send message to Telegram user:', userId);
+    console.log('Bot token available:', !!this.botToken);
+    
+    if (!this.botToken) {
+      console.error(
+        'ERROR: Cannot send message - Telegram bot token is missing!',
+      );
+      return false;
+    }
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         console.log(`Attempt ${attempt} to send message to user ${userId}`);
+        console.log('Message content:', message.substring(0, 50) + '...');
+        
+        const requestBody = {
+          chat_id: userId,
+          text: message,
+          parse_mode: 'HTML',
+        };
+        
+        console.log('Request body:', JSON.stringify(requestBody));
+        
         const response = await firstValueFrom(
-          this.httpService.post(
-            url,
-            {
-              chat_id: userId,
-              text: message,
-              parse_mode: 'HTML',
-            },
-            {
-              timeout: 10000, // 10 second timeout
-            },
-          ),
+          this.httpService.post(url, requestBody, {
+            timeout: 10000, // 10 second timeout
+          }),
         );
 
         console.log('Message sent successfully:', response.data);
         return response.data.ok === true;
       } catch (error) {
-        console.error(
-          `Attempt ${attempt} failed:`,
-          error.message,
-          error.response?.data,
-        );
+        console.error(`Attempt ${attempt} failed:`, error.message);
+        
+        if (error.response) {
+          console.error('Error response data:', error.response.data);
+          console.error('Error response status:', error.response.status);
+        }
 
         if (attempt < retries) {
           // Exponential backoff (500ms, 1000ms, 2000ms, etc.)

@@ -34,17 +34,37 @@ export class UsersService {
     if (telegramInitDto.username) {
       telegramInitDto.username = telegramInitDto.username.toLowerCase();
     }
+    
+    console.log('createAndUpdateUser - Received data:', {
+      telegramId,
+      username: telegramInitDto.username,
+    });
+    
     let user = await this.userModel.findOne({ telegramId }).exec();
 
     if (!user) {
+      console.log('User not found, creating new user');
       user = await this.userModel.create(telegramInitDto);
     } else {
+      console.log('Found existing user:', {
+        id: user._id,
+        telegramId: user.telegramId,
+        username: user.username,
+      });
+      
       if (
         telegramInitDto.username.toLowerCase() !== user.username.toLowerCase()
       ) {
-        this.telegramService.sendMessage(
-          Number(user.telegramId),
-          `<b>🔄 Username Changed</b>
+        console.log('Username changed detected!', {
+          oldUsername: user.username,
+          newUsername: telegramInitDto.username,
+        });
+        
+        console.log('Sending notification message to user');
+        try {
+          await this.telegramService.sendMessage(
+            Number(user.telegramId),
+            `<b>🔄 Username Changed</b>
 
 It appears that you've recently changed your username 🧑‍💻.
 
@@ -60,11 +80,17 @@ As a result:
 
 <i>😞 We're sorry for the inconvenience.</i><br>
 🔁 To recover your passwords, please log in again using your old username.`,
-        );
+          );
+          console.log('Notification message sent successfully');
+        } catch (error) {
+          console.error('Failed to send notification message:', error);
+        }
 
         user = await this.userModel
           .findByIdAndUpdate(user._id, telegramInitDto, { new: true })
           .exec();
+      } else {
+        console.log('Username has not changed');
       }
       // Convert to plain object if it's a Mongoose document
       const userObject = user.toObject ? user.toObject() : user;
@@ -79,17 +105,37 @@ As a result:
       if (userData.username) {
         userData.username = userData.username.toLowerCase();
       }
+      
+      console.log('createOrUpdateUser - Received data:', {
+        telegramId: userData.telegramId,
+        username: userData.username,
+      });
+      
       const existingUser = await this.userModel.findOne({
         telegramId: userData.telegramId,
       });
+      
       if (existingUser) {
+        console.log('Found existing user:', {
+          id: existingUser._id,
+          telegramId: existingUser.telegramId,
+          username: existingUser.username,
+        });
+        
         if (
           userData.username.toLowerCase() !==
           existingUser.username.toLowerCase()
         ) {
-          this.telegramService.sendMessage(
-            Number(existingUser.telegramId),
-            `<b>🔄 Username Changed</b>
+          console.log('Username changed detected!', {
+            oldUsername: existingUser.username,
+            newUsername: userData.username,
+          });
+          
+          console.log('Sending notification message to user');
+          try {
+            await this.telegramService.sendMessage(
+              Number(existingUser.telegramId),
+              `<b>🔄 Username Changed</b>
 
 It appears that you've recently changed your username 🧑‍💻.
 
@@ -105,8 +151,15 @@ As a result:
 
 <i>😞 We're sorry for the inconvenience.</i><br>
 🔁 To recover your passwords, please log in again using your old username.`,
-          );
+            );
+            console.log('Notification message sent successfully');
+          } catch (error) {
+            console.error('Failed to send notification message:', error);
+          }
+        } else {
+          console.log('Username has not changed');
         }
+        
         const updatedUser = await this.userModel.findByIdAndUpdate(
           existingUser._id,
           userData,
@@ -116,11 +169,14 @@ As a result:
         );
         return updatedUser;
       }
+      
+      console.log('User not found, creating new user');
       const newUser = new this.userModel(userData);
       const savedUser = await newUser.save();
       return savedUser;
     } catch (error) {
       // console.error('Error creating or updating user:', error);
+      console.error('Error in createOrUpdateUser:', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }

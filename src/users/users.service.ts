@@ -44,12 +44,22 @@ export class UsersService {
       ) {
         this.telegramService.sendMessage(
           Number(user.telegramId),
-          `It appears you've recently changed your (User Name).
-          so. while you can still view your old passwords, they can no longer be decrypted.
-          You will also lose access to any passwords shared with you by other users.
-          Your old username: ${user.username},
-          Your new username: ${telegramInitDto.username}
-          Sorry about this! To recover your passwords, you must use your old username again.`,
+          `<b>🔄 Username Changed</b>
+
+It appears that you've recently changed your username 🧑‍💻.
+
+As a result:
+<ul>
+  <li>✅ You can still <b>view</b> your old passwords.</li>
+  <li>🔐 However, they can <b>no longer be decrypted</b>.</li>
+  <li>🚫 You will also <b>lose access</b> to any passwords shared with you by other users.</li>
+</ul>
+
+<b>Old username:</b> <code>${user.username}</code><br>
+<b>New username:</b> <code>${telegramInitDto.username}</code>
+
+<i>😞 We're sorry for the inconvenience.</i><br>
+🔁 To recover your passwords, please log in again using your old username.`,
         );
 
         user = await this.userModel
@@ -79,12 +89,22 @@ export class UsersService {
         ) {
           this.telegramService.sendMessage(
             Number(existingUser.telegramId),
-            `It appears you've recently changed your (User Name).
-          so. while you can still view your old passwords, they can no longer be decrypted.
-          You will also lose access to any passwords shared with you by other users.
-          Your old username: ${existingUser.username},
-          Your new username: ${userData.username}
-          Sorry about this! To recover your passwords, you must use your old username again.`,
+            `<b>🔄 Username Changed</b>
+
+It appears that you've recently changed your username 🧑‍💻.
+
+As a result:
+<ul>
+  <li>✅ You can still <b>view</b> your old passwords.</li>
+  <li>🔐 However, they can <b>no longer be decrypted</b>.</li>
+  <li>🚫 You will also <b>lose access</b> to any passwords shared with you by other users.</li>
+</ul>
+
+<b>Old username:</b> <code>${existingUser.username}</code><br>
+<b>New username:</b> <code>${userData.username}</code>
+
+<i>😞 We're sorry for the inconvenience.</i><br>
+🔁 To recover your passwords, please log in again using your old username.`,
           );
         }
         const updatedUser = await this.userModel.findByIdAndUpdate(

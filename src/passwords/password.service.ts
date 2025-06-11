@@ -497,7 +497,12 @@ export class PasswordService {
               `Sending notification to ${sharedWithUser.username} (${sharedWithUser.telegramId})`,
             );
 
-            const message = `User (${user.username}) has shared his ${passwordUser.key} password with you. You can view it by clicking shared with me tab.`;
+            const message = `🔐 <b>Password Shared With You</b> 
+
+User <code>${user.username}</code> has shared their <b>${passwordUser.key}</b> password with you 🔁.
+
+You can view it under the <b>"Shared with me"</b> tab 📂.
+`;
 
             const result = await this.telegramService.sendMessage(
               Number(sharedWithUser.telegramId),

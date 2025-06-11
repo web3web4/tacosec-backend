@@ -6,9 +6,10 @@ import {
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { firstValueFrom } from 'rxjs';
+// import { firstValueFrom } from 'rxjs';
 // import { TelegramValidatorService } from './telegram-validator.service';
 import { UsersService } from '../users/users.service';
+import axios from 'axios';
 
 @Injectable()
 export class TelegramService {
@@ -78,10 +79,11 @@ export class TelegramService {
     retries = 3,
   ): Promise<boolean> {
     const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
-    
+
     console.log('Attempting to send message to Telegram user:', userId);
     console.log('Bot token available:', !!this.botToken);
-    
+    console.log('Full message content:', message);
+
     if (!this.botToken) {
       console.error(
         'ERROR: Cannot send message - Telegram bot token is missing!',
@@ -92,30 +94,33 @@ export class TelegramService {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         console.log(`Attempt ${attempt} to send message to user ${userId}`);
-        console.log('Message content:', message.substring(0, 50) + '...');
-        
+
         const requestBody = {
           chat_id: userId,
           text: message,
           parse_mode: 'HTML',
         };
-        
+
         console.log('Request body:', JSON.stringify(requestBody));
-        
-        const response = await firstValueFrom(
-          this.httpService.post(url, requestBody, {
-            timeout: 10000, // 10 second timeout
-          }),
-        );
+
+        // Use axios directly instead of HttpService
+        const response = await axios.post(url, requestBody, {
+          timeout: 10000, // 10 second timeout
+        });
 
         console.log('Message sent successfully:', response.data);
         return response.data.ok === true;
       } catch (error) {
         console.error(`Attempt ${attempt} failed:`, error.message);
-        
+
         if (error.response) {
-          console.error('Error response data:', error.response.data);
+          console.error(
+            'Error response data:',
+            JSON.stringify(error.response.data),
+          );
           console.error('Error response status:', error.response.status);
+        } else {
+          console.error('Full error object:', JSON.stringify(error));
         }
 
         if (attempt < retries) {

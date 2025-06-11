@@ -22,6 +22,8 @@ import {
 } from '../decorators/pagination.decorator';
 import { GetTelegramProfileDto } from './dto/get-telegram-profile.dto';
 import { TelegramService } from '../telegram/telegram.service';
+import { HttpService } from '@nestjs/axios';
+// import { firstValueFrom } from 'rxjs';
 
 @Controller('users')
 export class UsersController {
@@ -30,6 +32,7 @@ export class UsersController {
     private readonly passwordService: PasswordService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
     private readonly telegramService: TelegramService,
+    private readonly httpService: HttpService,
   ) {}
 
   /**
@@ -134,43 +137,59 @@ export class UsersController {
    * Test endpoint to manually trigger a username change notification
    * This endpoint is for testing purposes only and should be secured or removed in production
    */
-  @Post('test-username-change')
-  async testUsernameChange(
-    @Body()
-    body: {
-      telegramId: string;
-      oldUsername: string;
-      newUsername: string;
-    },
-  ): Promise<{ success: boolean }> {
-    try {
-      console.log('Testing username change notification:', body);
-      
-      // Manually trigger the notification
-      const result = await this.telegramService.sendMessage(
-        Number(body.telegramId),
-        `<b>🔄 Username Changed</b>
+  //   @Post('test-username-change')
+  //   async testUsernameChange(
+  //     @Body()
+  //     body: {
+  //       telegramId: string;
+  //       oldUsername: string;
+  //       newUsername: string;
+  //     },
+  //   ): Promise<{ success: boolean }> {
+  //     try {
+  //       console.log('Testing username change notification:', body);
 
-It appears that you've recently changed your username 🧑‍💻.
+  //       // Get the bot token from environment
+  //       const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  //       console.log('Bot token available:', !!botToken);
 
-As a result:
-<ul>
-  <li>✅ You can still <b>view</b> your old passwords.</li>
-  <li>🔐 However, they can <b>no longer be decrypted</b>.</li>
-  <li>🚫 You will also <b>lose access</b> to any passwords shared with you by other users.</li>
-</ul>
+  //       if (!botToken) {
+  //         console.error('ERROR: Telegram bot token is missing!');
+  //         return { success: false };
+  //       }
 
-<b>Old username:</b> <code>${body.oldUsername}</code><br>
-<b>New username:</b> <code>${body.newUsername}</code>
+  //       // Use axios directly to call the Telegram API
+  //       const axios = require('axios');
+  //       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
-<i>😞 We're sorry for the inconvenience.</i><br>
-🔁 To recover your passwords, please log in again using your old username.`,
-      );
-      
-      return { success: result };
-    } catch (error) {
-      console.error('Error in test username change:', error);
-      return { success: false };
-    }
-  }
+  //       const response = await axios.post(url, {
+  //         chat_id: body.telegramId,
+  //         text: `<b>🔄 Username Changed</b>
+
+  // It appears that you've recently changed your username.
+
+  // As a result:
+  // • ✅ You can still <b>view</b> your old passwords.
+  // • 🔐 However, they can <b>no longer be decrypted</b>.
+  // • 🚫 You will also <b>lose access</b> to any passwords shared with you by other users.
+
+  // <b>Old username:</b> <code>${body.oldUsername}</code>
+  // <b>New username:</b> <code>${body.newUsername}</code>
+
+  // <i>😞 We're sorry for the inconvenience.</i>
+  // 🔁 To recover your passwords, please log in again using your old username.`,
+  //         parse_mode: 'HTML',
+  //       });
+
+  //       console.log('Telegram API response:', response.data);
+  //       return { success: response.data.ok === true };
+  //     } catch (error) {
+  //       console.error('Error in test username change:', error.message);
+  //       if (error.response) {
+  //         console.error('Error response data:', error.response.data);
+  //         console.error('Error response status:', error.response.status);
+  //       }
+  //       return { success: false };
+  //     }
+  //   }
 }

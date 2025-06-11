@@ -34,12 +34,12 @@ export class UsersService {
     if (telegramInitDto.username) {
       telegramInitDto.username = telegramInitDto.username.toLowerCase();
     }
-    
+
     console.log('createAndUpdateUser - Received data:', {
       telegramId,
       username: telegramInitDto.username,
     });
-    
+
     let user = await this.userModel.findOne({ telegramId }).exec();
 
     if (!user) {
@@ -51,7 +51,7 @@ export class UsersService {
         telegramId: user.telegramId,
         username: user.username,
       });
-      
+
       if (
         telegramInitDto.username.toLowerCase() !== user.username.toLowerCase()
       ) {
@@ -59,26 +59,24 @@ export class UsersService {
           oldUsername: user.username,
           newUsername: telegramInitDto.username,
         });
-        
+
         console.log('Sending notification message to user');
         try {
           await this.telegramService.sendMessage(
             Number(user.telegramId),
             `<b>🔄 Username Changed</b>
 
-It appears that you've recently changed your username 🧑‍💻.
+It appears that you've recently changed your username.
 
 As a result:
-<ul>
-  <li>✅ You can still <b>view</b> your old passwords.</li>
-  <li>🔐 However, they can <b>no longer be decrypted</b>.</li>
-  <li>🚫 You will also <b>lose access</b> to any passwords shared with you by other users.</li>
-</ul>
+• ✅ You can still <b>view</b> your old passwords.
+• 🔐 However, they can <b>no longer be decrypted</b>.
+• 🚫 You will also <b>lose access</b> to any passwords shared with you by other users.
 
-<b>Old username:</b> <code>${user.username}</code><br>
+<b>Old username:</b> <code>${user.username}</code>
 <b>New username:</b> <code>${telegramInitDto.username}</code>
 
-<i>😞 We're sorry for the inconvenience.</i><br>
+<i>😞 We're sorry for the inconvenience.</i>
 🔁 To recover your passwords, please log in again using your old username.`,
           );
           console.log('Notification message sent successfully');
@@ -105,23 +103,23 @@ As a result:
       if (userData.username) {
         userData.username = userData.username.toLowerCase();
       }
-      
+
       console.log('createOrUpdateUser - Received data:', {
         telegramId: userData.telegramId,
         username: userData.username,
       });
-      
+
       const existingUser = await this.userModel.findOne({
         telegramId: userData.telegramId,
       });
-      
+
       if (existingUser) {
         console.log('Found existing user:', {
           id: existingUser._id,
           telegramId: existingUser.telegramId,
           username: existingUser.username,
         });
-        
+
         if (
           userData.username.toLowerCase() !==
           existingUser.username.toLowerCase()
@@ -130,26 +128,24 @@ As a result:
             oldUsername: existingUser.username,
             newUsername: userData.username,
           });
-          
+
           console.log('Sending notification message to user');
           try {
             await this.telegramService.sendMessage(
               Number(existingUser.telegramId),
               `<b>🔄 Username Changed</b>
 
-It appears that you've recently changed your username 🧑‍💻.
+It appears that you've recently changed your username.
 
 As a result:
-<ul>
-  <li>✅ You can still <b>view</b> your old passwords.</li>
-  <li>🔐 However, they can <b>no longer be decrypted</b>.</li>
-  <li>🚫 You will also <b>lose access</b> to any passwords shared with you by other users.</li>
-</ul>
+• ✅ You can still <b>view</b> your old passwords.
+• 🔐 However, they can <b>no longer be decrypted</b>.
+• 🚫 You will also <b>lose access</b> to any passwords shared with you by other users.
 
-<b>Old username:</b> <code>${existingUser.username}</code><br>
+<b>Old username:</b> <code>${existingUser.username}</code>
 <b>New username:</b> <code>${userData.username}</code>
 
-<i>😞 We're sorry for the inconvenience.</i><br>
+<i>😞 We're sorry for the inconvenience.</i>
 🔁 To recover your passwords, please log in again using your old username.`,
             );
             console.log('Notification message sent successfully');
@@ -159,7 +155,7 @@ As a result:
         } else {
           console.log('Username has not changed');
         }
-        
+
         const updatedUser = await this.userModel.findByIdAndUpdate(
           existingUser._id,
           userData,
@@ -169,7 +165,7 @@ As a result:
         );
         return updatedUser;
       }
-      
+
       console.log('User not found, creating new user');
       const newUser = new this.userModel(userData);
       const savedUser = await newUser.save();

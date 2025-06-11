@@ -88,6 +88,7 @@ export class TelegramService {
             {
               chat_id: userId,
               text: message,
+              parse_mode: 'HTML',
             },
             {
               timeout: 10000, // 10 second timeout

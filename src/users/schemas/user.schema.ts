@@ -16,7 +16,7 @@ export class User {
   @Prop()
   lastName: string;
 
-  @Prop()
+  @Prop({ index: true })
   @Transform(({ value }) => value.toLowerCase())
   username: string;
 
@@ -43,3 +43,6 @@ export class User {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+// Add text index for full-text search on username
+UserSchema.index({ username: 'text' });

@@ -336,4 +336,66 @@ As a result:
       );
     }
   }
+
+  /**
+   * Search users by username using full-text search for autocomplete
+   * @param searchQuery The search query string
+   * @param currentUserTelegramId The telegram ID of the current user to exclude from results
+   * @param limit Maximum number of results to return
+   * @param skip Number of results to skip
+   * @returns Array of users matching the search query
+   */
+  async searchUsersByUsername(
+    searchQuery: string,
+    currentUserTelegramId: string,
+    limit: number = 10,
+    skip: number = 0,
+  ): Promise<{
+    data: { username: string; firstName?: string; lastName?: string }[];
+    total: number;
+  }> {
+    // Get current user to exclude from results
+    const currentUser = await this.userModel
+      .findOne({ telegramId: currentUserTelegramId })
+      .exec();
+
+    if (!currentUser) {
+      throw new HttpException('Current user not found', HttpStatus.NOT_FOUND);
+    }
+
+    // Build search query
+    const searchFilter: any = {
+      _id: { $ne: currentUser._id },
+      isActive: true,
+    };
+
+    if (searchQuery && searchQuery.trim()) {
+      // Use regex for partial matching (autocomplete functionality)
+      searchFilter.username = {
+        $regex: searchQuery.toLowerCase(),
+        $options: 'i', // case insensitive
+      };
+    }
+
+    // Execute search with pagination
+    const [users, total] = await Promise.all([
+      this.userModel
+        .find(searchFilter)
+        .select('username firstName lastName -_id')
+        .limit(limit)
+        .skip(skip)
+        .sort({ username: 1 }) // Sort alphabetically
+        .exec(),
+      this.userModel.countDocuments(searchFilter).exec(),
+    ]);
+
+    return {
+      data: users.map((user) => ({
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      })),
+      total,
+    };
+  }
 }

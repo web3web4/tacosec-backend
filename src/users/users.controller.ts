@@ -24,6 +24,7 @@ import { GetTelegramProfileDto } from './dto/get-telegram-profile.dto';
 import { TelegramService } from '../telegram/telegram.service';
 import { HttpService } from '@nestjs/axios';
 // import { firstValueFrom } from 'rxjs';
+import { SearchUsersDto } from './dto/search-users.dto';
 
 @Controller('users')
 export class UsersController {
@@ -125,6 +126,25 @@ export class UsersController {
     return this.usersService.findByQuery({
       username: { $regex: query, $options: 'i' },
     });
+  }
+
+  @Get('search/autocomplete')
+  @TelegramDtoAuth()
+  async searchUsersAutocomplete(
+    @Query() searchDto: SearchUsersDto,
+    @Request() req: Request,
+  ) {
+    // Extract telegram ID from auth data
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+
+    return this.usersService.searchUsersByUsername(
+      searchDto.query || '',
+      teleDtoData.telegramId,
+      searchDto.limit,
+      searchDto.skip,
+    );
   }
 
   @Delete(':id')

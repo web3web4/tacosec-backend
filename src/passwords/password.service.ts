@@ -496,10 +496,14 @@ export class PasswordService {
             console.log(
               `Sending notification to ${sharedWithUser.username} (${sharedWithUser.telegramId})`,
             );
+            const userName =
+              user.firstName && user.firstName.trim() !== ''
+                ? user.firstName + ' ' + user.lastName
+                : user.username;
 
             const message = `🔐 <b>Password Shared With You</b> 
 
-User <b>${user.firstName} ${user.lastName}</b> has shared their "<b>${passwordUser.key}</b>" secret with you 🔁.
+User <b>${userName}</b> has shared their "<b>${passwordUser.key}</b>" secret with you 🔁.
 
 You can view it under the <b>"Shared with me"</b> tab 📂.
 `;

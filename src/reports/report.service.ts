@@ -103,7 +103,7 @@ export class ReportService {
           password.sharedWith &&
           password.sharedWith.some(
             (shared) =>
-              shared.username.toLowerCase() === reporter.username.toLowerCase()
+              shared.username.toLowerCase() === reporter.username.toLowerCase(),
           )
         );
       });

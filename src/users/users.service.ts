@@ -17,6 +17,7 @@ import { PaginationParams } from '../decorators/pagination.decorator';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
 import { TelegramService } from '../telegram/telegram.service';
+import { SearchType } from './dto/search-users.dto';
 
 @Injectable()
 export class UsersService {
@@ -348,6 +349,7 @@ As a result:
   async searchUsersByUsername(
     searchQuery: string,
     currentUserTelegramId: string,
+    searchType: SearchType = SearchType.STARTS_WITH,
     limit: number = 10,
     skip: number = 0,
   ): Promise<{
@@ -370,9 +372,19 @@ As a result:
     };
 
     if (searchQuery && searchQuery.trim()) {
-      // Use regex for partial matching (autocomplete functionality)
+      let regexPattern: string;
+
+      // Choose regex pattern based on search type
+      if (searchType === SearchType.STARTS_WITH) {
+        // Search for usernames that START with the query
+        regexPattern = `^${searchQuery.toLowerCase()}`;
+      } else {
+        // Search for usernames that CONTAIN the query anywhere
+        regexPattern = searchQuery.toLowerCase();
+      }
+
       searchFilter.username = {
-        $regex: searchQuery.toLowerCase(),
+        $regex: regexPattern,
         $options: 'i', // case insensitive
       };
     }

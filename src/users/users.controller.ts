@@ -128,6 +128,12 @@ export class UsersController {
     });
   }
 
+  /**
+   * Search users by username with configurable search type
+   * Supports both 'starts_with' and 'contains' search modes
+   * GET /users/search/autocomplete?query=john&searchType=starts_with&limit=10&skip=0
+   * GET /users/search/autocomplete?query=john&searchType=contains&limit=10&skip=0
+   */
   @Get('search/autocomplete')
   @TelegramDtoAuth()
   async searchUsersAutocomplete(
@@ -142,6 +148,7 @@ export class UsersController {
     return this.usersService.searchUsersByUsername(
       searchDto.query || '',
       teleDtoData.telegramId,
+      searchDto.searchType,
       searchDto.limit,
       searchDto.skip,
     );

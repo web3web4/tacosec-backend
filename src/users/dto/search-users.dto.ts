@@ -1,10 +1,19 @@
-import { IsString, IsOptional, IsNumber, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, Min, IsEnum } from 'class-validator';
 import { Transform } from 'class-transformer';
+
+export enum SearchType {
+  STARTS_WITH = 'starts_with',
+  CONTAINS = 'contains',
+}
 
 export class SearchUsersDto {
   @IsString()
   @IsOptional()
   query?: string;
+
+  @IsOptional()
+  @IsEnum(SearchType)
+  searchType?: SearchType = SearchType.STARTS_WITH; // Default to starts_with
 
   @IsOptional()
   @IsNumber()

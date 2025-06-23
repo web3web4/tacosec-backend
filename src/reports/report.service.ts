@@ -13,6 +13,7 @@ import {
 @Injectable()
 export class ReportService {
   private readonly maxReportsBeforeBan: number;
+  private readonly maxPercentageOfReportsRequiredForBan: number;
 
   constructor(
     @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
@@ -26,6 +27,15 @@ export class ReportService {
     this.maxReportsBeforeBan = parseInt(
       this.configService.get<string>('MAX_REPORTS_BEFORE_BAN', '10'),
       10,
+    );
+
+    // Get the maximum percentage of reports required for ban from environment variables
+    // Default to 0.5 (50%) if not specified
+    this.maxPercentageOfReportsRequiredForBan = parseFloat(
+      this.configService.get<string>(
+        'MAX_PERCENTAGE_OF_REPORTS_REQUIRED_FOR_BAN',
+        '0.5',
+      ),
     );
   }
 
@@ -137,8 +147,15 @@ export class ReportService {
         { reportCount },
       );
 
-      // If report count reaches the threshold, restrict sharing
-      if (reportCount >= this.maxReportsBeforeBan) {
+      // Check both ban conditions
+      const shouldBanByCount = reportCount >= this.maxReportsBeforeBan;
+      const shouldBanByPercentage = await this.checkPercentageBanCondition(
+        reportedTelegramId,
+        reportCount,
+      );
+
+      // If either condition is met, restrict sharing
+      if (shouldBanByCount || shouldBanByPercentage) {
         await this.userModel.updateOne(
           { telegramId: reportedTelegramId },
           { sharingRestricted: true },
@@ -164,6 +181,74 @@ export class ReportService {
       .find({ reportedTelegramId: telegramId })
       .sort({ createdAt: -1 })
       .exec();
+  }
+
+  /**
+   * Get the count of users who can report a specific user
+   * (users who have shared passwords with the target user)
+   * @param reportedUserId The user ID of the reported user
+   * @returns Number of users who can report this user
+   */
+  private async getEligibleReportersCount(
+    reportedUserId: string,
+  ): Promise<number> {
+    // Find all passwords belonging to the reported user
+    const reportedUserPasswords = await this.passwordModel.find({
+      userId: reportedUserId,
+      isActive: true,
+    });
+
+    // Extract unique usernames from sharedWith arrays
+    const eligibleReporters = new Set<string>();
+
+    reportedUserPasswords.forEach((password) => {
+      if (password.sharedWith && password.sharedWith.length > 0) {
+        password.sharedWith.forEach((shared) => {
+          if (shared.username) {
+            eligibleReporters.add(shared.username.toLowerCase());
+          }
+        });
+      }
+    });
+
+    return eligibleReporters.size;
+  }
+
+  /**
+   * Check if a user should be banned based on percentage of reports
+   * @param reportedTelegramId The Telegram ID of the reported user
+   * @param currentReportCount Current number of unresolved reports
+   * @returns Boolean indicating if the user should be banned
+   */
+  private async shouldBanUserByPercentage(
+    reportedTelegramId: string,
+    currentReportCount: number,
+  ): Promise<boolean> {
+    // Get the reported user
+    const reportedUser = await this.userModel.findOne({
+      telegramId: reportedTelegramId,
+      isActive: true,
+    });
+
+    if (!reportedUser) {
+      return false;
+    }
+
+    // Get the count of eligible reporters
+    const eligibleReportersCount = await this.getEligibleReportersCount(
+      reportedUser._id.toString(),
+    );
+
+    // If no one can report this user, don't ban
+    if (eligibleReportersCount === 0) {
+      return false;
+    }
+
+    // Calculate the percentage of reports
+    const reportPercentage = currentReportCount / eligibleReportersCount;
+
+    // Check if percentage exceeds the threshold
+    return reportPercentage >= this.maxPercentageOfReportsRequiredForBan;
   }
 
   /**
@@ -206,8 +291,15 @@ export class ReportService {
       { reportCount },
     );
 
-    // If report count is now below the threshold, remove restriction
-    if (reportCount < this.maxReportsBeforeBan) {
+    // Check if user should still be banned after resolving this report
+    const shouldStillBanByCount = reportCount >= this.maxReportsBeforeBan;
+    const shouldStillBanByPercentage = await this.checkPercentageBanCondition(
+      report.reportedTelegramId,
+      reportCount,
+    );
+
+    // If neither condition is met, remove restriction
+    if (!shouldStillBanByCount && !shouldStillBanByPercentage) {
       await this.userModel.updateOne(
         { telegramId: report.reportedTelegramId },
         { sharingRestricted: false },
@@ -215,6 +307,65 @@ export class ReportService {
     }
 
     return updatedReport;
+  }
+
+  /**
+   * Check if user should be banned based on percentage of reports
+   * @param reportedTelegramId The Telegram ID of the reported user
+   * @param reportCount Current number of unresolved reports
+   * @returns Boolean indicating if user should be banned based on percentage
+   */
+  private async checkPercentageBanCondition(
+    reportedTelegramId: string,
+    reportCount: number,
+  ): Promise<boolean> {
+    try {
+      // Find the reported user
+      const reportedUser = await this.userModel.findOne({
+        telegramId: reportedTelegramId,
+        isActive: true,
+      });
+
+      if (!reportedUser) {
+        return false;
+      }
+
+      // Find all passwords belonging to the reported user
+      const reportedUserPasswords = await this.passwordModel.find({
+        userId: reportedUser._id,
+        isActive: true,
+      });
+
+      // Get all unique users who can report this user (users who have shared passwords with them)
+      const usersWhoCanReport = new Set<string>();
+
+      for (const password of reportedUserPasswords) {
+        if (password.sharedWith && password.sharedWith.length > 0) {
+          password.sharedWith.forEach((shared) => {
+            if (shared.username) {
+              usersWhoCanReport.add(shared.username.toLowerCase());
+            }
+          });
+        }
+      }
+
+      const totalUsersWhoCanReport = usersWhoCanReport.size;
+
+      // If no users can report, return false
+      if (totalUsersWhoCanReport === 0) {
+        return false;
+      }
+
+      // Calculate the percentage of reports
+      const reportPercentage = reportCount / totalUsersWhoCanReport;
+
+      // Check if percentage exceeds the threshold
+      return reportPercentage >= this.maxPercentageOfReportsRequiredForBan;
+    } catch (error) {
+      // Log error but don't throw to avoid breaking the main flow
+      console.error('Error checking percentage ban condition:', error);
+      return false;
+    }
   }
 
   /**

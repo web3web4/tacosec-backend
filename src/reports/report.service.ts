@@ -148,6 +148,8 @@ export class ReportService {
 
       // Handle reason field based on report_type
       let finalReason: string | null = null;
+
+      // For OTHER type, reason is required
       if (reportData.report_type === ReportType.OTHER) {
         if (!reportData.reason || reportData.reason.trim() === '') {
           throw new HttpException(
@@ -156,6 +158,11 @@ export class ReportService {
           );
         }
         finalReason = reportData.reason.trim();
+      } else {
+        // For all other types, reason is optional but if provided, save it
+        if (reportData.reason && reportData.reason.trim() !== '') {
+          finalReason = reportData.reason.trim();
+        }
       }
 
       // Create the report

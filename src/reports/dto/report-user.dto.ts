@@ -28,7 +28,7 @@ export class ReportUserDto {
   @IsNotEmpty()
   report_type: ReportType;
 
-  // Reason is required only when report_type is 'Other', otherwise it should be null
+  // Reason is optional for all report types, but required when report_type is 'Other'
   @ValidateIf((o) => o.report_type === ReportType.OTHER)
   @IsString()
   @IsNotEmpty()

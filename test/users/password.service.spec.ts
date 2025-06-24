@@ -7,6 +7,10 @@ import {
   Password,
   PasswordDocument,
 } from '../../src/passwords/schemas/password.schema';
+import {
+  Report,
+  ReportDocument,
+} from '../../src/reports/schemas/report.schema';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { SharedWithMeResponse } from '../../src/types/share-with-me-pass.types';
 import { TelegramService } from '../../src/telegram/telegram.service';
@@ -15,6 +19,7 @@ describe('PasswordService', () => {
   let service: PasswordService;
   let userModel: Model<UserDocument>;
   let passwordModel: Model<PasswordDocument>;
+  let reportModel: Model<ReportDocument>;
   let telegramServiceMock;
 
   // Mock data
@@ -78,6 +83,16 @@ describe('PasswordService', () => {
           },
         },
         {
+          provide: getModelToken(Report.name),
+          useValue: {
+            find: jest.fn().mockReturnValue({
+              populate: jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue([]),
+              }),
+            }),
+          },
+        },
+        {
           provide: TelegramService,
           useValue: telegramServiceMock,
         },
@@ -89,6 +104,7 @@ describe('PasswordService', () => {
     passwordModel = module.get<Model<PasswordDocument>>(
       getModelToken(Password.name),
     );
+    reportModel = module.get<Model<ReportDocument>>(getModelToken(Report.name));
   });
 
   it('should be defined', () => {
@@ -136,6 +152,7 @@ describe('PasswordService', () => {
           value: mockPassword.value,
           sharedWith: ['789012'],
           hidden: mockPassword.hidden,
+          reports: [],
         },
       ]);
     });

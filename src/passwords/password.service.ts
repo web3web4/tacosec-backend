@@ -3,9 +3,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Password, PasswordDocument } from './schemas/password.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { Report, ReportDocument } from '../reports/schemas/report.schema';
 import * as bcrypt from 'bcrypt';
 import { SharedWithMeResponse } from '../types/share-with-me-pass.types';
-import { passwordReturns } from '../types/password-returns.types';
+import {
+  passwordReturns,
+  PasswordReportInfo,
+} from '../types/password-returns.types';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { SharedWithDto } from './dto/shared-with.dto';
 import { TelegramService } from '../telegram/telegram.service';
@@ -14,6 +18,7 @@ export class PasswordService {
   constructor(
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
     private readonly telegramService: TelegramService,
   ) {}
 
@@ -60,6 +65,36 @@ export class PasswordService {
 
       const passwordWithSharedWithAsUsernames = await Promise.all(
         passwords.map(async (password) => {
+          // Fetch unresolved reports for this password
+          // Handle both ObjectId and string formats for secret_id
+          const reports = await this.reportModel
+            .find({
+              $or: [
+                { secret_id: password._id },
+                { secret_id: password._id.toString() },
+              ],
+              resolved: false,
+            })
+            .exec();
+
+          // Transform reports to include reporter username
+          const reportInfo: PasswordReportInfo[] = await Promise.all(
+            reports.map(async (report) => {
+              // Get reporter user info
+              const reporter = await this.userModel
+                .findOne({ telegramId: report.reporterTelegramId })
+                .select('username')
+                .exec();
+
+              return {
+                reporterUsername: reporter ? reporter.username : 'Unknown',
+                report_type: report.report_type,
+                reason: report.reason,
+                createdAt: report.createdAt,
+              };
+            }),
+          );
+
           return {
             _id: password._id,
             key: password.key,
@@ -70,6 +105,7 @@ export class PasswordService {
             updatedAt: password.updatedAt,
             createdAt: password.createdAt,
             hidden: password.hidden || false,
+            reports: reportInfo, // Include report information
           };
         }),
       );
@@ -165,24 +201,49 @@ export class PasswordService {
 
       const resolvedPasswords = await Promise.all(
         sharedPasswords.map(async (password) => {
-          // const user = await this.userModel.findOne({
-          //   telegramId: password.initData.telegramId,
-          //   isActive: true,
-          // });
+          // Find unresolved reports for this password
+          // Handle both ObjectId and string formats for secret_id
+          const reports = await this.reportModel
+            .find({
+              $or: [
+                { secret_id: password._id },
+                { secret_id: password._id.toString() },
+              ],
+              resolved: false,
+            })
+            .exec();
+
+          const transformedReports = await Promise.all(
+            reports.map(async (report) => {
+              // Find the reporter user by telegramId
+              const reporterUser = await this.userModel
+                .findOne({ telegramId: report.reporterTelegramId })
+                .select('username')
+                .exec();
+
+              return {
+                id: report._id.toString(),
+                reporterUsername: reporterUser?.username || 'unknown',
+                reason: report.reason,
+                createdAt: report.createdAt,
+              };
+            }),
+          );
 
           return {
             id: password._id.toString(),
             key: password.key,
             value: password.value,
             description: password.description,
-            // username: user?.username || 'unknown',
             username: password.initData.username,
+            reports: transformedReports,
           } as {
             id: string;
             key: string;
             value: string;
             description: string;
             username: string;
+            reports: any[];
           };
         }),
       );
@@ -196,6 +257,7 @@ export class PasswordService {
               key: string;
               value: string;
               description: string;
+              reports: any[];
             }>
           >,
           password,
@@ -212,6 +274,7 @@ export class PasswordService {
               key: password.key,
               value: password.value,
               description: password.description,
+              reports: password.reports,
             });
           }
 

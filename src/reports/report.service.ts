@@ -110,12 +110,12 @@ export class ReportService {
       const reportedTelegramId = reportedUser.telegramId;
 
       // Prevent self-reporting
-      // if (reporterTelegramId === reportedTelegramId) {
-      //   throw new HttpException(
-      //     'You cannot report yourself',
-      //     HttpStatus.BAD_REQUEST,
-      //   );
-      // }
+      if (reporterTelegramId === reportedTelegramId) {
+        throw new HttpException(
+          'You cannot report yourself',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
 
       // Verify that the password has been shared with the reporter
       const isPasswordSharedWithReporter =

@@ -4,6 +4,7 @@ import { PasswordService } from './password.service';
 import { PasswordController } from './password.controller';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Password, PasswordSchema } from './schemas/password.schema';
+import { Report, ReportSchema } from '../reports/schemas/report.schema';
 import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
 import { HttpModule } from '@nestjs/axios';
 import { TelegramModule } from '../telegram/telegram.module';
@@ -16,6 +17,7 @@ import { ReportsModule } from '../reports/reports.module';
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Password.name, schema: PasswordSchema },
+      { name: Report.name, schema: ReportSchema },
     ]),
     ConfigModule,
     HttpModule,

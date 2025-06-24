@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Report, ReportDocument } from './schemas/report.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
-import { ReportUserDto } from './dto/report-user.dto';
+import { ReportUserDto, ReportType } from './dto/report-user.dto';
 import { ConfigService } from '@nestjs/config';
 import {
   Password,
@@ -43,7 +43,7 @@ export class ReportService {
    * Report a user for inappropriate behavior
    * Only allows reporting users who have shared their passwords with the reporter
    * @param reporterTelegramId The Telegram ID of the user making the report
-   * @param reportData The report data containing reported username and reason
+   * @param reportData The report data containing reported username, secret_id, report_type and optional reason
    * @returns The created report
    */
   async reportUser(
@@ -60,7 +60,31 @@ export class ReportService {
         throw new HttpException('Reporter not found', HttpStatus.NOT_FOUND);
       }
 
-      // Check if reported user exists by username
+      // Validate the secret_id (password) exists and is active
+      const password = await this.passwordModel.findOne({
+        _id: reportData.secret_id,
+        isActive: true,
+      });
+      if (!password) {
+        throw new HttpException(
+          'Password not found or inactive',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Get the owner of the password
+      const passwordOwner = await this.userModel.findOne({
+        _id: password.userId,
+        isActive: true,
+      });
+      if (!passwordOwner) {
+        throw new HttpException(
+          'Password owner not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Check if reported user exists by username and matches the password owner
       const reportedUser = await this.userModel.findOne({
         username: {
           $regex: new RegExp(`^${reportData.reportedUsername}$`, 'i'),
@@ -74,63 +98,73 @@ export class ReportService {
         );
       }
 
-      // Get the telegramId of the reported user
-      const reportedTelegramId = reportedUser.telegramId;
-
-      // Prevent self-reporting
-      if (reporterTelegramId === reportedTelegramId) {
+      // Verify that the reported user is the owner of the password
+      if (reportedUser._id.toString() !== passwordOwner._id.toString()) {
         throw new HttpException(
-          'You cannot report yourself',
+          'The reported user is not the owner of the specified password',
           HttpStatus.BAD_REQUEST,
         );
       }
 
-      // Check if this user has already reported the same user
+      // Get the telegramId of the reported user
+      const reportedTelegramId = reportedUser.telegramId;
+
+      // Prevent self-reporting
+      // if (reporterTelegramId === reportedTelegramId) {
+      //   throw new HttpException(
+      //     'You cannot report yourself',
+      //     HttpStatus.BAD_REQUEST,
+      //   );
+      // }
+
+      // Verify that the password has been shared with the reporter
+      const isPasswordSharedWithReporter =
+        password.sharedWith &&
+        password.sharedWith.some(
+          (shared) =>
+            shared.username.toLowerCase() === reporter.username.toLowerCase(),
+        );
+
+      if (!isPasswordSharedWithReporter) {
+        throw new HttpException(
+          'You can only report passwords that have been shared with you',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      // Check if this user has already reported the same password
       const existingReport = await this.reportModel.findOne({
         reporterTelegramId,
-        reportedTelegramId,
+        secret_id: reportData.secret_id,
         resolved: false,
       });
 
       if (existingReport) {
         throw new HttpException(
-          'You have already reported this user',
+          'You have already reported this password',
           HttpStatus.BAD_REQUEST,
         );
       }
 
-      // Verify that the reported user has shared a password with the reporter
-      // Find all passwords belonging to the reported user
-      const reportedUserPasswords = await this.passwordModel.find({
-        userId: reportedUser._id,
-        isActive: true,
-      });
-
-      // Check if any of the reported user's passwords have been shared with the reporter
-      const hasSharedPassword = reportedUserPasswords.some((password) => {
-        // Check if the sharedWith array exists and contains the reporter's username
-        return (
-          password.sharedWith &&
-          password.sharedWith.some(
-            (shared) =>
-              shared.username.toLowerCase() === reporter.username.toLowerCase(),
-          )
-        );
-      });
-
-      // If no passwords have been shared with the reporter, throw an error
-      if (!hasSharedPassword) {
-        throw new HttpException(
-          'You can only report users who have shared their passwords with you',
-          HttpStatus.FORBIDDEN,
-        );
+      // Handle reason field based on report_type
+      let finalReason: string | null = null;
+      if (reportData.report_type === ReportType.OTHER) {
+        if (!reportData.reason || reportData.reason.trim() === '') {
+          throw new HttpException(
+            'Reason is required when report type is Other',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        finalReason = reportData.reason.trim();
       }
 
       // Create the report
       const report = new this.reportModel({
         reporterTelegramId,
         reportedTelegramId,
-        reason: reportData.reason,
+        secret_id: reportData.secret_id,
+        report_type: reportData.report_type,
+        reason: finalReason,
       });
 
       const savedReport = await report.save();

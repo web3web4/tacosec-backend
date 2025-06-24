@@ -7,11 +7,17 @@ import {
   Report,
   ReportDocument,
 } from '../../src/reports/schemas/report.schema';
+import {
+  Password,
+  PasswordDocument,
+} from '../../src/passwords/schemas/password.schema';
+import { ConfigService } from '@nestjs/config';
 
 describe('ReportService', () => {
   let service: ReportService;
   let userModel: Model<UserDocument>;
   let reportModel: Model<ReportDocument>;
+  let passwordModel: Model<PasswordDocument>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -33,6 +39,25 @@ describe('ReportService', () => {
             findById: jest.fn(),
             countDocuments: jest.fn(),
             distinct: jest.fn(),
+            // Add constructor for new Report instances
+            constructor: jest.fn().mockImplementation(() => ({
+              save: jest.fn().mockResolvedValue({}),
+            })),
+          },
+        },
+        {
+          provide: getModelToken(Password.name),
+          useValue: {
+            findOne: jest.fn(),
+            find: jest.fn(),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest
+              .fn()
+              .mockImplementation((key, defaultValue) => defaultValue),
           },
         },
       ],
@@ -41,6 +66,9 @@ describe('ReportService', () => {
     service = module.get<ReportService>(ReportService);
     userModel = module.get<Model<UserDocument>>(getModelToken(User.name));
     reportModel = module.get<Model<ReportDocument>>(getModelToken(Report.name));
+    passwordModel = module.get<Model<PasswordDocument>>(
+      getModelToken(Password.name),
+    );
   });
 
   it('should be defined', () => {

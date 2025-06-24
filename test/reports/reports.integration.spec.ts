@@ -8,7 +8,10 @@ import { User } from '../../src/users/schemas/user.schema';
 import { Report } from '../../src/reports/schemas/report.schema';
 import { TelegramDtoAuthGuard } from '../../src/telegram/dto/telegram-dto-auth.guard';
 import { TelegramService } from '../../src/telegram/telegram.service';
-import { ReportUserDto } from '../../src/reports/dto/report-user.dto';
+import {
+  ReportUserDto,
+  ReportType,
+} from '../../src/reports/dto/report-user.dto';
 import { RolesGuard } from '../../src/guards/roles.guard';
 import { CryptoModule } from '../../src/utils/crypto.module';
 
@@ -61,6 +64,8 @@ describe.skip('ReportController (e2e)', () => {
 
   const mockReportUserDto: ReportUserDto = {
     reportedUsername: 'reportedUser',
+    secret_id: '507f1f77bcf86cd799439012', // Mock MongoDB ObjectId
+    report_type: ReportType.OTHER,
     reason: 'Inappropriate behavior',
   };
 

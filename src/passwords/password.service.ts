@@ -224,6 +224,7 @@ export class PasswordService {
               return {
                 id: report._id.toString(),
                 reporterUsername: reporterUser?.username || 'unknown',
+                report_type: report.report_type,
                 reason: report.reason,
                 createdAt: report.createdAt,
               };

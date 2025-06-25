@@ -101,7 +101,7 @@ export class ReportService {
       // Verify that the reported user is the owner of the password
       if (reportedUser._id.toString() !== passwordOwner._id.toString()) {
         throw new HttpException(
-          'The reported user is not the owner of the specified password',
+          'The reported user is not the owner of the specified secret',
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -127,7 +127,7 @@ export class ReportService {
 
       if (!isPasswordSharedWithReporter) {
         throw new HttpException(
-          'You can only report passwords that have been shared with you',
+          'You can only report secrets that have been shared with you',
           HttpStatus.FORBIDDEN,
         );
       }
@@ -141,7 +141,7 @@ export class ReportService {
 
       if (existingReport) {
         throw new HttpException(
-          'You have already reported this password',
+          'You have already reported this secret',
           HttpStatus.BAD_REQUEST,
         );
       }

@@ -565,7 +565,7 @@ export class PasswordService {
                 ? user.firstName + ' ' + user.lastName
                 : user.username;
 
-            const message = `🔐 <b>Password Shared With You</b> 
+            const message = `🔐 <b>Secret Shared With You</b> 
 
 User <b>${userName}</b> has shared their "<b>${passwordUser.key}</b>" secret with you 🔁.
 
@@ -646,13 +646,13 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
 
       // Check if password exists
       if (!password) {
-        throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+        throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
       }
 
       // Check if the authenticated user is the owner of the password
       if (password.initData?.telegramId !== telegramId) {
         throw new HttpException(
-          'You are not authorized to delete this password',
+          'You are not authorized to delete this secret',
           HttpStatus.FORBIDDEN,
         );
       }
@@ -686,13 +686,13 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
 
       // Check if password exists
       if (!password) {
-        throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+        throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
       }
 
       // Check if the authenticated user is the owner of the password
       if (password.initData?.telegramId !== telegramId) {
         throw new HttpException(
-          'You are not authorized to modify this password',
+          'You are not authorized to modify this secret',
           HttpStatus.FORBIDDEN,
         );
       }

@@ -70,15 +70,15 @@ export class UsersService {
 It appears that you've recently changed your username.
 
 As a result:
-• ✅ You can still <b>view</b> your old passwords.
+• ✅ You can still <b>view</b> your old secrets.
 • 🔐 However, they can <b>no longer be decrypted</b>.
-• 🚫 You will also <b>lose access</b> to any passwords shared with you by other users.
+• 🚫 You will also <b>lose access</b> to any secrets shared with you by other users.
 
 <b>Old username:</b> <code>${user.username}</code>
 <b>New username:</b> <code>${telegramInitDto.username}</code>
 
 <i>😞 We're sorry for the inconvenience.</i>
-🔁 To recover your passwords, please log in again using your old username.`,
+🔁 To recover your secrets, please log in again using your old username.`,
           );
           console.log('Notification message sent successfully');
         } catch (error) {
@@ -139,15 +139,15 @@ As a result:
 It appears that you've recently changed your username.
 
 As a result:
-• ✅ You can still <b>view</b> your old passwords.
+• ✅ You can still <b>view</b> your old secrets.
 • 🔐 However, they can <b>no longer be decrypted</b>.
-• 🚫 You will also <b>lose access</b> to any passwords shared with you by other users.
+• 🚫 You will also <b>lose access</b> to any secrets shared with you by other users.
 
 <b>Old username:</b> <code>${existingUser.username}</code>
 <b>New username:</b> <code>${userData.username}</code>
 
 <i>😞 We're sorry for the inconvenience.</i>
-🔁 To recover your passwords, please log in again using your old username.`,
+🔁 To recover your secrets, please log in again using your old username.`,
             );
             console.log('Notification message sent successfully');
           } catch (error) {

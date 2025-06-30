@@ -86,9 +86,7 @@ describe('PasswordService', () => {
           provide: getModelToken(Report.name),
           useValue: {
             find: jest.fn().mockReturnValue({
-              populate: jest.fn().mockReturnValue({
-                exec: jest.fn().mockResolvedValue([]),
-              }),
+              exec: jest.fn().mockResolvedValue([]),
             }),
           },
         },

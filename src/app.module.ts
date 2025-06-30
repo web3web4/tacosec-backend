@@ -6,6 +6,7 @@ import { UsersModule } from './users/users.module';
 import { DatabaseModule } from './database/database.module';
 import { PasswordModule } from './passwords/password.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { TelegramClientModule } from './telegram-client/telegram-client.module';
 import { PublicAddressesModule } from './public-addresses/public-addresses.module';
 import { CryptoModule } from './utils/crypto.module';
 import { ReportsModule } from './reports/reports.module';
@@ -20,6 +21,7 @@ import { ReportsModule } from './reports/reports.module';
     UsersModule,
     PasswordModule,
     TelegramModule,
+    TelegramClientModule,
     PublicAddressesModule,
     CryptoModule,
     ReportsModule,

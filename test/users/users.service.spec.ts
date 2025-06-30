@@ -8,6 +8,7 @@ import {
   Password,
   // PasswordDocument,
 } from '../../src/passwords/schemas/password.schema';
+import { Report } from '../../src/reports/schemas/report.schema';
 import { PaginationParams } from '../../src/decorators/pagination.decorator';
 import { TelegramInitDto } from '../../src/telegram/dto/telegram-init.dto';
 import { HttpException, HttpStatus } from '@nestjs/common';
@@ -89,6 +90,19 @@ describe('UsersService', () => {
             findOne: jest.fn(),
             find: jest.fn(),
             save: jest.fn(),
+          },
+        },
+        {
+          provide: getModelToken(Report.name),
+          useValue: {
+            find: jest.fn().mockReturnValue({
+              exec: jest.fn().mockResolvedValue([]),
+            }),
+            findOne: jest.fn().mockReturnValue({
+              exec: jest.fn().mockResolvedValue(null),
+            }),
+            save: jest.fn(),
+            create: jest.fn(),
           },
         },
         {
@@ -196,7 +210,7 @@ describe('UsersService', () => {
       // Verify the Telegram message was sent
       expect(telegramServiceMock.sendMessage).toHaveBeenCalledWith(
         Number(existingUser.telegramId),
-        expect.stringContaining('changed your (User Name)'),
+        expect.stringContaining('🔄 Username Changed'),
       );
 
       // Verify update was called with correct parameters

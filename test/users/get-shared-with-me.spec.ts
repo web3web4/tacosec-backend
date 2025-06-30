@@ -3,6 +3,7 @@ import { PasswordService } from '../../src/passwords/password.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { Password } from '../../src/passwords/schemas/password.schema';
 import { User } from '../../src/users/schemas/user.schema';
+import { Report } from '../../src/reports/schemas/report.schema';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { TelegramService } from '../../src/telegram/telegram.service';
 
@@ -40,6 +41,19 @@ describe('PasswordService - getSharedWithMe', () => {
         {
           provide: getModelToken(User.name),
           useValue: userModel,
+        },
+        {
+          provide: getModelToken(Report.name),
+          useValue: {
+            find: jest.fn().mockReturnValue({
+              exec: jest.fn().mockResolvedValue([]),
+            }),
+            findOne: jest.fn().mockReturnValue({
+              exec: jest.fn().mockResolvedValue(null),
+            }),
+            save: jest.fn(),
+            create: jest.fn(),
+          },
         },
         {
           provide: TelegramService,
@@ -132,12 +146,14 @@ describe('PasswordService - getSharedWithMe', () => {
       key: 'facebook',
       value: 'password123',
       description: 'Facebook password',
+      reports: [],
     });
     expect(alicePasswords.passwords).toContainEqual({
       id: '2',
       key: 'twitter',
       value: 'twitter123',
       description: 'Twitter password',
+      reports: [],
     });
 
     const bobPasswords = result.sharedWithMe.find(
@@ -151,6 +167,7 @@ describe('PasswordService - getSharedWithMe', () => {
       key: 'instagram',
       value: 'insta123',
       description: 'Instagram password',
+      reports: [],
     });
   });
 
@@ -195,6 +212,7 @@ describe('PasswordService - getSharedWithMe', () => {
       key: 'site1',
       value: 'pass1',
       description: 'Site 1',
+      reports: [],
     });
   });
 
@@ -239,6 +257,7 @@ describe('PasswordService - getSharedWithMe', () => {
       key: 'site1',
       value: 'pass1',
       description: 'Site 1',
+      reports: [],
     });
   });
 

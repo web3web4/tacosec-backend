@@ -91,8 +91,6 @@ export class TelegramClientController {
     return this.contactsService.getContacts(parseInt(userId), getContactsDto);
   }
 
-  
-
   /**
    * Search contacts by query
    * @param userId - User ID

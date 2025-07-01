@@ -91,12 +91,13 @@ As a result:
       } else {
         console.log('Username has not changed');
       }
-      // Convert to plain object if it's a Mongoose document
-      const userObject = user.toObject ? user.toObject() : user;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { _id: _, ...userWithoutId } = userObject;
-      return userWithoutId;
     }
+
+    // Convert to plain object if it's a Mongoose document and return user data
+    const userObject = user.toObject ? user.toObject() : user;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { _id: _, ...userWithoutId } = userObject;
+    return userWithoutId;
   }
   async createOrUpdateUser(userData: Partial<User>): Promise<User> {
     try {

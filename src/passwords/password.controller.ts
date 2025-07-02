@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   // HttpException,
   // HttpStatus,
   Request,
@@ -101,14 +102,20 @@ export class PasswordController {
   @TelegramDtoAuth()
   getChildPasswords(
     @Param('parentId') parentId: string,
+    @Query('page') page: string = '1',
+    @Query('secret_count') secretCount: string = '10',
     @Request() req: Request,
   ) {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],
     );
+    const pageNumber = parseInt(page, 10) || 1;
+    const limit = parseInt(secretCount, 10) || 10;
     return this.passwordService.getChildPasswords(
       parentId,
       teleDtoData.telegramId,
+      pageNumber,
+      limit,
     );
   }
 

@@ -751,17 +751,30 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
   }
 
   /**
-   * Get child passwords for a specific parent password
+   * Get child passwords for a specific parent password with pagination
    * Only accessible by the owner of the parent password or users who own some child passwords
    * @param parentId The ID of the parent password
    * @param telegramId The Telegram ID of the authenticated user
-   * @returns Array of child passwords that the user has access to
+   * @param page The page number (1-based)
+   * @param limit The number of passwords per page
+   * @returns Object containing paginated child passwords and pagination info
    * @throws HttpException if the parent password is not found or user has no access
    */
   async getChildPasswords(
     parentId: string,
     telegramId: string,
-  ): Promise<passwordReturns[]> {
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    passwords: passwordReturns[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalCount: number;
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+    };
+  }> {
     try {
       // Find the parent password by ID
       const parentPassword = await this.passwordModel.findById(parentId).exec();
@@ -807,47 +820,50 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         hasOwnershipAccess,
       });
 
-      // Find child passwords
-      let childPasswords;
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Define the base query
+      let baseQuery;
       if (hasOwnershipAccess) {
-        // If user owns the parent, return all child passwords
-        childPasswords = await this.passwordModel
-          .find({
-            parent_secret_id: new Types.ObjectId(parentId),
-            isActive: true,
-            $or: [{ hidden: false }, { hidden: { $exists: false } }],
-          })
-          .select(
-            'key value description updatedAt createdAt sharedWith type hidden initData',
-          )
-          .exec();
-
-        console.log(
-          'Child passwords found (owner access):',
-          childPasswords.length,
-        );
+        baseQuery = {
+          parent_secret_id: new Types.ObjectId(parentId),
+          isActive: true,
+          $or: [{ hidden: false }, { hidden: { $exists: false } }],
+        };
       } else {
-        // If user doesn't own the parent, return only child passwords they own
-        childPasswords = await this.passwordModel
-          .find({
-            parent_secret_id: new Types.ObjectId(parentId),
-            'initData.telegramId': telegramId,
-            isActive: true,
-            $or: [{ hidden: false }, { hidden: { $exists: false } }],
-          })
-          .select(
-            'key value description updatedAt createdAt sharedWith type hidden initData',
-          )
-          .exec();
-
-        console.log(
-          'Child passwords found (user-specific access):',
-          childPasswords.length,
-        );
+        baseQuery = {
+          parent_secret_id: new Types.ObjectId(parentId),
+          'initData.telegramId': telegramId,
+          isActive: true,
+          $or: [{ hidden: false }, { hidden: { $exists: false } }],
+        };
       }
 
+      // Get total count for pagination
+      const totalCount = await this.passwordModel
+        .countDocuments(baseQuery)
+        .exec();
+
+      // Find child passwords with pagination
+      const childPasswords = await this.passwordModel
+        .find(baseQuery)
+        .select(
+          'key value description updatedAt createdAt sharedWith type hidden initData',
+        )
+        .skip(skip)
+        .limit(limit)
+        .exec();
+
+      console.log(
+        hasOwnershipAccess
+          ? 'Child passwords found (owner access):'
+          : 'Child passwords found (user-specific access):',
+        `${childPasswords.length} of ${totalCount} total`,
+      );
+
       // If no child passwords found and user is not parent owner, throw forbidden
-      if (childPasswords.length === 0 && !isParentOwner) {
+      if (totalCount === 0 && !isParentOwner) {
         throw new HttpException(
           'You are not authorized to access child secrets for this parent secret',
           HttpStatus.FORBIDDEN,
@@ -901,7 +917,21 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         }),
       );
 
-      return passwordWithReports;
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
+      return {
+        passwords: passwordWithReports,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+        },
+      };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;

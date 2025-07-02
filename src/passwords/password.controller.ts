@@ -134,8 +134,11 @@ export class PasswordController {
    */
   @Post(':id/generate-thread-id')
   @TelegramDtoAuth()
-  generateThreadId(@Param('id') id: string) {
-    return this.passwordService.generateThreadId(id);
+  generateThreadId(@Param('id') id: string, @Request() req: Request) {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+    return this.passwordService.generateThreadId(id, teleDtoData.telegramId);
   }
 
   /**
@@ -145,10 +148,14 @@ export class PasswordController {
    */
   @Post('link')
   @TelegramDtoAuth()
-  linkPasswords(@Body() linkData: LinkPasswordsDto) {
+  linkPasswords(@Body() linkData: LinkPasswordsDto, @Request() req: Request) {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
     return this.passwordService.linkPasswords(
       linkData.password1Id,
       linkData.password2Id,
+      teleDtoData.telegramId,
     );
   }
 

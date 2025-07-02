@@ -714,16 +714,29 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
 
   /**
    * Generate a unique threadId for a password
+   * Only the owner of the password can perform this action
    * @param passwordId The ID of the password to generate threadId for
+   * @param telegramId The Telegram ID of the authenticated user
    * @returns The updated password with threadId
-   * @throws HttpException if password not found
+   * @throws HttpException if password not found or user is not the owner
    */
-  async generateThreadId(passwordId: string): Promise<Password> {
+  async generateThreadId(
+    passwordId: string,
+    telegramId: string,
+  ): Promise<Password> {
     try {
       const password = await this.passwordModel.findById(passwordId).exec();
 
       if (!password) {
         throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if the authenticated user is the owner of the password
+      if (password.initData?.telegramId !== telegramId) {
+        throw new HttpException(
+          'You are not authorized to modify this secret',
+          HttpStatus.FORBIDDEN,
+        );
       }
 
       const threadId = uuidv4();
@@ -742,14 +755,17 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
 
   /**
    * Link two passwords by unifying their threadId
+   * User must be the owner of at least one of the passwords
    * @param password1Id First password ID
    * @param password2Id Second password ID
+   * @param telegramId The Telegram ID of the authenticated user
    * @returns Success message with linking status
    * @throws HttpException for various error conditions
    */
   async linkPasswords(
     password1Id: string,
     password2Id: string,
+    telegramId: string,
   ): Promise<{ message: string; threadId?: string }> {
     try {
       const password1 = await this.passwordModel.findById(password1Id).exec();
@@ -762,6 +778,17 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         throw new HttpException(
           'Second secret not found',
           HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Check if the authenticated user is the owner of at least one password
+      const isOwnerOfPassword1 = password1.initData?.telegramId === telegramId;
+      const isOwnerOfPassword2 = password2.initData?.telegramId === telegramId;
+
+      if (!isOwnerOfPassword1 && !isOwnerOfPassword2) {
+        throw new HttpException(
+          'You must be the owner of at least one of the secrets to link them',
+          HttpStatus.FORBIDDEN,
         );
       }
 

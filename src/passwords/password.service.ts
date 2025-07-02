@@ -5,6 +5,7 @@ import { Password, PasswordDocument } from './schemas/password.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { Report, ReportDocument } from '../reports/schemas/report.schema';
 import * as bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
 import { SharedWithMeResponse } from '../types/share-with-me-pass.types';
 import {
   passwordReturns,
@@ -703,6 +704,168 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         .exec();
 
       return updatedPassword;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Generate a unique threadId for a password
+   * @param passwordId The ID of the password to generate threadId for
+   * @returns The updated password with threadId
+   * @throws HttpException if password not found
+   */
+  async generateThreadId(passwordId: string): Promise<Password> {
+    try {
+      const password = await this.passwordModel.findById(passwordId).exec();
+
+      if (!password) {
+        throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+      }
+
+      const threadId = uuidv4();
+      const updatedPassword = await this.passwordModel
+        .findByIdAndUpdate(passwordId, { threadId }, { new: true })
+        .exec();
+
+      return updatedPassword;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Link two passwords by unifying their threadId
+   * @param password1Id First password ID
+   * @param password2Id Second password ID
+   * @returns Success message with linking status
+   * @throws HttpException for various error conditions
+   */
+  async linkPasswords(
+    password1Id: string,
+    password2Id: string,
+  ): Promise<{ message: string; threadId?: string }> {
+    try {
+      const password1 = await this.passwordModel.findById(password1Id).exec();
+      const password2 = await this.passwordModel.findById(password2Id).exec();
+
+      if (!password1) {
+        throw new HttpException(
+          'First password not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      if (!password2) {
+        throw new HttpException(
+          'Second password not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const hasThreadId1 = !!password1.threadId;
+      const hasThreadId2 = !!password2.threadId;
+
+      // Case 1: Both passwords have different threadIds
+      if (
+        hasThreadId1 &&
+        hasThreadId2 &&
+        password1.threadId !== password2.threadId
+      ) {
+        throw new HttpException(
+          'Both passwords already have different threadIds. Cannot link passwords with different thread IDs.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Case 2: Both passwords have the same threadId
+      if (
+        hasThreadId1 &&
+        hasThreadId2 &&
+        password1.threadId === password2.threadId
+      ) {
+        return {
+          message: 'Both passwords already have the same threadId.',
+          threadId: password1.threadId,
+        };
+      }
+
+      // Case 3: Neither password has threadId - generate new one for both
+      if (!hasThreadId1 && !hasThreadId2) {
+        const newThreadId = uuidv4();
+        await Promise.all([
+          this.passwordModel
+            .findByIdAndUpdate(password1Id, { threadId: newThreadId })
+            .exec(),
+          this.passwordModel
+            .findByIdAndUpdate(password2Id, { threadId: newThreadId })
+            .exec(),
+        ]);
+        return {
+          message:
+            'New threadId generated and assigned to both passwords. Passwords have been successfully linked.',
+          threadId: newThreadId,
+        };
+      }
+
+      // Case 4: One has threadId, the other doesn't - assign existing threadId to the one without
+      const existingThreadId = hasThreadId1
+        ? password1.threadId
+        : password2.threadId;
+      const passwordToUpdate = hasThreadId1 ? password2Id : password1Id;
+
+      await this.passwordModel
+        .findByIdAndUpdate(passwordToUpdate, { threadId: existingThreadId })
+        .exec();
+
+      return {
+        message: 'Passwords have been successfully linked through threadId.',
+        threadId: existingThreadId,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Get all passwords that share the same threadId
+   * @param threadId The threadId to search for
+   * @param sortOrder Sort order: 'asc' for oldest first, 'desc' for newest first
+   * @returns Array of passwords with the same threadId
+   * @throws HttpException if no passwords found
+   */
+  async getPasswordsByThreadId(
+    threadId: string,
+    sortOrder: 'asc' | 'desc' = 'asc',
+  ): Promise<Password[]> {
+    try {
+      if (!threadId) {
+        throw new HttpException('ThreadId is required', HttpStatus.BAD_REQUEST);
+      }
+
+      const sortDirection = sortOrder === 'desc' ? -1 : 1;
+
+      const passwords = await this.passwordModel
+        .find({ threadId, isActive: true })
+        .sort({ createdAt: sortDirection })
+        .exec();
+
+      if (!passwords || passwords.length === 0) {
+        throw new HttpException(
+          'No passwords found with the specified threadId',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return passwords;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;

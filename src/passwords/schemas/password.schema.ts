@@ -36,6 +36,9 @@ export class Password {
   @Prop({ default: false })
   hidden: boolean;
 
+  @Prop({ type: String, required: false })
+  threadId: string;
+
   @Prop({ type: Date, required: false })
   updatedAt: Date;
 

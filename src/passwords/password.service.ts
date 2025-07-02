@@ -723,7 +723,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
       const password = await this.passwordModel.findById(passwordId).exec();
 
       if (!password) {
-        throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+        throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
       }
 
       const threadId = uuidv4();
@@ -756,14 +756,11 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
       const password2 = await this.passwordModel.findById(password2Id).exec();
 
       if (!password1) {
-        throw new HttpException(
-          'First password not found',
-          HttpStatus.NOT_FOUND,
-        );
+        throw new HttpException('First secret not found', HttpStatus.NOT_FOUND);
       }
       if (!password2) {
         throw new HttpException(
-          'Second password not found',
+          'Second secret not found',
           HttpStatus.NOT_FOUND,
         );
       }
@@ -778,7 +775,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         password1.threadId !== password2.threadId
       ) {
         throw new HttpException(
-          'Both passwords already have different threadIds. Cannot link passwords with different thread IDs.',
+          'Both secrets already have different threadIds. Cannot link secrets with different thread IDs.',
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -790,7 +787,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         password1.threadId === password2.threadId
       ) {
         return {
-          message: 'Both passwords already have the same threadId.',
+          message: 'Both secrets already have the same threadId.',
           threadId: password1.threadId,
         };
       }
@@ -808,7 +805,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         ]);
         return {
           message:
-            'New threadId generated and assigned to both passwords. Passwords have been successfully linked.',
+            'New threadId generated and assigned to both secrets. Secrets have been successfully linked.',
           threadId: newThreadId,
         };
       }
@@ -824,7 +821,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         .exec();
 
       return {
-        message: 'Passwords have been successfully linked through threadId.',
+        message: 'Secrets have been successfully linked through threadId.',
         threadId: existingThreadId,
       };
     } catch (error) {
@@ -860,7 +857,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
 
       if (!passwords || passwords.length === 0) {
         throw new HttpException(
-          'No passwords found with the specified threadId',
+          'No Secretss found with the specified threadId',
           HttpStatus.NOT_FOUND,
         );
       }

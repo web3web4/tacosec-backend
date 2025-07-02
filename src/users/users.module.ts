@@ -1,12 +1,39 @@
-import { Module } from '@nestjs/common';
-import { UsersController } from './users.controller';
+import { Module, forwardRef } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
 import { UsersService } from './users.service';
-import { DatabaseModule } from '../database/database.module';
+import { UsersController } from './users.controller';
+import { User, UserSchema } from './schemas/user.schema';
+import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
+import { TelegramAuthGuard } from '../guards/telegram-auth.guard';
+import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
+import { RolesGuard } from '../guards/roles.guard';
+import { HttpModule } from '@nestjs/axios';
+import { PasswordModule } from '../passwords/password.module';
+import { TelegramValidatorService } from '../telegram/telegram-validator.service';
+import { ConfigModule } from '@nestjs/config';
+import { TelegramModule } from '../telegram/telegram.module';
+import { ReportsModule } from '../reports/reports.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: Password.name, schema: PasswordSchema },
+    ]),
+    ConfigModule,
+    HttpModule,
+    forwardRef(() => PasswordModule),
+    forwardRef(() => TelegramModule),
+    forwardRef(() => ReportsModule),
+  ],
   controllers: [UsersController],
-  providers: [UsersService],
-  exports: [UsersService]
+  providers: [
+    UsersService,
+    TelegramAuthGuard,
+    TelegramDtoAuthGuard,
+    RolesGuard,
+    TelegramValidatorService,
+  ],
+  exports: [UsersService, RolesGuard],
 })
-export class UsersModule {} 
+export class UsersModule {}

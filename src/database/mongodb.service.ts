@@ -1,13 +1,13 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { MongoClient, Db, ServerApiVersion } from 'mongodb';
 
-let cachedClient: MongoClient = null;
-let cachedDb: Db = null;
+let cachedClient: MongoClient | null = null;
+let cachedDb: Db | null = null;
 
 @Injectable()
 export class MongoDBService implements OnModuleInit {
-  private client: MongoClient;
-  private db: Db;
+  private client: MongoClient | null = null;
+  private db: Db | null = null;
 
   async onModuleInit() {
     try {
@@ -27,12 +27,17 @@ export class MongoDBService implements OnModuleInit {
         serverApi: {
           version: ServerApiVersion.v1,
           strict: false,
-          deprecationErrors: false
-        }
+          deprecationErrors: false,
+        },
+        maxPoolSize: 10,
+        minPoolSize: 5,
+        maxIdleTimeMS: 60000,
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
       });
 
       this.db = this.client.db('user-management');
-      
+
       // Cache the connection
       cachedClient = this.client;
       cachedDb = this.db;
@@ -58,4 +63,4 @@ export class MongoDBService implements OnModuleInit {
       console.error('Error closing MongoDB connection:', error);
     }
   }
-} 
+}

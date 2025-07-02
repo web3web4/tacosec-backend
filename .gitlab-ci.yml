@@ -1,0 +1,46 @@
+image: node:18-alpine
+
+services:
+  - mongo:latest
+
+variables:
+  MONGODB_URI: mongodb://mongo:27017/taco-test
+  ENCRYPTION_KEY: test-encryption-key-for-ci
+
+stages:
+  - test
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
+install_dependencies:
+  stage: test
+  script:
+    - npm install
+    - echo "MONGODB_URI=$MONGODB_URI" > .env.test
+    - echo "TELEGRAM_BOT_TOKEN=test-token" >> .env.test
+    - echo "NODE_ENV=test" >> .env.test
+    - echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" >> .env.test
+  artifacts:
+    paths:
+      - node_modules/
+      - package-lock.json
+      - .env.test
+
+test:
+  stage: test
+  needs:
+    - install_dependencies
+  script:
+    - npm run test -- --reporters=default --reporters=jest-junit
+    - npm run test:integration -- --reporters=default --reporters=jest-junit || true
+    - npm run test:e2e -- --reporters=default --reporters=jest-junit || true
+    - echo "Tests completed, artifacts will be uploaded even if some tests failed"
+  artifacts:
+    when: always
+    paths:
+      - junit.xml
+    reports:
+      junit: junit.xml

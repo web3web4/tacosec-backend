@@ -97,6 +97,21 @@ export class PasswordController {
     return this.passwordService.hidePassword(id, teleDtoData.telegramId);
   }
 
+  @Get('children/:parentId')
+  @TelegramDtoAuth()
+  getChildPasswords(
+    @Param('parentId') parentId: string,
+    @Request() req: Request,
+  ) {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+    return this.passwordService.getChildPasswords(
+      parentId,
+      teleDtoData.telegramId,
+    );
+  }
+
   // @Post('verify')
   // @TelegramDtoAuth()
   // async verifyPassword(

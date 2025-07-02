@@ -52,12 +52,20 @@ export class PasswordService {
         throw new Error('telegramId is not valid');
       }
 
-      // Find passwords that are active and either not hidden or hidden field doesn't exist
+      // Find passwords that are active, either not hidden or hidden field doesn't exist, and are parent passwords (no parent_secret_id)
       const passwords = await this.passwordModel
         .find({
           'initData.telegramId': telegramId,
           isActive: true,
-          $or: [{ hidden: false }, { hidden: { $exists: false } }],
+          $and: [
+            { $or: [{ hidden: false }, { hidden: { $exists: false } }] },
+            {
+              $or: [
+                { parent_secret_id: { $exists: false } },
+                { parent_secret_id: null },
+              ],
+            },
+          ],
         })
         .select(
           'key value description updatedAt createdAt sharedWith type hidden',
@@ -192,6 +200,10 @@ export class PasswordService {
           // 'sharedWith.username': { $in: [username] },
           'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') }, //case insensitive
           isActive: true,
+          $or: [
+            { parent_secret_id: { $exists: false } },
+            { parent_secret_id: null },
+          ],
         })
         .select(' _id key value description initData.username ')
         .lean()
@@ -445,6 +457,31 @@ export class PasswordService {
         await this.validateSharingRestrictions(user, passwordData.sharedWith);
       }
 
+      // Validate parent_secret_id if provided
+      let parentSecretId: Types.ObjectId | undefined;
+      if (passwordData.parent_secret_id) {
+        const parentSecret = await this.passwordModel
+          .findById(passwordData.parent_secret_id)
+          .exec();
+
+        if (!parentSecret) {
+          throw new HttpException(
+            'Parent secret not found',
+            HttpStatus.NOT_FOUND,
+          );
+        }
+
+        // Check if parent secret is already a child (has parent_secret_id)
+        if (parentSecret.parent_secret_id) {
+          throw new HttpException(
+            'Parent secret cannot be a child secret itself',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        parentSecretId = new Types.ObjectId(passwordData.parent_secret_id);
+      }
+
       // get valid auth date
       const authDate = this.getValidAuthDate(passwordData.initData.authDate);
 
@@ -458,6 +495,7 @@ export class PasswordService {
         type: passwordData.type,
         sharedWith: passwordData.sharedWith,
         hidden: false, // Explicitly set hidden to false
+        parent_secret_id: parentSecretId,
         initData: { ...passwordData.initData, authDate },
       });
 
@@ -704,6 +742,166 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         .exec();
 
       return updatedPassword;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Get child passwords for a specific parent password
+   * Only accessible by the owner of the parent password or users who own some child passwords
+   * @param parentId The ID of the parent password
+   * @param telegramId The Telegram ID of the authenticated user
+   * @returns Array of child passwords that the user has access to
+   * @throws HttpException if the parent password is not found or user has no access
+   */
+  async getChildPasswords(
+    parentId: string,
+    telegramId: string,
+  ): Promise<passwordReturns[]> {
+    try {
+      // Find the parent password by ID
+      const parentPassword = await this.passwordModel.findById(parentId).exec();
+
+      // Check if parent password exists
+      if (!parentPassword) {
+        throw new HttpException(
+          'Parent secret not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Check if parent password is actually a parent (no parent_secret_id)
+      if (parentPassword.parent_secret_id) {
+        throw new HttpException(
+          'This secret is not a parent secret',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Check if user owns the parent password - check both initData.telegramId and direct user lookup
+      const isParentOwner = parentPassword.initData?.telegramId === telegramId;
+
+      // Additional check: find user by telegramId and check if they own this password
+      const user = await this.userModel
+        .findOne({ telegramId, isActive: true })
+        .exec();
+      const isOwnerByUserId =
+        user &&
+        parentPassword.userId &&
+        parentPassword.userId.toString() === user._id.toString();
+
+      const hasOwnershipAccess = isParentOwner || isOwnerByUserId;
+
+      console.log('Parent ownership check:', {
+        parentId,
+        telegramId,
+        parentTelegramId: parentPassword.initData?.telegramId,
+        parentUserId: parentPassword.userId?.toString(),
+        currentUserId: user?._id?.toString(),
+        isParentOwner,
+        isOwnerByUserId,
+        hasOwnershipAccess,
+      });
+
+      // Find child passwords
+      let childPasswords;
+      if (hasOwnershipAccess) {
+        // If user owns the parent, return all child passwords
+        childPasswords = await this.passwordModel
+          .find({
+            parent_secret_id: new Types.ObjectId(parentId),
+            isActive: true,
+            $or: [{ hidden: false }, { hidden: { $exists: false } }],
+          })
+          .select(
+            'key value description updatedAt createdAt sharedWith type hidden initData',
+          )
+          .exec();
+
+        console.log(
+          'Child passwords found (owner access):',
+          childPasswords.length,
+        );
+      } else {
+        // If user doesn't own the parent, return only child passwords they own
+        childPasswords = await this.passwordModel
+          .find({
+            parent_secret_id: new Types.ObjectId(parentId),
+            'initData.telegramId': telegramId,
+            isActive: true,
+            $or: [{ hidden: false }, { hidden: { $exists: false } }],
+          })
+          .select(
+            'key value description updatedAt createdAt sharedWith type hidden initData',
+          )
+          .exec();
+
+        console.log(
+          'Child passwords found (user-specific access):',
+          childPasswords.length,
+        );
+      }
+
+      // If no child passwords found and user is not parent owner, throw forbidden
+      if (childPasswords.length === 0 && !isParentOwner) {
+        throw new HttpException(
+          'You are not authorized to access child secrets for this parent secret',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      // Transform child passwords to match passwordReturns format
+      const passwordWithReports = await Promise.all(
+        childPasswords.map(async (password) => {
+          // Fetch unresolved reports for this password
+          const reports = await this.reportModel
+            .find({
+              $or: [
+                { secret_id: password._id },
+                { secret_id: password._id.toString() },
+              ],
+              resolved: false,
+            })
+            .exec();
+
+          // Transform reports to include reporter username
+          const reportInfo: PasswordReportInfo[] = await Promise.all(
+            reports.map(async (report) => {
+              // Get reporter user info
+              const reporter = await this.userModel
+                .findOne({ telegramId: report.reporterTelegramId })
+                .select('username')
+                .exec();
+
+              return {
+                reporterUsername: reporter ? reporter.username : 'Unknown',
+                report_type: report.report_type,
+                reason: report.reason,
+                createdAt: report.createdAt,
+              };
+            }),
+          );
+
+          return {
+            _id: password._id,
+            key: password.key,
+            value: password.value,
+            description: password.description,
+            type: password.type,
+            sharedWith: password.sharedWith,
+            updatedAt: password.updatedAt,
+            createdAt: password.createdAt,
+            hidden: password.hidden || false,
+            reports: reportInfo,
+          };
+        }),
+      );
+
+      return passwordWithReports;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;

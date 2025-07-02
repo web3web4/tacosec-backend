@@ -46,4 +46,8 @@ export class CreatePasswordDto {
   @ValidateNested()
   @TransformType(() => TelegramInitDto)
   initData: TelegramInitDto;
+
+  @IsMongoId()
+  @IsOptional()
+  parent_secret_id?: Types.ObjectId;
 }

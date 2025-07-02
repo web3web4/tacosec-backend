@@ -36,6 +36,9 @@ export class Password {
   @Prop({ default: false })
   hidden: boolean;
 
+  @Prop({ type: Types.ObjectId, ref: 'Password', required: false })
+  parent_secret_id?: Types.ObjectId;
+
   @Prop({ type: Date, required: false })
   updatedAt: Date;
 

@@ -13,6 +13,7 @@ import {
 } from '../types/password-returns.types';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { SharedWithDto } from './dto/shared-with.dto';
+import { PaginatedResponse } from './dto/pagination.dto';
 import { TelegramService } from '../telegram/telegram.service';
 @Injectable()
 export class PasswordService {
@@ -936,6 +937,316 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
       if (error instanceof HttpException) {
         throw error;
       }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Get user passwords with optional pagination
+   * @param telegramId The Telegram ID of the user
+   * @param page Optional page number for pagination
+   * @param limit Optional limit for pagination
+   * @returns Either paginated response or simple array based on parameters
+   */
+  async findByUserTelegramIdWithPagination(
+    telegramId: string,
+    page?: number,
+    limit?: number,
+  ): Promise<passwordReturns[] | PaginatedResponse<passwordReturns>> {
+    try {
+      if (!telegramId) {
+        throw new Error('Telegram ID is required');
+      }
+      const user = await this.userModel
+        .findOne({ telegramId, isActive: true })
+        .exec();
+      if (!user) {
+        throw new Error('telegramId is not valid');
+      }
+
+      // If pagination parameters are not provided or incomplete, return original response
+      if (
+        page === undefined ||
+        limit === undefined ||
+        isNaN(page) ||
+        isNaN(limit) ||
+        page <= 0 ||
+        limit <= 0
+      ) {
+        return this.findByUserTelegramId(telegramId);
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Base query for finding passwords
+      const baseQuery = {
+        'initData.telegramId': telegramId,
+        isActive: true,
+        $and: [
+          { $or: [{ hidden: false }, { hidden: { $exists: false } }] },
+          {
+            $or: [
+              { parent_secret_id: { $exists: false } },
+              { parent_secret_id: null },
+            ],
+          },
+        ],
+      };
+
+      // Get total count for pagination
+      const totalCount = await this.passwordModel
+        .countDocuments(baseQuery)
+        .exec();
+
+      // Find passwords with pagination
+      const passwords = await this.passwordModel
+        .find(baseQuery)
+        .select(
+          'key value description updatedAt createdAt sharedWith type hidden',
+        )
+        .skip(skip)
+        .limit(limit)
+        .exec();
+
+      // Transform passwords with reports
+      const passwordWithSharedWithAsUsernames = await Promise.all(
+        passwords.map(async (password) => {
+          // Fetch unresolved reports for this password
+          const reports = await this.reportModel
+            .find({
+              $or: [
+                { secret_id: password._id },
+                { secret_id: password._id.toString() },
+              ],
+              resolved: false,
+            })
+            .exec();
+
+          // Transform reports to include reporter username
+          const reportInfo: PasswordReportInfo[] = await Promise.all(
+            reports.map(async (report) => {
+              // Get reporter user info
+              const reporter = await this.userModel
+                .findOne({ telegramId: report.reporterTelegramId })
+                .select('username')
+                .exec();
+
+              return {
+                reporterUsername: reporter ? reporter.username : 'Unknown',
+                report_type: report.report_type,
+                reason: report.reason,
+                createdAt: report.createdAt,
+              };
+            }),
+          );
+
+          return {
+            _id: password._id,
+            key: password.key,
+            value: password.value,
+            description: password.description,
+            type: password.type,
+            sharedWith: password.sharedWith,
+            updatedAt: password.updatedAt,
+            createdAt: password.createdAt,
+            hidden: password.hidden || false,
+            reports: reportInfo,
+          };
+        }),
+      );
+
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
+      return {
+        data: passwordWithSharedWithAsUsernames,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+          limit,
+        },
+      };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Get shared with data with optional pagination
+   * @param telegramId The Telegram ID of the user
+   * @param key The password key
+   * @param page Optional page number for pagination
+   * @param limit Optional limit for pagination
+   * @returns Either paginated response or simple array based on parameters
+   */
+  async findSharedWithByTelegramIdWithPagination(
+    telegramId: string,
+    key: string,
+    page?: number,
+    limit?: number,
+  ): Promise<SharedWithDto[] | PaginatedResponse<SharedWithDto>> {
+    try {
+      if (!telegramId) {
+        throw new Error('Telegram ID is required');
+      }
+      const user = await this.userModel.findOne({
+        telegramId,
+        isActive: true,
+      });
+      if (!user) {
+        throw new Error('telegramId is not valid');
+      }
+      if (!key) {
+        throw new Error('Key is required');
+      }
+      const passwordKey = await this.passwordModel.findOne({
+        key,
+        isActive: true,
+      });
+      if (!passwordKey) {
+        throw new Error('Key is not found');
+      }
+
+      // If pagination parameters are not provided or incomplete, return original response
+      if (
+        page === undefined ||
+        limit === undefined ||
+        isNaN(page) ||
+        isNaN(limit) ||
+        page <= 0 ||
+        limit <= 0
+      ) {
+        return this.findSharedWithByTelegramId(telegramId, key);
+      }
+
+      // For this method, pagination doesn't make much sense as it typically returns
+      // a single password's sharedWith array, but we'll implement it for consistency
+      const sharedWith = await this.passwordModel
+        .find({
+          'initData.telegramId': telegramId,
+          isActive: true,
+          key: key,
+        })
+        .select('sharedWith -_id')
+        .exec();
+
+      const sharedWithData =
+        sharedWith.length > 0 ? sharedWith[0].sharedWith : [];
+
+      // Apply pagination to sharedWith array
+      const skip = (page - 1) * limit;
+      const paginatedData = sharedWithData.slice(skip, skip + limit);
+      const totalCount = sharedWithData.length;
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
+      return {
+        data: paginatedData,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+          limit,
+        },
+      };
+    } catch (error) {
+      console.log('error', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Get passwords shared with me with optional pagination
+   * @param username The username
+   * @param page Optional page number for pagination
+   * @param limit Optional limit for pagination
+   * @returns Either paginated response or simple response based on parameters
+   */
+  async findPasswordsSharedWithMeWithPagination(
+    username: string,
+    page?: number,
+    limit?: number,
+  ): Promise<SharedWithMeResponse | PaginatedResponse<any>> {
+    try {
+      if (!username) {
+        throw new Error('Username is required');
+      }
+
+      // If pagination parameters are not provided or incomplete, return original response
+      if (
+        page === undefined ||
+        limit === undefined ||
+        isNaN(page) ||
+        isNaN(limit) ||
+        page <= 0 ||
+        limit <= 0
+      ) {
+        return this.findPasswordsSharedWithMe(username);
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Base query for finding shared passwords
+      const baseQuery = {
+        'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') },
+        isActive: true,
+        $or: [
+          { parent_secret_id: { $exists: false } },
+          { parent_secret_id: null },
+        ],
+      };
+
+      // Get total count for pagination
+      const totalCount = await this.passwordModel
+        .countDocuments(baseQuery)
+        .exec();
+
+      // Find shared passwords with pagination
+      const sharedPasswords = await this.passwordModel
+        .find(baseQuery)
+        .select(' _id key value description initData.username ')
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec();
+
+      // Transform the data similar to getSharedWithMe method
+      const transformedData = sharedPasswords.map((password) => ({
+        _id: password._id,
+        key: password.key,
+        value: password.value,
+        description: password.description,
+        sharedBy: password.initData?.username || 'Unknown',
+      }));
+
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
+      return {
+        data: transformedData,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+          limit,
+        },
+      };
+    } catch (error) {
+      console.log('error', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }

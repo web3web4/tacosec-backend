@@ -43,32 +43,73 @@ export class PasswordController {
 
   @Get()
   @TelegramDtoAuth()
-  getUserPasswords(@Request() req: Request) {
+  getUserPasswords(
+    @Request() req: Request,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],
     );
-    return this.passwordService.findByUserTelegramId(teleDtoData.telegramId);
+
+    // Parse pagination parameters if provided
+    const pageNumber = page ? parseInt(page, 10) : undefined;
+    const limitNumber = limit ? parseInt(limit, 10) : undefined;
+
+    // Use pagination-enabled method
+    return this.passwordService.findByUserTelegramIdWithPagination(
+      teleDtoData.telegramId,
+      pageNumber,
+      limitNumber,
+    );
   }
 
   @Get('shared-with')
   @TelegramDtoAuth()
-  getUserBySharedWith(@Request() req: Request, @Body() body: { key: string }) {
+  getUserBySharedWith(
+    @Request() req: Request,
+    @Body() body: { key: string },
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],
     );
-    return this.passwordService.findSharedWithByTelegramId(
+
+    // Parse pagination parameters if provided
+    const pageNumber = page ? parseInt(page, 10) : undefined;
+    const limitNumber = limit ? parseInt(limit, 10) : undefined;
+
+    // Use pagination-enabled method
+    return this.passwordService.findSharedWithByTelegramIdWithPagination(
       teleDtoData.telegramId,
       body.key,
+      pageNumber,
+      limitNumber,
     );
   }
 
   @Get('shared-with-me')
   @TelegramDtoAuth()
-  getPasswordsSharedWithMe(@Request() req: Request) {
+  getPasswordsSharedWithMe(
+    @Request() req: Request,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],
     );
-    return this.passwordService.findPasswordsSharedWithMe(teleDtoData.username);
+
+    // Parse pagination parameters if provided
+    const pageNumber = page ? parseInt(page, 10) : undefined;
+    const limitNumber = limit ? parseInt(limit, 10) : undefined;
+
+    // Use pagination-enabled method
+    return this.passwordService.findPasswordsSharedWithMeWithPagination(
+      teleDtoData.username,
+      pageNumber,
+      limitNumber,
+    );
   }
 
   @Delete(':id')

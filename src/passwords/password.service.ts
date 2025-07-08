@@ -869,10 +869,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
 
       // If no child passwords found and user is not parent owner, throw forbidden
       if (totalCount === 0 && !isParentOwner) {
-        throw new HttpException(
-          'You are not authorized to access child secrets for this parent secret',
-          HttpStatus.FORBIDDEN,
-        );
+        throw new HttpException('There are no children', HttpStatus.NOT_FOUND);
       }
 
       // Transform child passwords to match passwordReturns format

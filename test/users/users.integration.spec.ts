@@ -171,6 +171,4 @@ describe('UserController (e2e)', () => {
         .expect(404);
     }, 10000); // 10 seconds timeout
   });
-
-
 });

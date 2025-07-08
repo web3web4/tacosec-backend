@@ -206,7 +206,7 @@ export class PasswordService {
             { parent_secret_id: null },
           ],
         })
-        .select(' _id key value description initData.username ')
+        .select(' _id key value description initData.username sharedWith ')
         .lean()
         .exec();
       if (!sharedPasswords?.length) {
@@ -251,6 +251,7 @@ export class PasswordService {
             value: password.value,
             description: password.description,
             username: password.initData.username,
+            sharedWith: password.sharedWith || [], // Include sharedWith field in response
             reports: transformedReports,
           } as {
             id: string;
@@ -258,6 +259,7 @@ export class PasswordService {
             value: string;
             description: string;
             username: string;
+            sharedWith: any[];
             reports: any[];
           };
         }),
@@ -272,6 +274,7 @@ export class PasswordService {
               key: string;
               value: string;
               description: string;
+              sharedWith: any[];
               reports: any[];
             }>
           >,
@@ -289,6 +292,7 @@ export class PasswordService {
               key: password.key,
               value: password.value,
               description: password.description,
+              sharedWith: password.sharedWith || [], // Include sharedWith field in grouped data
               reports: password.reports,
             });
           }
@@ -1214,7 +1218,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
       // Find shared passwords with pagination
       const sharedPasswords = await this.passwordModel
         .find(baseQuery)
-        .select(' _id key value description initData.username ')
+        .select(' _id key value description initData.username sharedWith ')
         .skip(skip)
         .limit(limit)
         .lean()
@@ -1227,6 +1231,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         value: password.value,
         description: password.description,
         sharedBy: password.initData?.username || 'Unknown',
+        sharedWith: password.sharedWith || [], // Include sharedWith field in response
       }));
 
       // Calculate pagination info

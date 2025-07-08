@@ -914,6 +914,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
             description: password.description,
             type: password.type,
             sharedWith: password.sharedWith,
+            username: password.initData?.username || 'Unknown', // Include username of password owner
             updatedAt: password.updatedAt,
             createdAt: password.createdAt,
             hidden: password.hidden || false,

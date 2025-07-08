@@ -85,6 +85,10 @@ describe('PasswordService - getSharedWithMe', () => {
     expect(passwordModel.find).toHaveBeenCalledWith({
       'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') },
       isActive: true,
+      $or: [
+        { parent_secret_id: { $exists: false } },
+        { parent_secret_id: null },
+      ],
     });
     expect(result).toEqual({ sharedWithMe: [], userCount: 0 });
   });
@@ -125,6 +129,10 @@ describe('PasswordService - getSharedWithMe', () => {
     expect(passwordModel.find).toHaveBeenCalledWith({
       'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') },
       isActive: true,
+      $or: [
+        { parent_secret_id: { $exists: false } },
+        { parent_secret_id: null },
+      ],
     });
 
     expect(passwordModel.select).toHaveBeenCalledWith(

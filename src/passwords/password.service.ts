@@ -509,6 +509,15 @@ export class PasswordService {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { userId: _, ...passwordWithId } = passwordObj;
 
+      // Send notification to parent password owner if this is a child password
+      if (passwordData.parent_secret_id) {
+        await this.sendChildPasswordNotificationToParentOwner(
+          passwordData.parent_secret_id,
+          user,
+          passwordData.key,
+        );
+      }
+
       return passwordWithId;
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
@@ -641,6 +650,95 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
       console.log('All notifications processed');
     } catch (error) {
       console.error('Error in sendMessageToUsersBySharedWith:', error.message);
+      // Don't rethrow to prevent breaking the main operation
+    }
+  }
+
+  /**
+   * Send notification to parent password owner when a child password is created
+   * @param parentSecretId The ID of the parent password
+   * @param childUser The user who created the child password
+   * @param childSecretName The name/key of the child password
+   */
+  private async sendChildPasswordNotificationToParentOwner(
+    parentSecretId: string,
+    childUser: UserDocument,
+    childSecretName: string,
+  ): Promise<void> {
+    try {
+      // Find the parent password
+      const parentPassword = await this.passwordModel
+        .findById(parentSecretId)
+        .exec();
+
+      if (!parentPassword) {
+        console.error('Parent password not found for notification');
+        return;
+      }
+
+      // Find the parent password owner
+      const parentOwner = await this.userModel
+        .findOne({
+          telegramId: parentPassword.initData?.telegramId,
+          isActive: true,
+        })
+        .exec();
+
+      if (!parentOwner || !parentOwner.telegramId) {
+        console.error('Parent password owner not found or has no Telegram ID');
+        return;
+      }
+
+      // For development/testing purposes, send notification even if same user
+      // if (parentOwner.telegramId === childUser.telegramId) {
+      //   console.log('Child password creator is the same as parent owner, skipping notification');
+      //   return;
+      // }
+
+      // Prepare user display name
+      const childUserDisplayName =
+        childUser.firstName && childUser.firstName.trim() !== ''
+          ? `${childUser.firstName} ${childUser.lastName || ''}`.trim()
+          : childUser.username;
+
+      // Get current date and time
+      const now = new Date();
+      const dateTime = now.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short',
+      });
+
+      // Create the notification message
+      const message = `🔐 <b>Child Secret Response</b>
+
+User <b>${childUserDisplayName}</b> has responded to your secret "<b>${parentPassword.key}</b>" with a new secret "<b>${childSecretName}</b>" 🔄
+
+📅 <b>Response Date & Time:</b> ${dateTime}
+
+You can view the response in your secrets list 📋.`;
+
+      console.log(
+        `Sending child password notification to parent owner ${parentOwner.username} (${parentOwner.telegramId})`,
+      );
+
+      // Send the notification
+      const result = await this.telegramService.sendMessage(
+        Number(parentOwner.telegramId),
+        message,
+      );
+
+      console.log(
+        `Child password notification sent to ${parentOwner.username}, result: ${result}`,
+      );
+    } catch (error) {
+      console.error(
+        'Error sending child password notification to parent owner:',
+        error.message,
+      );
       // Don't rethrow to prevent breaking the main operation
     }
   }

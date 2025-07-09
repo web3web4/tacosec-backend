@@ -4,14 +4,14 @@ import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { TelegramInitDto } from '../../src/telegram/dto/telegram-init.dto';
 import { UsersService } from '../../src/users/users.service';
-import { PasswordService } from '../../src/passwords/password.service';
+// import { PasswordService } from '../../src/passwords/password.service';
 import { TelegramValidatorService } from '../../src/telegram/telegram-validator.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { User } from '../../src/users/schemas/user.schema';
 import { TelegramDtoAuthGuard } from '../../src/telegram/dto/telegram-dto-auth.guard';
 import { TelegramService } from '../../src/telegram/telegram.service';
-import { Types } from 'mongoose';
-import { Type } from '../../src/passwords/enums/type.enum';
+// import { Types } from 'mongoose';
+// import { Type } from '../../src/passwords/enums/type.enum';
 
 describe('UserController (e2e)', () => {
   let app: INestApplication;

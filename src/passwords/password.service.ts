@@ -206,7 +206,9 @@ export class PasswordService {
             { parent_secret_id: null },
           ],
         })
-        .select(' _id key value description initData.username sharedWith ')
+        .select(
+          ' _id key value description initData.username sharedWith createdAt updatedAt ',
+        )
         .lean()
         .exec();
       if (!sharedPasswords?.length) {
@@ -253,6 +255,8 @@ export class PasswordService {
             username: password.initData.username,
             sharedWith: password.sharedWith || [], // Include sharedWith field in response
             reports: transformedReports,
+            createdAt: password.createdAt,
+            updatedAt: password.updatedAt,
           } as {
             id: string;
             key: string;
@@ -261,6 +265,8 @@ export class PasswordService {
             username: string;
             sharedWith: any[];
             reports: any[];
+            createdAt: Date;
+            updatedAt: Date;
           };
         }),
       );
@@ -276,9 +282,21 @@ export class PasswordService {
               description: string;
               sharedWith: any[];
               reports: any[];
+              createdAt: Date;
+              updatedAt: Date;
             }>
           >,
-          password,
+          password: {
+            id: string;
+            key: string;
+            value: string;
+            description: string;
+            username: string;
+            sharedWith: any[];
+            reports: any[];
+            createdAt: Date;
+            updatedAt: Date;
+          },
         ) => {
           const ownerUsername = password.username;
 
@@ -292,7 +310,9 @@ export class PasswordService {
               key: password.key,
               value: password.value,
               description: password.description,
-              sharedWith: password.sharedWith || [], // Include sharedWith field in grouped data
+              createdAt: password.createdAt,
+              updatedAt: password.updatedAt,
+              sharedWith: password.sharedWith || [],
               reports: password.reports,
             });
           }
@@ -306,7 +326,16 @@ export class PasswordService {
         .filter(([username]) => username !== 'unknown')
         .map(([username, passwords]) => ({
           username,
-          passwords,
+          passwords: passwords.map((p) => ({
+            id: p.id,
+            key: p.key,
+            value: p.value,
+            description: p.description,
+            createdAt: p.createdAt,
+            updatedAt: p.updatedAt,
+            sharedWith: p.sharedWith,
+            reports: p.reports,
+          })),
           count: passwords.length,
         }));
 
@@ -1314,7 +1343,9 @@ You can view the response in your secrets list 📋.`;
       // Find shared passwords with pagination
       const sharedPasswords = await this.passwordModel
         .find(baseQuery)
-        .select(' _id key value description initData.username sharedWith ')
+        .select(
+          ' _id key value description initData.username sharedWith createdAt updatedAt ',
+        )
         .skip(skip)
         .limit(limit)
         .lean()
@@ -1328,6 +1359,8 @@ You can view the response in your secrets list 📋.`;
         description: password.description,
         sharedBy: password.initData?.username || 'Unknown',
         sharedWith: password.sharedWith || [], // Include sharedWith field in response
+        createdAt: password.createdAt,
+        updatedAt: password.updatedAt,
       }));
 
       // Calculate pagination info

@@ -927,50 +927,24 @@ You can view the response in your secrets list 📋.`;
         );
       }
 
-      // Check if user owns the parent password - check both initData.telegramId and direct user lookup
-      const isParentOwner = parentPassword.initData?.telegramId === telegramId;
-
-      // Additional check: find user by telegramId and check if they own this password
+      // Verify user exists and is active
       const user = await this.userModel
         .findOne({ telegramId, isActive: true })
         .exec();
-      const isOwnerByUserId =
-        user &&
-        parentPassword.userId &&
-        parentPassword.userId.toString() === user._id.toString();
 
-      const hasOwnershipAccess = isParentOwner || isOwnerByUserId;
-
-      console.log('Parent ownership check:', {
-        parentId,
-        telegramId,
-        parentTelegramId: parentPassword.initData?.telegramId,
-        parentUserId: parentPassword.userId?.toString(),
-        currentUserId: user?._id?.toString(),
-        isParentOwner,
-        isOwnerByUserId,
-        hasOwnershipAccess,
-      });
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
 
       // Calculate pagination
       const skip = (page - 1) * limit;
 
-      // Define the base query
-      let baseQuery;
-      if (hasOwnershipAccess) {
-        baseQuery = {
-          parent_secret_id: new Types.ObjectId(parentId),
-          isActive: true,
-          $or: [{ hidden: false }, { hidden: { $exists: false } }],
-        };
-      } else {
-        baseQuery = {
-          parent_secret_id: new Types.ObjectId(parentId),
-          'initData.telegramId': telegramId,
-          isActive: true,
-          $or: [{ hidden: false }, { hidden: { $exists: false } }],
-        };
-      }
+      // Define the base query - return all child passwords regardless of ownership
+      const baseQuery = {
+        parent_secret_id: new Types.ObjectId(parentId),
+        isActive: true,
+        $or: [{ hidden: false }, { hidden: { $exists: false } }],
+      };
 
       // Get total count for pagination
       const totalCount = await this.passwordModel
@@ -988,14 +962,12 @@ You can view the response in your secrets list 📋.`;
         .exec();
 
       console.log(
-        hasOwnershipAccess
-          ? 'Child passwords found (owner access):'
-          : 'Child passwords found (user-specific access):',
+        'Child passwords found:',
         `${childPasswords.length} of ${totalCount} total`,
       );
 
-      // If no child passwords found and user is not parent owner, throw forbidden
-      if (totalCount === 0 && !isParentOwner) {
+      // If no child passwords found, throw not found
+      if (totalCount === 0) {
         throw new HttpException('There are no children', HttpStatus.NOT_FOUND);
       }
 

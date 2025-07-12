@@ -384,12 +384,6 @@ describe('PasswordService', () => {
      * 3. Verify error is thrown
      */
     it('should throw error if username is not provided', async () => {
-      jest
-        .spyOn(service, 'getSharedWithMe')
-        .mockRejectedValue(
-          new HttpException('Username is required', HttpStatus.BAD_REQUEST),
-        );
-
       await expect(service.findPasswordsSharedWithMe('')).rejects.toThrow(
         new HttpException('Username is required', HttpStatus.BAD_REQUEST),
       );
@@ -440,6 +434,9 @@ describe('PasswordService', () => {
             value: 'shared_value',
             description: 'test description',
             sharedBy: 'owner',
+            createdAt: undefined,
+            updatedAt: undefined,
+            sharedWith: [],
           },
         ],
         pagination: {

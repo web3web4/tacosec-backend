@@ -136,7 +136,7 @@ describe('PasswordService - getSharedWithMe', () => {
     });
 
     expect(passwordModel.select).toHaveBeenCalledWith(
-      ' _id key value description initData.username ',
+      ' _id key value description initData.username sharedWith createdAt updatedAt ',
     );
 
     expect(result.sharedWithMe).toHaveLength(2); // Two unique owners
@@ -155,6 +155,9 @@ describe('PasswordService - getSharedWithMe', () => {
       value: 'password123',
       description: 'Facebook password',
       reports: [],
+      createdAt: undefined,
+      sharedWith: [],
+      updatedAt: undefined,
     });
     expect(alicePasswords.passwords).toContainEqual({
       id: '2',
@@ -162,6 +165,9 @@ describe('PasswordService - getSharedWithMe', () => {
       value: 'twitter123',
       description: 'Twitter password',
       reports: [],
+      createdAt: undefined,
+      sharedWith: [],
+      updatedAt: undefined,
     });
 
     const bobPasswords = result.sharedWithMe.find(
@@ -176,6 +182,9 @@ describe('PasswordService - getSharedWithMe', () => {
       value: 'insta123',
       description: 'Instagram password',
       reports: [],
+      createdAt: undefined,
+      sharedWith: [],
+      updatedAt: undefined,
     });
   });
 
@@ -221,6 +230,9 @@ describe('PasswordService - getSharedWithMe', () => {
       value: 'pass1',
       description: 'Site 1',
       reports: [],
+      createdAt: undefined,
+      sharedWith: [],
+      updatedAt: undefined,
     });
   });
 
@@ -266,6 +278,9 @@ describe('PasswordService - getSharedWithMe', () => {
       value: 'pass1',
       description: 'Site 1',
       reports: [],
+      createdAt: undefined,
+      sharedWith: [],
+      updatedAt: undefined,
     });
   });
 

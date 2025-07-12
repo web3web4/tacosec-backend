@@ -45,4 +45,8 @@ export class CreatePasswordRequestDto {
   @IsString()
   @IsOptional()
   initDataRaw?: string;
+
+  @IsString()
+  @IsOptional()
+  parent_secret_id?: string;
 }

@@ -4,11 +4,15 @@ import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { TelegramInitDto } from '../../src/telegram/dto/telegram-init.dto';
 import { UsersService } from '../../src/users/users.service';
+// import { PasswordService } from '../../src/passwords/password.service';
 import { TelegramValidatorService } from '../../src/telegram/telegram-validator.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { User } from '../../src/users/schemas/user.schema';
 import { TelegramDtoAuthGuard } from '../../src/telegram/dto/telegram-dto-auth.guard';
 import { TelegramService } from '../../src/telegram/telegram.service';
+import { TelegramClientService } from '../../src/telegram-client/telegram-client.service';
+// import { Types } from 'mongoose';
+// import { Type } from '../../src/passwords/enums/type.enum';
 
 describe('UserController (e2e)', () => {
   let app: INestApplication;
@@ -16,6 +20,7 @@ describe('UserController (e2e)', () => {
   let userService: UsersService;
   let telegramDtoAuthGuard: TelegramDtoAuthGuard;
   let telegramServiceMock;
+  let telegramClientServiceMock;
 
   // Fixed authDate to avoid JSON serialization differences
   const fixedDate = new Date().toISOString();
@@ -48,6 +53,17 @@ describe('UserController (e2e)', () => {
       sendMessage: jest.fn().mockResolvedValue({}),
     };
 
+    telegramClientServiceMock = {
+      createClient: jest.fn(),
+      getClientForUser: jest.fn(),
+      getClient: jest.fn(),
+      saveUserSession: jest.fn(),
+      getUserSession: jest.fn(),
+      removeUserSession: jest.fn(),
+      hasUserSession: jest.fn(),
+      disconnectClient: jest.fn(),
+    };
+
     // Create a new test module
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -70,6 +86,8 @@ describe('UserController (e2e)', () => {
       })
       .overrideProvider(TelegramService)
       .useValue(telegramServiceMock)
+      .overrideProvider(TelegramClientService)
+      .useValue(telegramClientServiceMock)
       .compile();
 
     // Create the app

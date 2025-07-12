@@ -3,6 +3,10 @@ export type SharedPassword = {
   key: string;
   value: string;
   description: string;
+  createdAt: Date;
+  updatedAt: Date;
+  sharedWith?: any[];
+  reports?: any[];
 };
 
 export type OwnerPasswords = {

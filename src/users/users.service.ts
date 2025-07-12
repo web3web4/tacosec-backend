@@ -251,6 +251,13 @@ As a result:
     return this.userModel.findOne({ telegramId, isActive: true }).exec();
   }
 
+  /**
+   * Find all admin users
+   * @returns Array of admin users
+   */
+  async findAdminUsers(): Promise<User[]> {
+    return this.userModel.find({ role: 'admin', isActive: true }).exec();
+  }
   async findByUsername(username: string): Promise<boolean> {
     const usernameLower = username.toLowerCase();
     const user = await this.userModel

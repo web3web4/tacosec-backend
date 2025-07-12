@@ -138,3 +138,10 @@ create ENCRYPTION_KEY
 npx ts-node src/utils/generate-key.ts
 
 npx ts-node src/scripts/cleanup-null-keys.ts
+
+
+git config user.name
+git config user.email
+
+push
+git push origin T1-Auth --force-with-lease

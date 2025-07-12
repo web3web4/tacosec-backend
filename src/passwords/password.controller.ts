@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { PasswordService } from './password.service';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
-import { LinkPasswordsDto } from './dto/link-passwords.dto';
+
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
 import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
 import { TelegramService } from '../telegram/telegram.service';
@@ -43,32 +43,73 @@ export class PasswordController {
 
   @Get()
   @TelegramDtoAuth()
-  getUserPasswords(@Request() req: Request) {
+  getUserPasswords(
+    @Request() req: Request,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],
     );
-    return this.passwordService.findByUserTelegramId(teleDtoData.telegramId);
+
+    // Parse pagination parameters if provided
+    const pageNumber = page ? parseInt(page, 10) : undefined;
+    const limitNumber = limit ? parseInt(limit, 10) : undefined;
+
+    // Use pagination-enabled method
+    return this.passwordService.findByUserTelegramIdWithPagination(
+      teleDtoData.telegramId,
+      pageNumber,
+      limitNumber,
+    );
   }
 
   @Get('shared-with')
   @TelegramDtoAuth()
-  getUserBySharedWith(@Request() req: Request, @Body() body: { key: string }) {
+  getUserBySharedWith(
+    @Request() req: Request,
+    @Body() body: { key: string },
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],
     );
-    return this.passwordService.findSharedWithByTelegramId(
+
+    // Parse pagination parameters if provided
+    const pageNumber = page ? parseInt(page, 10) : undefined;
+    const limitNumber = limit ? parseInt(limit, 10) : undefined;
+
+    // Use pagination-enabled method
+    return this.passwordService.findSharedWithByTelegramIdWithPagination(
       teleDtoData.telegramId,
       body.key,
+      pageNumber,
+      limitNumber,
     );
   }
 
   @Get('shared-with-me')
   @TelegramDtoAuth()
-  getPasswordsSharedWithMe(@Request() req: Request) {
+  getPasswordsSharedWithMe(
+    @Request() req: Request,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
       req.headers['x-telegram-init-data'],
     );
-    return this.passwordService.findPasswordsSharedWithMe(teleDtoData.username);
+
+    // Parse pagination parameters if provided
+    const pageNumber = page ? parseInt(page, 10) : undefined;
+    const limitNumber = limit ? parseInt(limit, 10) : undefined;
+
+    // Use pagination-enabled method
+    return this.passwordService.findPasswordsSharedWithMeWithPagination(
+      teleDtoData.username,
+      pageNumber,
+      limitNumber,
+    );
   }
 
   @Delete(':id')
@@ -96,6 +137,27 @@ export class PasswordController {
       req.headers['x-telegram-init-data'],
     );
     return this.passwordService.hidePassword(id, teleDtoData.telegramId);
+  }
+
+  @Get('children/:parentId')
+  @TelegramDtoAuth()
+  getChildPasswords(
+    @Param('parentId') parentId: string,
+    @Query('page') page: string = '1',
+    @Query('secret_count') secretCount: string = '10',
+    @Request() req: Request,
+  ) {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+    const pageNumber = parseInt(page, 10) || 1;
+    const limit = parseInt(secretCount, 10) || 10;
+    return this.passwordService.getChildPasswords(
+      parentId,
+      teleDtoData.telegramId,
+      pageNumber,
+      limit,
+    );
   }
 
   // @Post('verify')
@@ -127,44 +189,4 @@ export class PasswordController {
 
   //   return { isValid };
   // }
-
-  /**
-   * Generate a unique threadId for a password
-   * POST /passwords/:id/generate-thread-id
-   */
-  @Post(':id/generate-thread-id')
-  @TelegramDtoAuth()
-  generateThreadId(@Param('id') id: string) {
-    return this.passwordService.generateThreadId(id);
-  }
-
-  /**
-   * Link two passwords by unifying their threadId
-   * POST /passwords/link
-   * Body: { password1Id: string, password2Id: string }
-   */
-  @Post('link')
-  @TelegramDtoAuth()
-  linkPasswords(@Body() linkData: LinkPasswordsDto) {
-    return this.passwordService.linkPasswords(
-      linkData.password1Id,
-      linkData.password2Id,
-    );
-  }
-
-  /**
-   * Get all passwords that share the same threadId
-   * GET /passwords/thread/:threadId?sortOrder=asc|desc
-   */
-  @Get('thread/:threadId')
-  @TelegramDtoAuth()
-  getPasswordsByThreadId(
-    @Param('threadId') threadId: string,
-    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-  ) {
-    return this.passwordService.getPasswordsByThreadId(
-      threadId,
-      sortOrder || 'asc',
-    );
-  }
 }

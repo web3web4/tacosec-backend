@@ -183,4 +183,142 @@ export class TelegramService {
       return null;
     }
   }
+
+  /**
+   * Send a message to all admin users
+   * @param message The message to send
+   * @param senderTelegramId The telegram ID of the sender
+   * @param subject Optional subject for the message
+   * @returns Object with success status and number of admins contacted
+   */
+  async sendMessageToAdmins(
+    message: string,
+    senderTelegramId: string,
+    subject?: string,
+  ): Promise<{ success: boolean; adminCount: number }> {
+    try {
+      // Get all admin users from the database
+      const adminUsers = await this.usersService.findAdminUsers();
+
+      if (adminUsers.length === 0) {
+        console.log('No admin users found in the system');
+        return { success: false, adminCount: 0 };
+      }
+
+      // Get sender information
+      const sender = await this.usersService.findByTelegramId(senderTelegramId);
+
+      // Format the message with sender information
+      const formattedMessage = `🆘 <b>Support Request</b>
+
+👤 <b>User:</b> ${sender?.firstName || ''} ${sender?.lastName || ''}
+🪪 <b>Telegram Username:</b> ${sender?.username || 'N/A'}
+🆔 <b>Telegram ID:</b> ${senderTelegramId}
+${subject ? `📋 <b>Subject:</b> ${subject}\n` : ''}
+💬 <b>Message:</b>
+${message}
+
+⏰ <b>Date:</b> ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}`;
+
+      let successCount = 0;
+      const sendPromises = adminUsers.map(async (admin) => {
+        try {
+          const success = await this.sendMessage(
+            Number(admin.telegramId),
+            formattedMessage,
+          );
+          if (success) {
+            successCount++;
+            console.log(
+              `Message sent successfully to admin: ${admin.telegramId}`,
+            );
+          } else {
+            console.log(`Failed to send message to admin: ${admin.telegramId}`);
+          }
+          return success;
+        } catch (error) {
+          console.error(
+            `Error sending message to admin ${admin.telegramId}:`,
+            error,
+          );
+          return false;
+        }
+      });
+
+      // Wait for all messages to be sent
+      await Promise.all(sendPromises);
+
+      console.log(
+        `Message sent to ${successCount}/${adminUsers.length} admin users`,
+      );
+
+      return {
+        success: successCount > 0,
+        adminCount: successCount,
+      };
+    } catch (error) {
+      console.error('Error sending message to admins:', error);
+      return { success: false, adminCount: 0 };
+    }
+  }
+
+  /**
+   * Send a message to a specific admin user defined in environment variables
+   * @param message The message to send
+   * @param senderTelegramId The telegram ID of the sender
+   * @param subject Optional subject for the message
+   * @returns Object with success status
+   */
+  async sendMessageToSpecificAdmin(
+    message: string,
+    senderTelegramId: string,
+    subject?: string,
+  ): Promise<{ success: boolean; adminTelegramId?: string }> {
+    try {
+      // Get the admin telegram ID from environment variables
+      const adminTelegramId =
+        this.configService.get<string>('ADMIN_TELEGRAM_ID');
+
+      if (!adminTelegramId) {
+        console.error(
+          'ADMIN_TELEGRAM_ID is not configured in environment variables',
+        );
+        return { success: false };
+      }
+
+      // Get sender information
+      const sender = await this.usersService.findByTelegramId(senderTelegramId);
+
+      // Format the message with sender information
+      const formattedMessage = `🆘 <b>Support Request</b>
+
+👤 <b>User:</b> ${sender?.firstName || ''} ${sender?.lastName || ''}
+🪪 <b>Telegram Username:</b> ${sender?.username || 'N/A'}
+🆔 <b>Telegram ID:</b> ${senderTelegramId}
+${subject ? `📋 <b>Subject:</b> ${subject}\n` : ''}💬 <b>Message:</b>
+${message}
+
+⏰ <b>Date:</b> ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}`;
+
+      // Send message to the specific admin
+      const success = await this.sendMessage(
+        Number(adminTelegramId),
+        formattedMessage,
+      );
+
+      if (success) {
+        console.log(`Message sent successfully to admin: ${adminTelegramId}`);
+      } else {
+        console.log(`Failed to send message to admin: ${adminTelegramId}`);
+      }
+
+      return {
+        success,
+        adminTelegramId: success ? adminTelegramId : undefined,
+      };
+    } catch (error) {
+      console.error('Error sending message to specific admin:', error);
+      return { success: false };
+    }
+  }
 }

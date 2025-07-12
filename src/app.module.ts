@@ -10,6 +10,7 @@ import { TelegramClientModule } from './telegram-client/telegram-client.module';
 import { PublicAddressesModule } from './public-addresses/public-addresses.module';
 import { CryptoModule } from './utils/crypto.module';
 import { ReportsModule } from './reports/reports.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ReportsModule } from './reports/reports.module';
     PublicAddressesModule,
     CryptoModule,
     ReportsModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

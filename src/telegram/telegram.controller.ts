@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
 import { GetUsersDto } from './dto/get-users.dto';
+import { SendToAdminDto } from './dto/send-to-admin.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
 import { TelegramDtoAuthGuard } from './dto/telegram-dto-auth.guard';
 // import { TelegramAuth } from '../decorators/telegram-auth.decorator';
@@ -80,5 +81,51 @@ export class TelegramController {
       body.message,
     );
     return { success };
+  }
+
+  /**
+   * Send a message to admin users
+   * This endpoint allows regular users to send messages to all admin users
+   */
+  @Post('send-to-admin')
+  @TelegramDtoAuth()
+  async sendMessageToAdmin(
+    @Request() req: Request,
+    @Body() sendToAdminDto: SendToAdminDto,
+  ): Promise<{ success: boolean; adminCount: number }> {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+
+    const result = await this.telegramService.sendMessageToAdmins(
+      sendToAdminDto.message,
+      teleDtoData.telegramId,
+      sendToAdminDto.subject,
+    );
+
+    return result;
+  }
+
+  /**
+   * Send a message to a specific admin user defined in environment variables
+   * This endpoint allows regular users to send messages to the specific admin
+   */
+  @Post('send-to-specific-admin')
+  @TelegramDtoAuth()
+  async sendMessageToSpecificAdmin(
+    @Request() req: Request,
+    @Body() sendToAdminDto: SendToAdminDto,
+  ): Promise<{ success: boolean; adminTelegramId?: string }> {
+    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+
+    const result = await this.telegramService.sendMessageToSpecificAdmin(
+      sendToAdminDto.message,
+      teleDtoData.telegramId,
+      sendToAdminDto.subject,
+    );
+
+    return result;
   }
 }

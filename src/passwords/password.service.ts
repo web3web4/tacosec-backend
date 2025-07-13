@@ -125,6 +125,11 @@ export class PasswordService {
       );
       return passwordWithSharedWithAsUsernames;
     } catch (error) {
+      // If the error is already an HttpException, preserve its status code
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      // For other errors, use BAD_REQUEST as default
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -343,6 +348,11 @@ export class PasswordService {
 
       return { sharedWithMe: result, userCount: result.length };
     } catch (error) {
+      // If the error is already an HttpException, preserve its status code
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      // For other errors, use BAD_REQUEST as default
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }

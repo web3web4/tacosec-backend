@@ -55,9 +55,9 @@ export class PasswordController {
   updatePassword(
     @Param('id') id: string,
     @Body() body: Partial<Password>,
-    @Request() req: AuthenticatedRequest,
+    // @Request() req: AuthenticatedRequest,
   ) {
-    return this.passwordService.updatePasswordWithAuth(id, body, req);
+    return this.passwordService.updatePasswordWithAuth(id, body);
   }
 
   @Get()
@@ -106,15 +106,13 @@ export class PasswordController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const username = this.passwordService.extractUsernameFromRequest(req);
-
     // Parse pagination parameters if provided
     const pageNumber = page ? parseInt(page, 10) : undefined;
     const limitNumber = limit ? parseInt(limit, 10) : undefined;
 
-    // Use pagination-enabled method
+    // Use pagination-enabled method with req object
     return this.passwordService.findPasswordsSharedWithMeWithPagination(
-      username,
+      req,
       pageNumber,
       limitNumber,
     );

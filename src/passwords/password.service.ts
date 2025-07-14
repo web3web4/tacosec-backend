@@ -276,19 +276,28 @@ export class PasswordService {
 
   async findPasswordsSharedWithMe(
     username: string,
+    userId?: string,
   ): Promise<SharedWithMeResponse> {
     try {
-      if (!username) {
-        throw new Error('Username is required');
+      if (!username && !userId) {
+        throw new Error('Username or userId is required');
       }
-      // const user = await this.userModel.findOne({
-      //   username,
-      //   isActive: true,
-      // });
-      // if (!user) {
-      //   throw new Error('username is not valid');
-      // }
-      const sharedWithMe = await this.getSharedWithMe(username);
+
+      // Try to find userId from username if not provided
+      let finalUserId = userId;
+      if (!finalUserId && username) {
+        const user = await this.userModel
+          .findOne({
+            username: username.toLowerCase(),
+            isActive: true,
+          })
+          .exec();
+        if (user) {
+          finalUserId = user._id.toString();
+        }
+      }
+
+      const sharedWithMe = await this.getSharedWithMe(username, finalUserId);
       return sharedWithMe;
     } catch (error) {
       console.log('error', error);
@@ -296,26 +305,52 @@ export class PasswordService {
     }
   }
 
-  async getSharedWithMe(username: string): Promise<SharedWithMeResponse> {
+  async getSharedWithMe(
+    username: string,
+    userId?: string,
+  ): Promise<SharedWithMeResponse> {
     try {
-      if (!username) {
-        throw new Error('Username is required');
+      if (!username && !userId) {
+        throw new Error('Username or userId is required');
       }
-      const sharedPasswords = await this.passwordModel
-        .find({
-          // 'sharedWith.username': { $in: [username] },
-          'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') }, //case insensitive
-          isActive: true,
-          $or: [
-            { parent_secret_id: { $exists: false } },
-            { parent_secret_id: null },
-          ],
-        })
-        .select(
-          ' _id key value description initData.username sharedWith createdAt updatedAt ',
-        )
-        .lean()
-        .exec();
+
+      let sharedPasswords: any[] = [];
+
+      // First, try searching by userId if available
+      if (userId) {
+        sharedPasswords = await this.passwordModel
+          .find({
+            'sharedWith.userId': userId,
+            isActive: true,
+            $or: [
+              { parent_secret_id: { $exists: false } },
+              { parent_secret_id: null },
+            ],
+          })
+          .select(
+            ' _id key value description initData.username sharedWith createdAt updatedAt ',
+          )
+          .lean()
+          .exec();
+      }
+
+      // If no results found with userId and username exists, try searching by username
+      if (sharedPasswords.length === 0 && username) {
+        sharedPasswords = await this.passwordModel
+          .find({
+            'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') }, //case insensitive
+            isActive: true,
+            $or: [
+              { parent_secret_id: { $exists: false } },
+              { parent_secret_id: null },
+            ],
+          })
+          .select(
+            ' _id key value description initData.username sharedWith createdAt updatedAt ',
+          )
+          .lean()
+          .exec();
+      }
       if (!sharedPasswords?.length) {
         return { sharedWithMe: [], userCount: 0 };
       }
@@ -469,7 +504,6 @@ export class PasswordService {
   async updatePasswordWithAuth(
     id: string,
     update: Partial<Password>,
-    req?: AuthenticatedRequest,
   ): Promise<Password> {
     const password = await this.passwordModel.findById(id).exec();
     if (!password) {
@@ -1863,13 +1897,40 @@ You can view the response in your secrets list 📋.`;
    * @returns Either paginated response or simple response based on parameters
    */
   async findPasswordsSharedWithMeWithPagination(
-    username: string,
+    req: AuthenticatedRequest,
     page?: number,
     limit?: number,
   ): Promise<SharedWithMeResponse | PaginatedResponse<any>> {
     try {
-      if (!username) {
-        throw new Error('Username is required');
+      // Extract userId and username from request
+      let userId: string | undefined;
+      let username: string | undefined;
+
+      if (req?.user && req.user.id) {
+        userId = req.user.id;
+        username = req.user.username;
+      } else if (req?.headers?.['x-telegram-init-data']) {
+        const headerInitData = req.headers['x-telegram-init-data'];
+        const parsedData =
+          this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+        username = parsedData.username;
+        // Try to find userId from username
+        if (username) {
+          const user = await this.userModel
+            .findOne({
+              username: username.toLowerCase(),
+              isActive: true,
+            })
+            .exec();
+          if (user) {
+            userId = user._id.toString();
+          }
+        }
+      } else {
+        throw new HttpException(
+          'No authentication data provided',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       // If pagination parameters are not provided or incomplete, return original response
@@ -1881,37 +1942,84 @@ You can view the response in your secrets list 📋.`;
         page <= 0 ||
         limit <= 0
       ) {
-        return this.findPasswordsSharedWithMe(username);
+        if (!username && !userId) {
+          throw new Error('Username or userId is required');
+        }
+        return this.findPasswordsSharedWithMe(username, userId);
       }
 
       // Calculate pagination
       const skip = (page - 1) * limit;
+      let baseQuery: any;
+      let totalCount = 0;
+      let sharedPasswords: any[] = [];
 
-      // Base query for finding shared passwords
-      const baseQuery = {
-        'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') },
-        isActive: true,
-        $or: [
-          { parent_secret_id: { $exists: false } },
-          { parent_secret_id: null },
-        ],
-      };
+      // First, try searching by userId if available
+      if (userId) {
+        baseQuery = {
+          'sharedWith.userId': userId,
+          isActive: true,
+          $or: [
+            { parent_secret_id: { $exists: false } },
+            { parent_secret_id: null },
+          ],
+        };
 
-      // Get total count for pagination
-      const totalCount = await this.passwordModel
-        .countDocuments(baseQuery)
-        .exec();
+        totalCount = await this.passwordModel.countDocuments(baseQuery).exec();
 
-      // Find shared passwords with pagination
-      const sharedPasswords = await this.passwordModel
-        .find(baseQuery)
-        .select(
-          ' _id key value description initData.username sharedWith createdAt updatedAt ',
-        )
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec();
+        if (totalCount > 0) {
+          sharedPasswords = await this.passwordModel
+            .find(baseQuery)
+            .select(
+              ' _id key value description initData.username sharedWith createdAt updatedAt ',
+            )
+            .skip(skip)
+            .limit(limit)
+            .lean()
+            .exec();
+        }
+      }
+
+      // If no results found with userId and username exists, try searching by username
+      if (totalCount === 0 && username) {
+        baseQuery = {
+          'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') },
+          isActive: true,
+          $or: [
+            { parent_secret_id: { $exists: false } },
+            { parent_secret_id: null },
+          ],
+        };
+
+        totalCount = await this.passwordModel.countDocuments(baseQuery).exec();
+
+        if (totalCount > 0) {
+          sharedPasswords = await this.passwordModel
+            .find(baseQuery)
+            .select(
+              ' _id key value description initData.username sharedWith createdAt updatedAt ',
+            )
+            .skip(skip)
+            .limit(limit)
+            .lean()
+            .exec();
+        }
+      }
+
+      // If no username available and no results, stop search and return empty result
+      if (totalCount === 0 && !username) {
+        return {
+          data: [],
+          pagination: {
+            currentPage: page,
+            totalPages: 0,
+            totalCount: 0,
+            hasNextPage: false,
+            hasPreviousPage: page > 1,
+            limit,
+          },
+        };
+      }
 
       // Transform the data similar to getSharedWithMe method
       const transformedData = sharedPasswords.map((password) => ({

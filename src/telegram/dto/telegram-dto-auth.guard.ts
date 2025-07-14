@@ -5,8 +5,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { JwtService } from '@nestjs/jwt';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { TelegramInitDto } from './telegram-init.dto';
 import { TelegramValidatorService } from '../telegram-validator.service';
+import { User, UserDocument } from '../../users/schemas/user.schema';
 
 export interface TelegramUser {
   id: number;
@@ -20,11 +24,37 @@ export interface TelegramUser {
 
 @Injectable()
 export class TelegramDtoAuthGuard implements CanActivate {
-  constructor(private telegramValidator: TelegramValidatorService) {}
+  constructor(
+    private telegramValidator: TelegramValidatorService,
+    private jwtService: JwtService,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
 
+    // Check for JWT token in Authorization header first
+    const authHeader = request.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        // Verify JWT token
+        const payload = this.jwtService.verify(token);
+
+        // Check if user exists in database
+        const user = await this.userModel.findById(payload.sub).exec();
+        if (!user || !user.isActive) {
+          throw new UnauthorizedException('User not found or inactive');
+        }
+
+        // Token is valid and user exists
+        return true;
+      } catch {
+        throw new UnauthorizedException('Invalid or expired token');
+      }
+    }
+
+    // If no valid JWT token, proceed with Telegram data validation
     // console.log('Request body:', JSON.stringify(request.body));
 
     // First try to extract raw Telegram data if it's included

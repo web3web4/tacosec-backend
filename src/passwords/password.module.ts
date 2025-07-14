@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { SharedJwtModule } from '../shared/jwt.module';
 import { PasswordService } from './password.service';
 import { PasswordController } from './password.controller';
 import { User, UserSchema } from '../users/schemas/user.schema';
@@ -19,6 +20,7 @@ import { ReportsModule } from '../reports/reports.module';
       { name: Password.name, schema: PasswordSchema },
       { name: Report.name, schema: ReportSchema },
     ]),
+    SharedJwtModule,
     ConfigModule,
     HttpModule,
     forwardRef(() => UsersModule),

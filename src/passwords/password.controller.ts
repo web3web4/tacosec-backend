@@ -133,13 +133,7 @@ export class PasswordController {
   @Patch('hide/:id')
   @TelegramDtoAuth(true)
   hidePassword(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
-    // If JWT token exists, use userId; otherwise use telegramId
-    if (req?.user && req.user.id) {
-      return this.passwordService.hidePasswordByUserId(id, req.user.id);
-    } else {
-      const telegramId = this.passwordService.extractTelegramIdFromRequest(req);
-      return this.passwordService.hidePassword(id, telegramId);
-    }
+    return this.passwordService.hidePasswordWithAuth(req, id);
   }
 
   @Get('children/:parentId')

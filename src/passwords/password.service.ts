@@ -2560,12 +2560,88 @@ You can view the response in your secrets list 📋.`;
     req: AuthenticatedRequest,
     key: string,
   ): Promise<Password> {
-    // If JWT token exists, use userId; otherwise use telegramId
-    if (req?.user && req.user.id) {
-      return this.deletePasswordByUserId(key, req.user.id);
-    } else {
-      const telegramId = this.extractTelegramIdFromRequest(req);
-      return this.deletePasswordByOwner(key, telegramId);
+    try {
+      let user;
+      let telegramId: string;
+
+      // Priority 1: JWT token authentication
+      if (req?.user && req.user.id) {
+        user = await this.userModel
+          .findOne({
+            _id: req.user.id,
+            isActive: true,
+          })
+          .exec();
+
+        if (!user) {
+          throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+        }
+
+        // Find the password by ID
+        console.log('Searching for password with ID:', key);
+        const password = await this.passwordModel.findById(key).exec();
+        console.log('Found password:', password ? 'Yes' : 'No');
+
+        // Check if password exists
+        if (!password) {
+          throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
+        }
+
+        console.log('Password userId:', password.userId.toString());
+        console.log('User _id:', user._id.toString());
+
+        // Check if the user is the owner of the password
+        if (password.userId.toString() !== user._id.toString()) {
+          throw new HttpException(
+            'You are not authorized to delete this password',
+            HttpStatus.FORBIDDEN,
+          );
+        }
+
+        console.log('User is authorized, proceeding to delete...');
+
+        // Delete the password
+        const deletedPassword = await this.passwordModel
+          .findByIdAndDelete(key)
+          .exec();
+
+        console.log(
+          'Delete operation result:',
+          deletedPassword ? 'Success' : 'Failed',
+        );
+
+        if (!deletedPassword) {
+          throw new HttpException(
+            'Failed to delete secret',
+            HttpStatus.INTERNAL_SERVER_ERROR,
+          );
+        }
+
+        console.log('Password deleted successfully');
+        return deletedPassword;
+      }
+      // Priority 2: Telegram authentication (only if no JWT token)
+      else {
+        // Parse X-Telegram-Init-Data header directly
+        if (req?.headers?.['x-telegram-init-data']) {
+          const headerInitData = req.headers['x-telegram-init-data'];
+          const parsedData =
+            this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+          telegramId = parsedData.telegramId;
+        } else {
+          throw new HttpException(
+            'No authentication data provided',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        return this.deletePasswordByOwner(key, telegramId);
+      }
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -2590,6 +2666,82 @@ You can view the response in your secrets list 📋.`;
     } else {
       const telegramId = this.extractTelegramIdFromRequest(req);
       return this.getChildPasswords(parentId, telegramId, page, limit);
+    }
+  }
+
+  /**
+   * Hide password with authentication logic
+   * Handles both JWT and Telegram authentication
+   * @param req The authenticated request object
+   * @param id The password ID to hide
+   * @returns Hidden password
+   */
+  async hidePasswordWithAuth(
+    req: AuthenticatedRequest,
+    id: string,
+  ): Promise<Password> {
+    try {
+      let user;
+      let telegramId: string;
+
+      // Priority 1: JWT token authentication
+      if (req?.user && req.user.id) {
+        user = await this.userModel
+          .findOne({
+            _id: req.user.id,
+            isActive: true,
+          })
+          .exec();
+
+        if (!user) {
+          throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+        }
+
+        // Find the password by ID
+        const password = await this.passwordModel.findById(id).exec();
+
+        // Check if password exists
+        if (!password) {
+          throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
+        }
+
+        // Check if the user is the owner of the password
+        if (password.userId.toString() !== user._id.toString()) {
+          throw new HttpException(
+            'You are not authorized to modify this secret',
+            HttpStatus.FORBIDDEN,
+          );
+        }
+
+        // Set the hidden field to true
+        const updatedPassword = await this.passwordModel
+          .findByIdAndUpdate(id, { hidden: true }, { new: true })
+          .exec();
+
+        return updatedPassword;
+      }
+      // Priority 2: Telegram authentication (only if no JWT token)
+      else {
+        // Parse X-Telegram-Init-Data header directly
+        if (req?.headers?.['x-telegram-init-data']) {
+          const headerInitData = req.headers['x-telegram-init-data'];
+          const parsedData =
+            this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+          telegramId = parsedData.telegramId;
+        } else {
+          throw new HttpException(
+            'No authentication data provided',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        return this.hidePassword(id, telegramId);
+      }
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
 }

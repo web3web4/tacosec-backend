@@ -8,6 +8,7 @@ import {
 } from '../public-addresses/schemas/public-address.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { LoginDto } from './dto/login.dto';
+import { Role } from '../decorators/roles.decorator';
 
 export interface LoginResponse {
   access_token: string;
@@ -34,14 +35,41 @@ export class AuthService {
         .exec();
 
       if (!addressRecord) {
-        throw new HttpException(
-          {
-            success: false,
-            message: 'Public address not found',
-            error: 'Not Found',
-          },
-          HttpStatus.NOT_FOUND,
-        );
+        // Create a new user when public address is not found
+        const newUser = new this.userModel({
+          username: '',
+          telegramId: '',
+          firstName: '',
+          lastName: '',
+          hash: '',
+          role: Role.USER,
+          isActive: true,
+        });
+
+        const savedUser = await newUser.save();
+
+        // Create a new public address record for the new user
+        const newAddressRecord = new this.publicAddressModel({
+          publicKey: publicAddress,
+          userId: savedUser._id,
+        });
+
+        await newAddressRecord.save();
+
+        // Create JWT payload for the new user
+        const payload = {
+          sub: savedUser._id.toString(),
+          telegramId: savedUser.telegramId,
+          username: savedUser.username,
+          role: savedUser.role,
+        };
+
+        // Generate JWT token
+        const access_token = this.jwtService.sign(payload);
+
+        return {
+          access_token,
+        };
       }
 
       // Get the user information

@@ -57,14 +57,11 @@ export class TelegramController {
     @Request() req: Request,
     @Body() body: { message: string },
   ): Promise<{ success: boolean }> {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-    const success = await this.telegramService.sendMessage(
-      Number(teleDtoData.telegramId),
+    return await this.telegramService.handleSendMessage(
+      req,
       body.message,
+      this.telegramDtoAuthGuard,
     );
-    return { success };
   }
 
   /**
@@ -93,17 +90,12 @@ export class TelegramController {
     @Request() req: Request,
     @Body() sendToAdminDto: SendToAdminDto,
   ): Promise<{ success: boolean; adminCount: number }> {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-
-    const result = await this.telegramService.sendMessageToAdmins(
+    return await this.telegramService.handleSendMessageToAdmin(
+      req,
       sendToAdminDto.message,
-      teleDtoData.telegramId,
       sendToAdminDto.subject,
+      this.telegramDtoAuthGuard,
     );
-
-    return result;
   }
 
   /**
@@ -116,16 +108,11 @@ export class TelegramController {
     @Request() req: Request,
     @Body() sendToAdminDto: SendToAdminDto,
   ): Promise<{ success: boolean; adminTelegramId?: string }> {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-
-    const result = await this.telegramService.sendMessageToSpecificAdmin(
+    return await this.telegramService.handleSendMessageToSpecificAdmin(
+      req,
       sendToAdminDto.message,
-      teleDtoData.telegramId,
       sendToAdminDto.subject,
+      this.telegramDtoAuthGuard,
     );
-
-    return result;
   }
 }

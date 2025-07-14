@@ -321,4 +321,88 @@ ${message}
       return { success: false };
     }
   }
+
+  /**
+   * Extract telegram ID from request - prioritizes JWT token over x-telegram-init-data
+   * @param req The request object
+   * @param telegramDtoAuthGuard The guard instance for parsing telegram data
+   * @returns The telegram ID as string
+   */
+  extractTelegramIdFromRequest(req: any, telegramDtoAuthGuard: any): string {
+    // Check if user data is available from JWT token
+    if (req.user && req.user.telegramId) {
+      return req.user.telegramId;
+    }
+
+    // Fallback to x-telegram-init-data
+    const teleDtoData = telegramDtoAuthGuard.parseTelegramInitData(
+      req.headers['x-telegram-init-data'],
+    );
+    return teleDtoData.telegramId;
+  }
+
+  /**
+   * Handle sending message with automatic telegram ID extraction
+   * @param req The request object
+   * @param message The message to send
+   * @param telegramDtoAuthGuard The guard instance for parsing telegram data
+   * @returns Object with success status
+   */
+  async handleSendMessage(
+    req: any,
+    message: string,
+    telegramDtoAuthGuard: any,
+  ): Promise<{ success: boolean }> {
+    const telegramId = this.extractTelegramIdFromRequest(
+      req,
+      telegramDtoAuthGuard,
+    );
+
+    const success = await this.sendMessage(Number(telegramId), message);
+    return { success };
+  }
+
+  /**
+   * Handle sending message to admin with automatic telegram ID extraction
+   * @param req The request object
+   * @param message The message to send
+   * @param subject Optional subject for the message
+   * @param telegramDtoAuthGuard The guard instance for parsing telegram data
+   * @returns Object with success status and admin count
+   */
+  async handleSendMessageToAdmin(
+    req: any,
+    message: string,
+    subject: string | undefined,
+    telegramDtoAuthGuard: any,
+  ): Promise<{ success: boolean; adminCount: number }> {
+    const telegramId = this.extractTelegramIdFromRequest(
+      req,
+      telegramDtoAuthGuard,
+    );
+
+    return await this.sendMessageToAdmins(message, telegramId, subject);
+  }
+
+  /**
+   * Handle sending message to specific admin with automatic telegram ID extraction
+   * @param req The request object
+   * @param message The message to send
+   * @param subject Optional subject for the message
+   * @param telegramDtoAuthGuard The guard instance for parsing telegram data
+   * @returns Object with success status and admin telegram ID
+   */
+  async handleSendMessageToSpecificAdmin(
+    req: any,
+    message: string,
+    subject: string | undefined,
+    telegramDtoAuthGuard: any,
+  ): Promise<{ success: boolean; adminTelegramId?: string }> {
+    const telegramId = this.extractTelegramIdFromRequest(
+      req,
+      telegramDtoAuthGuard,
+    );
+
+    return await this.sendMessageToSpecificAdmin(message, telegramId, subject);
+  }
 }

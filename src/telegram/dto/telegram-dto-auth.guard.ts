@@ -47,9 +47,27 @@ export class TelegramDtoAuthGuard implements CanActivate {
           throw new UnauthorizedException('User not found or inactive');
         }
 
-        // Token is valid and user exists
+        // Check if user has a valid telegramId
+        if (!user.telegramId || user.telegramId === '') {
+          throw new UnauthorizedException(
+            'User does not have a valid linked Telegram account',
+          );
+        }
+
+        // Store user data in request for later use
+        (request as any).user = {
+          telegramId: user.telegramId,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        };
+
+        // Token is valid and user exists with valid telegram account
         return true;
-      } catch {
+      } catch (error) {
+        if (error instanceof UnauthorizedException) {
+          throw error;
+        }
         throw new UnauthorizedException('Invalid or expired token');
       }
     }

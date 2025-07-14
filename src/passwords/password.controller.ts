@@ -15,7 +15,7 @@ import { PasswordService } from './password.service';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
-import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { TelegramService } from '../telegram/telegram.service';
 // import { Types } from 'mongoose';
 // import { VerifyPasswordData } from './interfaces/verify-password.interface';

@@ -5,7 +5,7 @@ import { Report, ReportSchema } from './schemas/report.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { ReportService } from './report.service';
 import { ReportController } from './report.controller';
-import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
 import { RolesGuard } from '../guards/roles.guard';

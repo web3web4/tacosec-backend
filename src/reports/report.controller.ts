@@ -10,7 +10,7 @@ import {
 import { ReportService } from './report.service';
 import { ReportUserDto } from './dto/report-user.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
-import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { Roles, Role } from '../decorators/roles.decorator';
 
 @Controller('reports')

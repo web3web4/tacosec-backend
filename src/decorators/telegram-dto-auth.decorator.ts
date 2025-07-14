@@ -1,5 +1,5 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
-import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 
 /**

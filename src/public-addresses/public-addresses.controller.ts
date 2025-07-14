@@ -6,7 +6,7 @@ import {
 } from './public-addresses.service';
 import { CreatePublicAddressDto } from './dto/create-public-address.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
-import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 
 @Controller('public-addresses')
 export class PublicAddressesController {

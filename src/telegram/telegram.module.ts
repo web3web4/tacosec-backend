@@ -7,7 +7,7 @@ import { TelegramController } from './telegram.controller';
 import { TelegramService } from './telegram.service';
 import { TelegramValidatorService } from './telegram-validator.service';
 import { UsersModule } from '../users/users.module';
-import { TelegramDtoAuthGuard } from './dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { User, UserSchema } from '../users/schemas/user.schema';
 
 @Module({

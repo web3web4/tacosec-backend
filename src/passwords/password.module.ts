@@ -6,7 +6,7 @@ import { PasswordController } from './password.controller';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Password, PasswordSchema } from './schemas/password.schema';
 import { Report, ReportSchema } from '../reports/schemas/report.schema';
-import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { HttpModule } from '@nestjs/axios';
 import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';

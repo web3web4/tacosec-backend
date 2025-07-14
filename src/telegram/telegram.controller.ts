@@ -11,7 +11,7 @@ import { TelegramService } from './telegram.service';
 import { GetUsersDto } from './dto/get-users.dto';
 import { SendToAdminDto } from './dto/send-to-admin.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
-import { TelegramDtoAuthGuard } from './dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 // import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 
 @Controller('telegram')

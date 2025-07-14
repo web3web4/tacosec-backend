@@ -14,7 +14,7 @@ import { PasswordService } from '../passwords/password.service';
 import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
 import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
-import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { Roles, Role } from '../decorators/roles.decorator';
 import {
   Pagination,

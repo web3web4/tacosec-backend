@@ -8,9 +8,9 @@ import { Request } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { TelegramInitDto } from './telegram-init.dto';
-import { TelegramValidatorService } from '../telegram-validator.service';
-import { User, UserDocument } from '../../users/schemas/user.schema';
+import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
+import { TelegramValidatorService } from '../telegram/telegram-validator.service';
+import { User, UserDocument } from '../users/schemas/user.schema';
 
 export interface TelegramUser {
   id: number;

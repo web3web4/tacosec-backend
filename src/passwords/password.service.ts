@@ -504,10 +504,74 @@ export class PasswordService {
   async updatePasswordWithAuth(
     id: string,
     update: Partial<Password>,
+    req?: AuthenticatedRequest,
   ): Promise<Password> {
     const password = await this.passwordModel.findById(id).exec();
     if (!password) {
       throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+    }
+
+    // Validate user authentication with priority for JWT token
+    let user;
+    let initData: any;
+
+    // Priority 1: JWT token authentication
+    if (req?.user && req.user.id) {
+      user = await this.userModel
+        .findOne({
+          _id: req.user.id,
+          isActive: true,
+        })
+        .exec();
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if the user is the owner of the password
+      if (password.userId.toString() !== user._id.toString()) {
+        throw new HttpException(
+          'You are not authorized to update this password',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      // Create initData from JWT user info
+      initData = {
+        telegramId: req.user.telegramId || '',
+        username: req.user.username || user.username || '',
+        firstName: req.user.firstName || user.firstName || '',
+        lastName: req.user.lastName || user.lastName || '',
+        authDate: Math.floor(Date.now() / 1000), // Current timestamp
+      };
+    }
+    // Priority 2: Telegram authentication (only if no JWT token)
+    else {
+      // Only use X-Telegram-Init-Data header when no JWT token is present
+      if (!req?.headers?.['x-telegram-init-data']) {
+        throw new HttpException(
+          'No authentication data provided',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      const headerInitData = req.headers['x-telegram-init-data'];
+      const parsedData =
+        this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+      const telegramId = parsedData.telegramId;
+
+      user = await this.userModel
+        .findOne({
+          telegramId: telegramId,
+          isActive: true,
+        })
+        .exec();
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      initData = parsedData;
     }
 
     // Process sharedWith array to ensure both userId and username are present
@@ -584,6 +648,11 @@ export class PasswordService {
     if (processedUpdate.hidden === undefined) {
       processedUpdate.hidden = password.hidden || false;
     }
+
+    // Always update initData with the correct authentication data
+    // This ensures initData reflects the current authentication method
+    const authDate = this.getValidAuthDate(initData.authDate);
+    processedUpdate.initData = { ...initData, authDate };
 
     const updatedPassword = await this.passwordModel
       .findByIdAndUpdate(id, processedUpdate, { new: true })
@@ -797,12 +866,12 @@ export class PasswordService {
     let telegramId: string;
     let initData: any;
 
-    // Try request body initData first
+    // Try request body initData first (only for addPassword)
     if (bodyInitData) {
       telegramId = bodyInitData.telegramId;
       initData = bodyInitData;
     }
-    // Use X-Telegram-Init-Data header as fallback
+    // Use X-Telegram-Init-Data header
     else if (req?.headers?.['x-telegram-init-data']) {
       const headerInitData = req.headers['x-telegram-init-data'];
       const parsedData =

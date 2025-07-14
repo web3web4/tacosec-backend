@@ -55,9 +55,9 @@ export class PasswordController {
   updatePassword(
     @Param('id') id: string,
     @Body() body: Partial<Password>,
-    // @Request() req: AuthenticatedRequest,
+    @Request() req: AuthenticatedRequest,
   ) {
-    return this.passwordService.updatePasswordWithAuth(id, body);
+    return this.passwordService.updatePasswordWithAuth(id, body, req);
   }
 
   @Get()

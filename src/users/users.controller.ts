@@ -85,7 +85,7 @@ export class UsersController {
   }
 
   @Get('telegram/profile')
-  @TelegramAuth(true) // Skip Telegram validation - only check JWT token
+  // @TelegramDtoAuth() // Skip Telegram validation - only check JWT token
   getTelegramProfile(@Query() query: GetTelegramProfileDto) {
     return this.usersService.getTelegramProfile(query.username);
   }

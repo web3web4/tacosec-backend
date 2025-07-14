@@ -11,6 +11,18 @@ import {
   // HttpStatus,
   Request,
 } from '@nestjs/common';
+
+// Extend Request interface to include user property
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    telegramId: string;
+    username: string;
+    firstName: string;
+    lastName: string;
+    [key: string]: any;
+  };
+}
 import { PasswordService } from './password.service';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 
@@ -30,59 +42,57 @@ export class PasswordController {
   ) {}
 
   @Post()
-  @TelegramDtoAuth()
-  createPassword(@Body() createPasswordDto: CreatePasswordRequestDto) {
-    return this.passwordService.addPassword(createPasswordDto);
+  @TelegramDtoAuth(true)
+  createPassword(
+    @Body() createPasswordDto: CreatePasswordRequestDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.passwordService.addPassword(createPasswordDto, req);
   }
 
   @Patch(':id')
-  @TelegramDtoAuth()
-  updatePassword(@Param('id') id: string, @Body() body: Partial<Password>) {
-    return this.passwordService.findByIdAndUpdate(id, body);
+  @TelegramDtoAuth(true)
+  updatePassword(
+    @Param('id') id: string,
+    @Body() body: Partial<Password>,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.passwordService.updatePasswordWithAuth(id, body, req);
   }
 
   @Get()
-  @TelegramDtoAuth()
+  @TelegramDtoAuth(true)
   getUserPasswords(
-    @Request() req: Request,
+    @Request() req: AuthenticatedRequest,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-
     // Parse pagination parameters if provided
     const pageNumber = page ? parseInt(page, 10) : undefined;
     const limitNumber = limit ? parseInt(limit, 10) : undefined;
 
-    // Use pagination-enabled method
-    return this.passwordService.findByUserTelegramIdWithPagination(
-      teleDtoData.telegramId,
+    // Use the service method that handles authentication logic
+    return this.passwordService.getUserPasswordsWithAuth(
+      req,
       pageNumber,
       limitNumber,
     );
   }
 
   @Get('shared-with')
-  @TelegramDtoAuth()
+  @TelegramDtoAuth(true)
   getUserBySharedWith(
-    @Request() req: Request,
+    @Request() req: AuthenticatedRequest,
     @Body() body: { key: string },
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-
     // Parse pagination parameters if provided
     const pageNumber = page ? parseInt(page, 10) : undefined;
     const limitNumber = limit ? parseInt(limit, 10) : undefined;
 
-    // Use pagination-enabled method
-    return this.passwordService.findSharedWithByTelegramIdWithPagination(
-      teleDtoData.telegramId,
+    return this.passwordService.getSharedWithByAuth(
+      req,
       body.key,
       pageNumber,
       limitNumber,
@@ -90,15 +100,13 @@ export class PasswordController {
   }
 
   @Get('shared-with-me')
-  @TelegramDtoAuth()
+  @TelegramDtoAuth(true)
   getPasswordsSharedWithMe(
-    @Request() req: Request,
+    @Request() req: AuthenticatedRequest,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
+    const username = this.passwordService.extractUsernameFromRequest(req);
 
     // Parse pagination parameters if provided
     const pageNumber = page ? parseInt(page, 10) : undefined;
@@ -106,55 +114,50 @@ export class PasswordController {
 
     // Use pagination-enabled method
     return this.passwordService.findPasswordsSharedWithMeWithPagination(
-      teleDtoData.username,
+      username,
       pageNumber,
       limitNumber,
     );
   }
 
   @Delete(':id')
-  @TelegramDtoAuth()
+  @TelegramDtoAuth(true)
   remove(@Param('id') id: string) {
     return this.passwordService.delete(id);
   }
 
   @Delete('owner/:id')
-  @TelegramDtoAuth()
-  deleteByOwner(@Param('id') id: string, @Request() req: Request) {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-    return this.passwordService.deletePasswordByOwner(
-      id,
-      teleDtoData.telegramId,
-    );
+  @TelegramDtoAuth(true)
+  deleteByOwner(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return this.passwordService.deletePasswordByOwnerWithAuth(req, id);
   }
 
   @Patch('hide/:id')
-  @TelegramDtoAuth()
-  hidePassword(@Param('id') id: string, @Request() req: Request) {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-    return this.passwordService.hidePassword(id, teleDtoData.telegramId);
+  @TelegramDtoAuth(true)
+  hidePassword(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    // If JWT token exists, use userId; otherwise use telegramId
+    if (req?.user && req.user.id) {
+      return this.passwordService.hidePasswordByUserId(id, req.user.id);
+    } else {
+      const telegramId = this.passwordService.extractTelegramIdFromRequest(req);
+      return this.passwordService.hidePassword(id, telegramId);
+    }
   }
 
   @Get('children/:parentId')
-  @TelegramDtoAuth()
+  @TelegramDtoAuth(true)
   getChildPasswords(
     @Param('parentId') parentId: string,
     @Query('page') page: string = '1',
     @Query('secret_count') secretCount: string = '10',
-    @Request() req: Request,
+    @Request() req: AuthenticatedRequest,
   ) {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
     const pageNumber = parseInt(page, 10) || 1;
     const limit = parseInt(secretCount, 10) || 10;
-    return this.passwordService.getChildPasswords(
+
+    return this.passwordService.getChildPasswordsWithAuth(
+      req,
       parentId,
-      teleDtoData.telegramId,
       pageNumber,
       limit,
     );

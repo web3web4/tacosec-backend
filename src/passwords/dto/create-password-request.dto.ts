@@ -40,7 +40,8 @@ export class CreatePasswordRequestDto {
 
   @ValidateNested()
   @TransformType(() => TelegramInitDto)
-  initData: TelegramInitDto;
+  @IsOptional()
+  initData?: TelegramInitDto;
 
   @IsString()
   @IsOptional()

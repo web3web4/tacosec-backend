@@ -4,6 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
@@ -11,6 +12,7 @@ import { Model } from 'mongoose';
 import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
 import { TelegramValidatorService } from '../telegram/telegram-validator.service';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { SKIP_TELEGRAM_VALIDATION } from '../decorators/telegram-auth.decorator';
 
 export interface TelegramUser {
   id: number;
@@ -28,10 +30,17 @@ export class TelegramDtoAuthGuard implements CanActivate {
     private telegramValidator: TelegramValidatorService,
     private jwtService: JwtService,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
+
+    // Get metadata to check if Telegram validation should be skipped
+    const skipTelegramValidation = this.reflector.getAllAndOverride<boolean>(
+      SKIP_TELEGRAM_VALIDATION,
+      [context.getHandler(), context.getClass()],
+    );
 
     // Check for JWT token in Authorization header first
     const authHeader = request.headers.authorization;
@@ -47,22 +56,26 @@ export class TelegramDtoAuthGuard implements CanActivate {
           throw new UnauthorizedException('User not found or inactive');
         }
 
-        // Check if user has a valid telegramId
-        if (!user.telegramId || user.telegramId === '') {
-          throw new UnauthorizedException(
-            'User does not have a valid linked Telegram account',
-          );
+        // If skipTelegramValidation is true, don't check telegramId
+        if (!skipTelegramValidation) {
+          // Check if user has a valid telegramId
+          if (!user.telegramId || user.telegramId === '') {
+            throw new UnauthorizedException(
+              'User does not have a valid linked Telegram account',
+            );
+          }
         }
 
         // Store user data in request for later use
         (request as any).user = {
-          telegramId: user.telegramId,
+          id: user._id.toString(),
+          telegramId: user.telegramId || '',
           username: user.username,
           firstName: user.firstName,
           lastName: user.lastName,
         };
 
-        // Token is valid and user exists with valid telegram account
+        // Token is valid and user exists
         return true;
       } catch (error) {
         if (error instanceof UnauthorizedException) {

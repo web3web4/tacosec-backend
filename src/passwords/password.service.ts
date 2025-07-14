@@ -1,6 +1,18 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+// import { Request } from 'express';
+
+// Extend Request interface to include user property
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    telegramId: string;
+    username: string;
+    firstName: string;
+    lastName: string;
+  };
+}
 import { Password, PasswordDocument } from './schemas/password.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { Report, ReportDocument } from '../reports/schemas/report.schema';
@@ -15,6 +27,7 @@ import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { SharedWithDto } from './dto/shared-with.dto';
 import { PaginatedResponse } from './dto/pagination.dto';
 import { TelegramService } from '../telegram/telegram.service';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 @Injectable()
 export class PasswordService {
   constructor(
@@ -22,6 +35,7 @@ export class PasswordService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
     private readonly telegramService: TelegramService,
+    private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
   ) {}
 
   private async hashPassword(password: string): Promise<string> {
@@ -37,8 +51,94 @@ export class PasswordService {
     return this.passwordModel.findById(id).exec();
   }
 
-  async findByUserId(userId: Types.ObjectId): Promise<Password[]> {
+  async findByUserObjectId(userId: Types.ObjectId): Promise<Password[]> {
     return this.passwordModel.find({ userId, isActive: true }).exec();
+  }
+
+  async findByUserId(userId: string): Promise<passwordReturns[]> {
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+      const user = await this.userModel
+        .findOne({ _id: userId, isActive: true })
+        .exec();
+      if (!user) {
+        throw new Error('userId is not valid');
+      }
+
+      // Find passwords that are active, either not hidden or hidden field doesn't exist, and are parent passwords (no parent_secret_id)
+      const passwords = await this.passwordModel
+        .find({
+          userId: user._id,
+          isActive: true,
+          $and: [
+            { $or: [{ hidden: false }, { hidden: { $exists: false } }] },
+            {
+              $or: [
+                { parent_secret_id: { $exists: false } },
+                { parent_secret_id: null },
+              ],
+            },
+          ],
+        })
+        .select(
+          'key value description updatedAt createdAt sharedWith type hidden',
+        )
+        .exec();
+
+      const passwordWithSharedWithAsUsernames = await Promise.all(
+        passwords.map(async (password) => {
+          // Fetch unresolved reports for this password
+          const reports = await this.reportModel
+            .find({
+              $or: [
+                { secret_id: password._id },
+                { secret_id: password._id.toString() },
+              ],
+              resolved: false,
+            })
+            .exec();
+
+          // Transform reports to include reporter username
+          const reportInfo: PasswordReportInfo[] = await Promise.all(
+            reports.map(async (report) => {
+              // Get reporter user info
+              const reporter = await this.userModel
+                .findOne({ telegramId: report.reporterTelegramId })
+                .select('username')
+                .exec();
+
+              return {
+                reporterUsername: reporter ? reporter.username : 'Unknown',
+                report_type: report.report_type,
+                reason: report.reason,
+                createdAt: report.createdAt,
+              };
+            }),
+          );
+
+          return {
+            _id: password._id,
+            key: password.key,
+            value: password.value,
+            description: password.description,
+            type: password.type,
+            sharedWith: password.sharedWith,
+            updatedAt: password.updatedAt,
+            createdAt: password.createdAt,
+            hidden: password.hidden || false,
+            reports: reportInfo,
+          };
+        }),
+      );
+      return passwordWithSharedWithAsUsernames;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 
   async findByUserTelegramId(telegramId: string): Promise<passwordReturns[]> {
@@ -56,7 +156,7 @@ export class PasswordService {
       // Find passwords that are active, either not hidden or hidden field doesn't exist, and are parent passwords (no parent_secret_id)
       const passwords = await this.passwordModel
         .find({
-          'initData.telegramId': telegramId,
+          userId: user._id,
           isActive: true,
           $and: [
             { $or: [{ hidden: false }, { hidden: { $exists: false } }] },
@@ -161,7 +261,7 @@ export class PasswordService {
       }
       const sharedWith = await this.passwordModel
         .find({
-          'initData.telegramId': telegramId,
+          userId: user._id,
           isActive: true,
           key: key,
         })
@@ -366,6 +466,100 @@ export class PasswordService {
       .exec();
   }
 
+  async updatePasswordWithAuth(
+    id: string,
+    update: Partial<Password>,
+    req?: AuthenticatedRequest,
+  ): Promise<Password> {
+    const password = await this.passwordModel.findById(id).exec();
+    if (!password) {
+      throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
+    }
+
+    // Process sharedWith array to ensure both userId and username are present
+    const processedUpdate = { ...update };
+    if (update.sharedWith?.length > 0) {
+      processedUpdate.sharedWith = await Promise.all(
+        update.sharedWith.map(async (shared) => {
+          let sharedUser;
+          let finalUsername = shared.username;
+          let finalUserId = shared.userId;
+
+          // Case 1: Both userId and username provided - use userId and ignore username
+          if (shared.userId && shared.username) {
+            sharedUser = await this.userModel
+              .findOne({
+                _id: shared.userId,
+                isActive: true,
+              })
+              .exec();
+            if (sharedUser) {
+              finalUsername = sharedUser.username;
+              finalUserId = shared.userId;
+            }
+          }
+          // Case 2: Only userId provided - find username
+          else if (shared.userId && !shared.username) {
+            sharedUser = await this.userModel
+              .findOne({
+                _id: shared.userId,
+                isActive: true,
+              })
+              .exec();
+            if (sharedUser) {
+              finalUsername = sharedUser.username;
+              finalUserId = shared.userId;
+            }
+          }
+          // Case 3: Only username provided - find userId
+          else if (shared.username && !shared.userId) {
+            sharedUser = await this.userModel
+              .findOne({
+                username: shared.username.toLowerCase(),
+                isActive: true,
+              })
+              .exec();
+            if (sharedUser) {
+              finalUsername = sharedUser.username;
+              finalUserId = sharedUser._id.toString();
+            }
+          }
+
+          return {
+            ...shared,
+            username: finalUsername,
+            userId: finalUserId,
+          };
+        }),
+      );
+    }
+
+    // If sharedWith is being updated, check for sharing restrictions
+    if (processedUpdate.sharedWith && processedUpdate.sharedWith.length > 0) {
+      const user = await this.userModel.findById(password.userId).exec();
+
+      if (user && user.sharingRestricted) {
+        await this.validateSharingRestrictions(
+          user,
+          processedUpdate.sharedWith,
+        );
+      }
+    }
+
+    // Ensure hidden field is maintained or set to false if it doesn't exist
+    if (processedUpdate.hidden === undefined) {
+      processedUpdate.hidden = password.hidden || false;
+    }
+
+    const updatedPassword = await this.passwordModel
+      .findByIdAndUpdate(id, processedUpdate, { new: true })
+      .exec();
+    if (updatedPassword) {
+      await this.sendMessageToUsersBySharedWith(updatedPassword);
+    }
+    return updatedPassword;
+  }
+
   async findByIdAndUpdate(
     id: string,
     update: Partial<Password>,
@@ -377,10 +571,7 @@ export class PasswordService {
 
     // If sharedWith is being updated, check for sharing restrictions
     if (update.sharedWith && update.sharedWith.length > 0) {
-      const user = await this.userModel.findOne({
-        telegramId: password.initData?.telegramId,
-        isActive: true,
-      });
+      const user = await this.userModel.findById(password.userId).exec();
 
       if (user && user.sharingRestricted) {
         await this.validateSharingRestrictions(user, update.sharedWith);
@@ -491,24 +682,220 @@ export class PasswordService {
   }
 
   // Moved from UsersService
-  async addPassword(passwordData: CreatePasswordRequestDto) {
-    try {
-      // get user by telegramId
-      const user = await this.userModel
-        .findOne({
-          telegramId: passwordData.initData.telegramId,
-          isActive: true,
-        })
-        .exec();
+  /**
+   * Helper method to extract user ID from request
+   * Priority: JWT token user.id -> fallback to telegramId
+   */
+  extractUserIdFromRequest(req: AuthenticatedRequest): string {
+    // If JWT token exists, use user.id and ignore X-Telegram-Init-Data completely
+    if (req?.user && req.user.id) {
+      return req.user.id;
+    }
+    // If no JWT token, fallback to telegramId from X-Telegram-Init-Data header
+    else if (req?.headers?.['x-telegram-init-data']) {
+      const headerInitData = req.headers['x-telegram-init-data'];
+      const parsedData =
+        this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+      return parsedData.telegramId;
+    } else {
+      throw new HttpException(
+        'No authentication data provided',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 
-      if (!user) {
-        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+  /**
+   * Helper method to extract telegramId from request
+   * Priority: JWT token -> X-Telegram-Init-Data header (only if no JWT token)
+   */
+  extractTelegramIdFromRequest(req: AuthenticatedRequest): string {
+    // If JWT token exists, use it and ignore X-Telegram-Init-Data completely
+    if (req?.user && req.user.id) {
+      return req.user.telegramId || '';
+    }
+    // Only use X-Telegram-Init-Data header if no JWT token
+    else if (req?.headers?.['x-telegram-init-data']) {
+      const headerInitData = req.headers['x-telegram-init-data'];
+      const parsedData =
+        this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+      return parsedData.telegramId;
+    } else {
+      throw new HttpException(
+        'No authentication data provided',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /**
+   * Helper method to extract username from request
+   * Priority: JWT token -> X-Telegram-Init-Data header (only if no JWT token)
+   */
+  extractUsernameFromRequest(req: AuthenticatedRequest): string {
+    // If JWT token exists, use it and ignore X-Telegram-Init-Data completely
+    if (req?.user && req.user.id) {
+      return req.user.username || '';
+    }
+    // Only use X-Telegram-Init-Data header if no JWT token
+    else if (req?.headers?.['x-telegram-init-data']) {
+      const headerInitData = req.headers['x-telegram-init-data'];
+      const parsedData =
+        this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+      return parsedData.username;
+    } else {
+      throw new HttpException(
+        'No authentication data provided',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /**
+   * Helper method to extract telegramId and initData from Telegram sources only
+   * This method should only be called when no JWT token is present
+   * Priority: request body -> X-Telegram-Init-Data header
+   */
+  private extractTelegramDataFromRequest(
+    req?: AuthenticatedRequest,
+    bodyInitData?: any,
+  ): { telegramId: string; initData: any } {
+    let telegramId: string;
+    let initData: any;
+
+    // Try request body initData first
+    if (bodyInitData) {
+      telegramId = bodyInitData.telegramId;
+      initData = bodyInitData;
+    }
+    // Use X-Telegram-Init-Data header as fallback
+    else if (req?.headers?.['x-telegram-init-data']) {
+      const headerInitData = req.headers['x-telegram-init-data'];
+      const parsedData =
+        this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+      telegramId = parsedData.telegramId;
+      initData = parsedData;
+    } else {
+      throw new HttpException(
+        'No Telegram authentication data provided',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return { telegramId, initData };
+  }
+
+  async addPassword(
+    passwordData: CreatePasswordRequestDto,
+    req?: AuthenticatedRequest,
+  ) {
+    try {
+      let user;
+      let initData: any;
+
+      // Priority 1: JWT token authentication
+      if (req?.user && req.user.id) {
+        user = await this.userModel
+          .findOne({
+            _id: req.user.id,
+            isActive: true,
+          })
+          .exec();
+
+        if (!user) {
+          throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+        }
+
+        // Create initData from JWT user info
+        initData = {
+          telegramId: req.user.telegramId || '',
+          username: req.user.username || user.username || '',
+          firstName: req.user.firstName || user.firstName || '',
+          lastName: req.user.lastName || user.lastName || '',
+          authDate: Math.floor(Date.now() / 1000), // Current timestamp
+        };
+      }
+      // Priority 2: Telegram authentication (only if no JWT token)
+      else {
+        const { telegramId, initData: extractedInitData } =
+          this.extractTelegramDataFromRequest(req, passwordData.initData);
+
+        user = await this.userModel
+          .findOne({
+            telegramId: telegramId,
+            isActive: true,
+          })
+          .exec();
+
+        if (!user) {
+          throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+        }
+
+        initData = extractedInitData;
+      }
+
+      // Process sharedWith array to ensure both userId and username are present
+      let processedSharedWith = passwordData.sharedWith;
+      if (passwordData.sharedWith?.length > 0) {
+        processedSharedWith = await Promise.all(
+          passwordData.sharedWith.map(async (shared) => {
+            let sharedUser;
+            let finalUsername = shared.username;
+            let finalUserId = shared.userId;
+
+            // Case 1: Both userId and username provided - use userId and ignore username
+            if (shared.userId && shared.username) {
+              sharedUser = await this.userModel
+                .findOne({
+                  _id: shared.userId,
+                  isActive: true,
+                })
+                .exec();
+              if (sharedUser) {
+                finalUsername = sharedUser.username;
+                finalUserId = shared.userId;
+              }
+            }
+            // Case 2: Only userId provided - find username
+            else if (shared.userId && !shared.username) {
+              sharedUser = await this.userModel
+                .findOne({
+                  _id: shared.userId,
+                  isActive: true,
+                })
+                .exec();
+              if (sharedUser) {
+                finalUsername = sharedUser.username;
+                finalUserId = shared.userId;
+              }
+            }
+            // Case 3: Only username provided - find userId
+            else if (shared.username && !shared.userId) {
+              sharedUser = await this.userModel
+                .findOne({
+                  username: shared.username.toLowerCase(),
+                  isActive: true,
+                })
+                .exec();
+              if (sharedUser) {
+                finalUsername = sharedUser.username;
+                finalUserId = sharedUser._id.toString();
+              }
+            }
+
+            return {
+              ...shared,
+              username: finalUsername,
+              userId: finalUserId,
+            };
+          }),
+        );
       }
 
       // Check if user is restricted from sharing passwords
-      if (user.sharingRestricted && passwordData.sharedWith?.length > 0) {
+      if (user.sharingRestricted && processedSharedWith?.length > 0) {
         // If user is restricted, we need to validate each user they're trying to share with
-        await this.validateSharingRestrictions(user, passwordData.sharedWith);
+        await this.validateSharingRestrictions(user, processedSharedWith);
       }
 
       // Validate parent_secret_id if provided
@@ -537,7 +924,7 @@ export class PasswordService {
       }
 
       // get valid auth date
-      const authDate = this.getValidAuthDate(passwordData.initData.authDate);
+      const authDate = this.getValidAuthDate(initData.authDate);
 
       // create password
       const password = await this.createOrUpdatePassword({
@@ -547,10 +934,10 @@ export class PasswordService {
         description: passwordData.description,
         isActive: true,
         type: passwordData.type,
-        sharedWith: passwordData.sharedWith,
+        sharedWith: processedSharedWith,
         hidden: false, // Explicitly set hidden to false
         parent_secret_id: parentSecretId,
-        initData: { ...passwordData.initData, authDate },
+        initData: { ...initData, authDate },
       });
 
       // Get the full password object including _id
@@ -620,16 +1007,19 @@ export class PasswordService {
   async sendMessageToUsersBySharedWith(passwordUser: Password) {
     try {
       console.log('sending message to users by shared with internally');
-      const user = await this.userModel.findOne({
-        telegramId: passwordUser.initData.telegramId,
-        isActive: true,
-      });
+      const user = await this.userModel.findById(passwordUser.userId).exec();
 
       if (!user) {
         console.error(
           'User not found when trying to send shared password messages',
         );
         return; // Don't throw exception, just return to prevent breaking the main flow
+      }
+
+      // Check if user has a valid telegramId before sending messages
+      if (!user.telegramId || user.telegramId === '') {
+        console.log('User has no valid Telegram ID, skipping notifications');
+        return;
       }
 
       if (!passwordUser.sharedWith || passwordUser.sharedWith.length === 0) {
@@ -732,14 +1122,19 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
 
       // Find the parent password owner
       const parentOwner = await this.userModel
-        .findOne({
-          telegramId: parentPassword.initData?.telegramId,
-          isActive: true,
-        })
+        .findById(parentPassword.userId)
         .exec();
 
-      if (!parentOwner || !parentOwner.telegramId) {
-        console.error('Parent password owner not found or has no Telegram ID');
+      if (!parentOwner) {
+        console.error('Parent password owner not found');
+        return;
+      }
+
+      // Check if parent owner has a valid telegramId before sending notification
+      if (!parentOwner.telegramId || parentOwner.telegramId === '') {
+        console.log(
+          'Parent password owner has no valid Telegram ID, skipping notification',
+        );
         return;
       }
 
@@ -837,6 +1232,14 @@ You can view the response in your secrets list 📋.`;
     telegramId: string,
   ): Promise<Password> {
     try {
+      // Find the user by telegramId
+      const user = await this.userModel
+        .findOne({ telegramId, isActive: true })
+        .exec();
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
       // Find the password by ID
       const password = await this.passwordModel.findById(id).exec();
 
@@ -846,7 +1249,7 @@ You can view the response in your secrets list 📋.`;
       }
 
       // Check if the authenticated user is the owner of the password
-      if (password.initData?.telegramId !== telegramId) {
+      if (!password.userId.equals(new Types.ObjectId(user._id.toString()))) {
         throw new HttpException(
           'You are not authorized to delete this secret',
           HttpStatus.FORBIDDEN,
@@ -877,6 +1280,14 @@ You can view the response in your secrets list 📋.`;
    */
   async hidePassword(id: string, telegramId: string): Promise<Password> {
     try {
+      // Find the user by telegramId
+      const user = await this.userModel
+        .findOne({ telegramId, isActive: true })
+        .exec();
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
       // Find the password by ID
       const password = await this.passwordModel.findById(id).exec();
 
@@ -886,7 +1297,7 @@ You can view the response in your secrets list 📋.`;
       }
 
       // Check if the authenticated user is the owner of the password
-      if (password.initData?.telegramId !== telegramId) {
+      if (!password.userId.equals(new Types.ObjectId(user._id.toString()))) {
         throw new HttpException(
           'You are not authorized to modify this secret',
           HttpStatus.FORBIDDEN,
@@ -959,6 +1370,30 @@ You can view the response in your secrets list 📋.`;
 
       if (!user) {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if the authenticated user is the owner of the parent password OR has access to it OR owns any child password
+      const isOwner = parentPassword.userId.equals(
+        new Types.ObjectId(user._id.toString()),
+      );
+      const hasAccess =
+        parentPassword.sharedWith &&
+        parentPassword.sharedWith.some(
+          (shared) => shared.username === user.username,
+        );
+
+      // Check if user owns any child password
+      const ownsChildPassword = await this.passwordModel.exists({
+        parent_secret_id: new Types.ObjectId(parentId),
+        userId: new Types.ObjectId(user._id.toString()),
+        isActive: true,
+      });
+
+      if (!isOwner && !hasAccess && !ownsChildPassword) {
+        throw new HttpException(
+          'You are not authorized to view child secrets for this parent secret',
+          HttpStatus.FORBIDDEN,
+        );
       }
 
       // Calculate pagination
@@ -1107,7 +1542,137 @@ You can view the response in your secrets list 📋.`;
 
       // Base query for finding passwords
       const baseQuery = {
-        'initData.telegramId': telegramId,
+        userId: user._id,
+        isActive: true,
+        $and: [
+          { $or: [{ hidden: false }, { hidden: { $exists: false } }] },
+          {
+            $or: [
+              { parent_secret_id: { $exists: false } },
+              { parent_secret_id: null },
+            ],
+          },
+        ],
+      };
+
+      // Get total count for pagination
+      const totalCount = await this.passwordModel
+        .countDocuments(baseQuery)
+        .exec();
+
+      // Find passwords with pagination
+      const passwords = await this.passwordModel
+        .find(baseQuery)
+        .select(
+          'key value description updatedAt createdAt sharedWith type hidden',
+        )
+        .skip(skip)
+        .limit(limit)
+        .exec();
+
+      // Transform passwords with reports
+      const passwordWithSharedWithAsUsernames = await Promise.all(
+        passwords.map(async (password) => {
+          // Fetch unresolved reports for this password
+          const reports = await this.reportModel
+            .find({
+              $or: [
+                { secret_id: password._id },
+                { secret_id: password._id.toString() },
+              ],
+              resolved: false,
+            })
+            .exec();
+
+          // Transform reports to include reporter username
+          const reportInfo: PasswordReportInfo[] = await Promise.all(
+            reports.map(async (report) => {
+              // Get reporter user info
+              const reporter = await this.userModel
+                .findOne({ telegramId: report.reporterTelegramId })
+                .select('username')
+                .exec();
+
+              return {
+                reporterUsername: reporter ? reporter.username : 'Unknown',
+                report_type: report.report_type,
+                reason: report.reason,
+                createdAt: report.createdAt,
+              };
+            }),
+          );
+
+          return {
+            _id: password._id,
+            key: password.key,
+            value: password.value,
+            description: password.description,
+            type: password.type,
+            sharedWith: password.sharedWith,
+            updatedAt: password.updatedAt,
+            createdAt: password.createdAt,
+            hidden: password.hidden || false,
+            reports: reportInfo,
+          };
+        }),
+      );
+
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
+      return {
+        data: passwordWithSharedWithAsUsernames,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+          limit,
+        },
+      };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async findByUserIdWithPagination(
+    userId: string,
+    page?: number,
+    limit?: number,
+  ): Promise<passwordReturns[] | PaginatedResponse<passwordReturns>> {
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+      const user = await this.userModel
+        .findOne({ _id: userId, isActive: true })
+        .exec();
+      if (!user) {
+        throw new Error('userId is not valid');
+      }
+
+      // If pagination parameters are not provided or incomplete, return original response
+      if (
+        page === undefined ||
+        limit === undefined ||
+        isNaN(page) ||
+        isNaN(limit) ||
+        page <= 0 ||
+        limit <= 0
+      ) {
+        // Call the string version of findByUserId explicitly
+        return this.findByUserId(userId as string);
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Base query for finding passwords
+      const baseQuery = {
+        userId: user._id,
         isActive: true,
         $and: [
           { $or: [{ hidden: false }, { hidden: { $exists: false } }] },
@@ -1255,7 +1820,7 @@ You can view the response in your secrets list 📋.`;
       // a single password's sharedWith array, but we'll implement it for consistency
       const sharedWith = await this.passwordModel
         .find({
-          'initData.telegramId': telegramId,
+          userId: user._id,
           isActive: true,
           key: key,
         })
@@ -1379,6 +1944,475 @@ You can view the response in your secrets list 📋.`;
     } catch (error) {
       console.log('error', error);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async findSharedWithByUserIdWithPagination(
+    userId: string,
+    key: string,
+    page?: number,
+    limit?: number,
+  ): Promise<SharedWithDto[] | PaginatedResponse<SharedWithDto>> {
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+      const user = await this.userModel.findOne({
+        _id: userId,
+        isActive: true,
+      });
+      if (!user) {
+        throw new Error('userId is not valid');
+      }
+      if (!key) {
+        throw new Error('Key is required');
+      }
+      const passwordKey = await this.passwordModel.findOne({
+        key,
+        isActive: true,
+      });
+      if (!passwordKey) {
+        throw new Error('Key is not found');
+      }
+
+      // If pagination parameters are not provided or incomplete, return original response
+      if (
+        page === undefined ||
+        limit === undefined ||
+        isNaN(page) ||
+        isNaN(limit) ||
+        page <= 0 ||
+        limit <= 0
+      ) {
+        return this.findSharedWithByUserId(userId, key);
+      }
+
+      // For this method, pagination doesn't make much sense as it typically returns
+      // a single password's sharedWith array, but we'll implement it for consistency
+      const sharedWith = await this.passwordModel
+        .find({
+          userId: user._id,
+          isActive: true,
+          key: key,
+        })
+        .select('sharedWith -_id')
+        .exec();
+
+      const sharedWithData =
+        sharedWith.length > 0 ? sharedWith[0].sharedWith : [];
+
+      // Apply pagination to sharedWith array
+      const skip = (page - 1) * limit;
+      const paginatedData = sharedWithData.slice(skip, skip + limit);
+      const totalCount = sharedWithData.length;
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
+      return {
+        data: paginatedData,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+          limit,
+        },
+      };
+    } catch (error) {
+      console.log('error', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async findSharedWithByUserId(
+    userId: string,
+    key: string,
+  ): Promise<SharedWithDto[]> {
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+      const user = await this.userModel.findOne({
+        _id: userId,
+        isActive: true,
+      });
+      if (!user) {
+        throw new Error('userId is not valid');
+      }
+      if (!key) {
+        throw new Error('Key is required');
+      }
+      const passwordKey = await this.passwordModel.findOne({
+        key,
+        isActive: true,
+      });
+      if (!passwordKey) {
+        throw new Error('Key is not found');
+      }
+      const sharedWith = await this.passwordModel
+        .find({
+          userId: user._id,
+          isActive: true,
+          key: key,
+        })
+        .select('sharedWith -_id')
+        .exec();
+      return sharedWith.length > 0 ? sharedWith[0].sharedWith : null;
+    } catch (error) {
+      console.log('error', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async deletePasswordByUserId(id: string, userId: string): Promise<Password> {
+    try {
+      // Find the user by userId
+      const user = await this.userModel
+        .findOne({ _id: userId, isActive: true })
+        .exec();
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Find the password by ID
+      const password = await this.passwordModel.findById(id).exec();
+
+      // Check if password exists
+      if (!password) {
+        throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if the authenticated user is the owner of the password
+      if (!password.userId.equals(new Types.ObjectId(user._id.toString()))) {
+        throw new HttpException(
+          'You are not authorized to delete this secret',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      // Delete the password
+      const deletedPassword = await this.passwordModel
+        .findByIdAndDelete(id)
+        .exec();
+      return deletedPassword;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async hidePasswordByUserId(id: string, userId: string): Promise<Password> {
+    try {
+      // Find the user by userId
+      const user = await this.userModel
+        .findOne({ _id: userId, isActive: true })
+        .exec();
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Find the password by ID
+      const password = await this.passwordModel.findById(id).exec();
+
+      // Check if password exists
+      if (!password) {
+        throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if the authenticated user is the owner of the password
+      if (!password.userId.equals(new Types.ObjectId(user._id.toString()))) {
+        throw new HttpException(
+          'You are not authorized to modify this secret',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      // Set the hidden field to true
+      const updatedPassword = await this.passwordModel
+        .findByIdAndUpdate(id, { hidden: true }, { new: true })
+        .exec();
+
+      return updatedPassword;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async getChildPasswordsByUserId(
+    parentId: string,
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    passwords: passwordReturns[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalCount: number;
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+    };
+  }> {
+    try {
+      // Find the parent password by ID
+      const parentPassword = await this.passwordModel.findById(parentId).exec();
+
+      // Check if parent password exists
+      if (!parentPassword) {
+        throw new HttpException(
+          'Parent secret not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Check if parent password is actually a parent (no parent_secret_id)
+      if (parentPassword.parent_secret_id) {
+        throw new HttpException(
+          'This secret is not a parent secret',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Verify user exists and is active
+      const user = await this.userModel
+        .findOne({ _id: userId, isActive: true })
+        .exec();
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if the authenticated user is the owner of the parent password OR has access to it OR owns any child password
+      const isOwner = parentPassword.userId.equals(
+        new Types.ObjectId(user._id.toString()),
+      );
+      const hasAccess =
+        parentPassword.sharedWith &&
+        parentPassword.sharedWith.some(
+          (shared) => shared.username === user.username,
+        );
+
+      // Check if user owns any child password
+      const ownsChildPassword = await this.passwordModel.exists({
+        parent_secret_id: new Types.ObjectId(parentId),
+        userId: new Types.ObjectId(user._id.toString()),
+        isActive: true,
+      });
+
+      if (!isOwner && !hasAccess && !ownsChildPassword) {
+        throw new HttpException(
+          'You are not authorized to view child secrets for this parent secret',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Define the base query - return all child passwords regardless of ownership
+      const baseQuery = {
+        parent_secret_id: new Types.ObjectId(parentId),
+        isActive: true,
+        $or: [{ hidden: false }, { hidden: { $exists: false } }],
+      };
+
+      // Get total count for pagination
+      const totalCount = await this.passwordModel
+        .countDocuments(baseQuery)
+        .exec();
+
+      // Find child passwords with pagination
+      const childPasswords = await this.passwordModel
+        .find(baseQuery)
+        .select(
+          'key value description updatedAt createdAt sharedWith type hidden initData',
+        )
+        .skip(skip)
+        .limit(limit)
+        .exec();
+
+      // If no child passwords found, throw not found
+      if (totalCount === 0) {
+        throw new HttpException('There are no children', HttpStatus.NOT_FOUND);
+      }
+
+      // Transform child passwords to match passwordReturns format
+      const passwordWithReports = await Promise.all(
+        childPasswords.map(async (password) => {
+          // Fetch unresolved reports for this password
+          const reports = await this.reportModel
+            .find({
+              $or: [
+                { secret_id: password._id },
+                { secret_id: password._id.toString() },
+              ],
+              resolved: false,
+            })
+            .exec();
+
+          // Transform reports to include reporter username
+          const reportInfo: PasswordReportInfo[] = await Promise.all(
+            reports.map(async (report) => {
+              const reporter = await this.userModel
+                .findOne({ telegramId: report.reporterTelegramId })
+                .select('username')
+                .exec();
+
+              return {
+                reporterUsername: reporter ? reporter.username : 'Unknown',
+                report_type: report.report_type,
+                reason: report.reason,
+                createdAt: report.createdAt,
+              };
+            }),
+          );
+
+          return {
+            _id: password._id,
+            key: password.key,
+            value: password.value,
+            description: password.description,
+            type: password.type,
+            sharedWith: password.sharedWith,
+            updatedAt: password.updatedAt,
+            createdAt: password.createdAt,
+            hidden: password.hidden || false,
+            reports: reportInfo,
+          };
+        }),
+      );
+
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
+      return {
+        passwords: passwordWithReports,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Get user passwords with authentication logic
+   * Handles both JWT and Telegram authentication with optional pagination
+   * @param req The authenticated request object
+   * @param page Optional page number for pagination
+   * @param limit Optional limit for pagination
+   * @returns Either paginated response or simple array based on parameters
+   */
+  async getUserPasswordsWithAuth(
+    req: AuthenticatedRequest,
+    page?: number,
+    limit?: number,
+  ): Promise<passwordReturns[] | PaginatedResponse<passwordReturns>> {
+    // If JWT token exists, use userId; otherwise use telegramId
+    if (req?.user && req.user.id) {
+      return this.findByUserIdWithPagination(req.user.id, page, limit);
+    } else {
+      const telegramId = this.extractTelegramIdFromRequest(req);
+      return this.findByUserTelegramIdWithPagination(telegramId, page, limit);
+    }
+  }
+
+  /**
+   * Get shared-with data with authentication logic
+   * Handles both JWT and Telegram authentication with optional pagination
+   * @param req The authenticated request object
+   * @param key The password key to get shared-with data for
+   * @param page Optional page number for pagination
+   * @param limit Optional limit for pagination
+   * @returns Either paginated response or simple array based on parameters
+   */
+  async getSharedWithByAuth(
+    req: AuthenticatedRequest,
+    key: string,
+    page?: number,
+    limit?: number,
+  ): Promise<SharedWithDto[] | PaginatedResponse<SharedWithDto>> {
+    // Parse pagination parameters if provided
+    const pageNumber = page ? parseInt(page.toString(), 10) : undefined;
+    const limitNumber = limit ? parseInt(limit.toString(), 10) : undefined;
+
+    // If JWT token exists, use userId; otherwise use telegramId
+    if (req?.user && req.user.id) {
+      return this.findSharedWithByUserIdWithPagination(
+        req.user.id,
+        key,
+        pageNumber,
+        limitNumber,
+      );
+    } else {
+      const telegramId = this.extractTelegramIdFromRequest(req);
+      return this.findSharedWithByTelegramIdWithPagination(
+        telegramId,
+        key,
+        pageNumber,
+        limitNumber,
+      );
+    }
+  }
+
+  /**
+   * Delete password by owner with authentication logic
+   * Handles both JWT and Telegram authentication
+   * @param req The authenticated request object
+   * @param key The password key to delete
+   * @returns Success message
+   */
+  async deletePasswordByOwnerWithAuth(
+    req: AuthenticatedRequest,
+    key: string,
+  ): Promise<Password> {
+    // If JWT token exists, use userId; otherwise use telegramId
+    if (req?.user && req.user.id) {
+      return this.deletePasswordByUserId(key, req.user.id);
+    } else {
+      const telegramId = this.extractTelegramIdFromRequest(req);
+      return this.deletePasswordByOwner(key, telegramId);
+    }
+  }
+
+  /**
+   * Get child passwords with authentication logic
+   * Handles both JWT and Telegram authentication
+   * @param req The authenticated request object
+   * @param parentId The parent password ID
+   * @param page Page number for pagination
+   * @param limit Number of items per page
+   * @returns Child passwords with pagination
+   */
+  async getChildPasswordsWithAuth(
+    req: AuthenticatedRequest,
+    parentId: string,
+    page: number,
+    limit: number,
+  ) {
+    // If JWT token exists, use userId; otherwise use telegramId
+    if (req?.user && req.user.id) {
+      return this.getChildPasswordsByUserId(parentId, req.user.id, page, limit);
+    } else {
+      const telegramId = this.extractTelegramIdFromRequest(req);
+      return this.getChildPasswords(parentId, telegramId, page, limit);
     }
   }
 }

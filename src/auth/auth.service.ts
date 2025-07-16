@@ -9,6 +9,9 @@ import {
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { LoginDto } from './dto/login.dto';
 import { Role } from '../decorators/roles.decorator';
+import { TelegramValidatorService } from '../telegram/telegram-validator.service';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
+import { UsersService } from '../users/users.service';
 
 export interface LoginResponse {
   access_token: string;
@@ -22,9 +25,15 @@ export class AuthService {
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
     private jwtService: JwtService,
+    private telegramValidator: TelegramValidatorService,
+    private telegramDtoAuthGuard: TelegramDtoAuthGuard,
+    private usersService: UsersService,
   ) {}
 
-  async login(loginDto: LoginDto): Promise<LoginResponse> {
+  async login(
+    loginDto: LoginDto,
+    telegramInitData?: string,
+  ): Promise<LoginResponse | any> {
     const { publicAddress } = loginDto;
 
     try {
@@ -34,6 +43,16 @@ export class AuthService {
         .populate('userId')
         .exec();
 
+      // If X-Telegram-Init-Data header is provided, handle Telegram authentication
+      if (telegramInitData) {
+        return this.handleTelegramLogin(
+          publicAddress,
+          telegramInitData,
+          addressRecord,
+        );
+      }
+
+      // Original login logic when no Telegram data is provided
       if (!addressRecord) {
         // Create a new user when public address is not found
         const newUser = new this.userModel({
@@ -113,5 +132,186 @@ export class AuthService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  private async handleTelegramLogin(
+    publicAddress: string,
+    telegramInitData: string,
+    addressRecord: any,
+  ): Promise<any> {
+    try {
+      // Step 1: Check if public address exists and is linked to a user
+      if (addressRecord) {
+        const user = addressRecord.userId as UserDocument;
+
+        // Check if user has a non-empty telegramId
+        if (user.telegramId && user.telegramId !== '') {
+          throw new HttpException(
+            {
+              success: false,
+              message:
+                'The specified public wallet address is already linked to a real Telegram user',
+              error: 'Conflict',
+            },
+            HttpStatus.CONFLICT,
+          );
+        }
+
+        // User exists but telegramId is empty, proceed with Telegram validation
+        return this.linkTelegramToExistingUser(user, telegramInitData);
+      }
+
+      // No address record found, this shouldn't happen in normal flow
+      // but we'll handle it by creating a new user with Telegram data
+      return this.createUserWithTelegramData(publicAddress, telegramInitData);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Error during Telegram authentication',
+          error: 'Internal Server Error',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  private async linkTelegramToExistingUser(
+    user: UserDocument,
+    telegramInitData: string,
+  ): Promise<any> {
+    // Step 2: Validate Telegram init data
+    const isValid =
+      this.telegramValidator.validateTelegramInitData(telegramInitData);
+    if (!isValid) {
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Invalid Telegram authentication data or signature',
+          error: 'Unauthorized',
+        },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    // Step 3: Parse Telegram data
+    const telegramData =
+      this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
+
+    // Step 4: Check if a user with this telegramId already exists
+    const existingTelegramUser = await this.userModel
+      .findOne({
+        telegramId: telegramData.telegramId,
+      })
+      .exec();
+
+    if (existingTelegramUser) {
+      throw new HttpException(
+        {
+          success: false,
+          message:
+            'User already exists. Linking is only possible with new users',
+          error: 'Conflict',
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    // Step 5: Update user with Telegram data
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(
+        user._id,
+        {
+          telegramId: telegramData.telegramId,
+          firstName: telegramData.firstName || '',
+          lastName: telegramData.lastName || '',
+          username: telegramData.username || '',
+          authDate: new Date(telegramData.authDate * 1000),
+          hash: telegramData.hash,
+        },
+        { new: true },
+      )
+      .exec();
+
+    // Step 6: Return successful response with user data (similar to signup)
+    const userObject = updatedUser.toObject();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { _id: _, ...userWithoutId } = userObject;
+
+    return userWithoutId;
+  }
+
+  private async createUserWithTelegramData(
+    publicAddress: string,
+    telegramInitData: string,
+  ): Promise<any> {
+    // Validate Telegram init data
+    const isValid =
+      this.telegramValidator.validateTelegramInitData(telegramInitData);
+    if (!isValid) {
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Invalid Telegram authentication data or signature',
+          error: 'Unauthorized',
+        },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    // Parse Telegram data
+    const telegramData =
+      this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
+
+    // Check if a user with this telegramId already exists
+    const existingTelegramUser = await this.userModel
+      .findOne({
+        telegramId: telegramData.telegramId,
+      })
+      .exec();
+
+    if (existingTelegramUser) {
+      throw new HttpException(
+        {
+          success: false,
+          message:
+            'User already exists. Linking is only possible with new users',
+          error: 'Conflict',
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    // Create new user with Telegram data
+    const newUser = new this.userModel({
+      telegramId: telegramData.telegramId,
+      firstName: telegramData.firstName || '',
+      lastName: telegramData.lastName || '',
+      username: telegramData.username || '',
+      authDate: new Date(telegramData.authDate * 1000),
+      hash: telegramData.hash,
+      role: Role.USER,
+      isActive: true,
+    });
+
+    const savedUser = await newUser.save();
+
+    // Create a new public address record for the new user
+    const newAddressRecord = new this.publicAddressModel({
+      publicKey: publicAddress,
+      userId: savedUser._id,
+    });
+
+    await newAddressRecord.save();
+
+    // Return user data (similar to signup)
+    const userObject = savedUser.toObject();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { _id: _, ...userWithoutId } = userObject;
+
+    return userWithoutId;
   }
 }

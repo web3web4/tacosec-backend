@@ -8,6 +8,9 @@ import {
   PublicAddressSchema,
 } from '../public-addresses/schemas/public-address.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
+import { TelegramModule } from '../telegram/telegram.module';
+import { UsersModule } from '../users/users.module';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 
 @Module({
   imports: [
@@ -16,9 +19,11 @@ import { User, UserSchema } from '../users/schemas/user.schema';
       { name: User.name, schema: UserSchema },
     ]),
     SharedJwtModule,
+    TelegramModule,
+    UsersModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, TelegramDtoAuthGuard],
   exports: [AuthService, SharedJwtModule],
 })
 export class AuthModule {}

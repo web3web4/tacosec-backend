@@ -6,6 +6,10 @@ import { PasswordController } from './password.controller';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Password, PasswordSchema } from './schemas/password.schema';
 import { Report, ReportSchema } from '../reports/schemas/report.schema';
+import {
+  PublicAddress,
+  PublicAddressSchema,
+} from '../public-addresses/schemas/public-address.schema';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { HttpModule } from '@nestjs/axios';
 import { TelegramModule } from '../telegram/telegram.module';
@@ -19,6 +23,7 @@ import { ReportsModule } from '../reports/reports.module';
       { name: User.name, schema: UserSchema },
       { name: Password.name, schema: PasswordSchema },
       { name: Report.name, schema: ReportSchema },
+      { name: PublicAddress.name, schema: PublicAddressSchema },
     ]),
     SharedJwtModule,
     ConfigModule,

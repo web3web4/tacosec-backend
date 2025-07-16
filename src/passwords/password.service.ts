@@ -16,6 +16,10 @@ interface AuthenticatedRequest extends Request {
 import { Password, PasswordDocument } from './schemas/password.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { Report, ReportDocument } from '../reports/schemas/report.schema';
+import {
+  PublicAddress,
+  PublicAddressDocument,
+} from '../public-addresses/schemas/public-address.schema';
 import * as bcrypt from 'bcrypt';
 
 import { SharedWithMeResponse } from '../types/share-with-me-pass.types';
@@ -34,6 +38,8 @@ export class PasswordService {
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
+    @InjectModel(PublicAddress.name)
+    private publicAddressModel: Model<PublicAddressDocument>,
     private readonly telegramService: TelegramService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
   ) {}
@@ -582,6 +588,7 @@ export class PasswordService {
           let sharedUser;
           let finalUsername = shared.username;
           let finalUserId = shared.userId;
+          let finalPublicAddress = shared.publicAddress;
 
           // Case 1: Both userId and username provided - use userId and ignore username
           if (shared.userId && shared.username) {
@@ -622,11 +629,37 @@ export class PasswordService {
               finalUserId = sharedUser._id.toString();
             }
           }
+          // Case 4: Only publicAddress provided - find user by public address
+          else if (shared.publicAddress && !shared.userId && !shared.username) {
+            // First, find the public address record
+            const publicAddressRecord = await this.publicAddressModel
+              .findOne({
+                publicKey: shared.publicAddress,
+              })
+              .populate('userId')
+              .exec();
+
+            if (publicAddressRecord && publicAddressRecord.userId) {
+              const user = publicAddressRecord.userId as any;
+              if (user.isActive) {
+                sharedUser = user;
+                finalUsername = user.username;
+                finalUserId = user._id.toString();
+                finalPublicAddress = shared.publicAddress;
+              }
+            } else {
+              // If no user found for this public address, keep only the public address
+              finalPublicAddress = shared.publicAddress;
+              finalUsername = undefined;
+              finalUserId = undefined;
+            }
+          }
 
           return {
             ...shared,
             username: finalUsername,
             userId: finalUserId,
+            publicAddress: finalPublicAddress,
           };
         }),
       );
@@ -945,6 +978,7 @@ export class PasswordService {
             let sharedUser;
             let finalUsername = shared.username;
             let finalUserId = shared.userId;
+            let finalPublicAddress = shared.publicAddress;
 
             // Case 1: Both userId and username provided - use userId and ignore username
             if (shared.userId && shared.username) {
@@ -985,11 +1019,41 @@ export class PasswordService {
                 finalUserId = sharedUser._id.toString();
               }
             }
+            // Case 4: Only publicAddress provided - find user by public address
+            else if (
+              shared.publicAddress &&
+              !shared.userId &&
+              !shared.username
+            ) {
+              // First, find the public address record
+              const publicAddressRecord = await this.publicAddressModel
+                .findOne({
+                  publicKey: shared.publicAddress,
+                })
+                .populate('userId')
+                .exec();
+
+              if (publicAddressRecord && publicAddressRecord.userId) {
+                const user = publicAddressRecord.userId as any;
+                if (user.isActive) {
+                  sharedUser = user;
+                  finalUsername = user.username;
+                  finalUserId = user._id.toString();
+                  finalPublicAddress = shared.publicAddress;
+                }
+              } else {
+                // If no user found for this public address, keep only the public address
+                finalPublicAddress = shared.publicAddress;
+                finalUsername = undefined;
+                finalUserId = undefined;
+              }
+            }
 
             return {
               ...shared,
               username: finalUsername,
               userId: finalUserId,
+              publicAddress: finalPublicAddress,
             };
           }),
         );
@@ -2744,5 +2808,4 @@ You can view the response in your secrets list 📋.`;
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
-
 }

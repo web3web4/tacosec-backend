@@ -8,6 +8,7 @@ import {
 import { Transform, Type } from 'class-transformer';
 // For internal use with the complete model
 export class SharedWithDto {
+  @IsOptional()
   @IsString()
   @Transform(({ value }) => value.toLowerCase())
   username: string;
@@ -18,6 +19,10 @@ export class SharedWithDto {
   @IsOptional()
   @IsString()
   userId?: string;
+
+  @IsOptional()
+  @IsString()
+  publicAddress?: string;
 }
 export class SharedWithArrayDto {
   @IsArray()

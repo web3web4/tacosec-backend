@@ -7,6 +7,10 @@ import {
   PublicAddressDocument,
 } from '../public-addresses/schemas/public-address.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import {
+  Password,
+  PasswordDocument,
+} from '../passwords/schemas/password.schema';
 import { LoginDto } from './dto/login.dto';
 import { Role } from '../decorators/roles.decorator';
 import { TelegramValidatorService } from '../telegram/telegram-validator.service';
@@ -24,6 +28,8 @@ export class AuthService {
     private publicAddressModel: Model<PublicAddressDocument>,
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
+    @InjectModel(Password.name)
+    private passwordModel: Model<PasswordDocument>,
     private jwtService: JwtService,
     private telegramValidator: TelegramValidatorService,
     private telegramDtoAuthGuard: TelegramDtoAuthGuard,
@@ -74,6 +80,13 @@ export class AuthService {
         });
 
         await newAddressRecord.save();
+
+        // Update shared secrets that contain this public address
+        await this.updateSharedSecretsForNewUser(
+          publicAddress,
+          savedUser.username,
+          savedUser._id.toString(),
+        );
 
         // Create JWT payload for the new user
         const payload = {
@@ -236,12 +249,74 @@ export class AuthService {
       )
       .exec();
 
+    // Get the user's public address to update shared secrets
+    const userPublicAddress = await this.publicAddressModel
+      .findOne({ userId: updatedUser._id })
+      .exec();
+
+    if (userPublicAddress) {
+      // Update shared secrets that contain this public address
+      await this.updateSharedSecretsForNewUser(
+        userPublicAddress.publicKey,
+        updatedUser.username,
+        updatedUser._id.toString(),
+      );
+    }
+
     // Step 6: Return successful response with user data (similar to signup)
     const userObject = updatedUser.toObject();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { _id: _, ...userWithoutId } = userObject;
 
     return userWithoutId;
+  }
+
+  /**
+   * Update secrets that contain sharedWith with the same public address
+   * to include username and userId along with the existing public address
+   */
+  private async updateSharedSecretsForNewUser(
+    publicAddress: string,
+    username: string,
+    userId: string,
+  ): Promise<void> {
+    try {
+      // Find all passwords that have sharedWith containing the public address
+      const passwordsWithSharedAddress = await this.passwordModel
+        .find({
+          'sharedWith.publicAddress': publicAddress,
+          isActive: true,
+        })
+        .exec();
+
+      // Update each password's sharedWith array
+      for (const password of passwordsWithSharedAddress) {
+        const updatedSharedWith = password.sharedWith.map((shared) => {
+          // If this shared entry has the matching public address, update it
+          if (shared.publicAddress === publicAddress) {
+            return {
+              ...shared,
+              username: username,
+              userId: userId,
+              publicAddress: publicAddress, // Keep the existing public address
+            };
+          }
+          return shared;
+        });
+
+        // Update the password document
+        await this.passwordModel
+          .findByIdAndUpdate(
+            password._id,
+            { sharedWith: updatedSharedWith },
+            { new: true },
+          )
+          .exec();
+      }
+    } catch (error) {
+      console.error('Error updating shared secrets for new user:', error);
+      // Don't throw error to avoid breaking the login flow
+    }
   }
 
   private async createUserWithTelegramData(
@@ -306,6 +381,13 @@ export class AuthService {
     });
 
     await newAddressRecord.save();
+
+    // Update shared secrets that contain this public address
+    await this.updateSharedSecretsForNewUser(
+      publicAddress,
+      savedUser.username,
+      savedUser._id.toString(),
+    );
 
     // Return user data (similar to signup)
     const userObject = savedUser.toObject();

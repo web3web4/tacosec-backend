@@ -8,6 +8,7 @@ import {
   PublicAddressSchema,
 } from '../public-addresses/schemas/public-address.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
+import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
 import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
@@ -17,6 +18,7 @@ import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
     MongooseModule.forFeature([
       { name: PublicAddress.name, schema: PublicAddressSchema },
       { name: User.name, schema: UserSchema },
+      { name: Password.name, schema: PasswordSchema },
     ]),
     SharedJwtModule,
     TelegramModule,

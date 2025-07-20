@@ -91,6 +91,7 @@ export class PasswordService {
         .select(
           'key value description updatedAt createdAt sharedWith type hidden',
         )
+        .sort({ createdAt: -1 })
         .exec();
 
       const passwordWithSharedWithAsUsernames = await Promise.all(
@@ -177,6 +178,7 @@ export class PasswordService {
         .select(
           'key value description updatedAt createdAt sharedWith type hidden',
         )
+        .sort({ createdAt: -1 })
         .exec();
 
       const passwordWithSharedWithAsUsernames = await Promise.all(
@@ -336,6 +338,7 @@ export class PasswordService {
           .select(
             ' _id key value description initData.username sharedWith createdAt updatedAt ',
           )
+          .sort({ createdAt: -1 })
           .lean()
           .exec();
       }
@@ -354,6 +357,7 @@ export class PasswordService {
           .select(
             ' _id key value description initData.username sharedWith createdAt updatedAt ',
           )
+          .sort({ createdAt: -1 })
           .lean()
           .exec();
       }
@@ -1584,6 +1588,7 @@ You can view the response in your secrets list 📋.`;
         .select(
           'key value description updatedAt createdAt sharedWith type hidden initData',
         )
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec();
@@ -1733,6 +1738,7 @@ You can view the response in your secrets list 📋.`;
         .select(
           'key value description updatedAt createdAt sharedWith type hidden',
         )
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec();
@@ -1863,6 +1869,7 @@ You can view the response in your secrets list 📋.`;
         .select(
           'key value description updatedAt createdAt sharedWith type hidden',
         )
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec();
@@ -2106,6 +2113,7 @@ You can view the response in your secrets list 📋.`;
             .select(
               ' _id key value description initData.username sharedWith createdAt updatedAt ',
             )
+            .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .lean()
@@ -2132,6 +2140,7 @@ You can view the response in your secrets list 📋.`;
             .select(
               ' _id key value description initData.username sharedWith createdAt updatedAt ',
             )
+            .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .lean()
@@ -2475,6 +2484,7 @@ You can view the response in your secrets list 📋.`;
         .select(
           'key value description updatedAt createdAt sharedWith type hidden initData',
         )
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec();

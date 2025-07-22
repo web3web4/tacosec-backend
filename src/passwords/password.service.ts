@@ -1235,7 +1235,7 @@ export class PasswordService {
 
             const message = `🔐 <b>Secret Shared With You</b> 
 
-User <b>${userName}</b> has shared their "<b>${passwordUser.key}</b>" secret with you 🔁.
+User <b>${userName}</b> has shared a secret with you 🔁.
 
 You can view it under the <b>"Shared with me"</b> tab 📂.
 `;

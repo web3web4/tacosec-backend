@@ -1598,9 +1598,12 @@ You can view the response in your secrets list 📋.`;
         `${childPasswords.length} of ${totalCount} total`,
       );
 
-      // If no child passwords found, throw not found
+      // If no child passwords found, throw moved permanently
       if (totalCount === 0) {
-        throw new HttpException('There are no children', HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          'There are no children',
+          HttpStatus.MOVED_PERMANENTLY,
+        );
       }
 
       // Transform child passwords to match passwordReturns format
@@ -2489,9 +2492,12 @@ You can view the response in your secrets list 📋.`;
         .limit(limit)
         .exec();
 
-      // If no child passwords found, throw not found
+      // If no child passwords found, throw moved permanently
       if (totalCount === 0) {
-        throw new HttpException('There are no children', HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          'There are no children',
+          HttpStatus.MOVED_PERMANENTLY,
+        );
       }
 
       // Transform child passwords to match passwordReturns format

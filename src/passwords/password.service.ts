@@ -1301,6 +1301,14 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         return;
       }
 
+      // Check if child user is the same as parent owner - don't send notification to self
+      if (parentOwner._id.toString() === childUser._id.toString()) {
+        console.log(
+          'Child password creator is the same as parent owner, skipping notification',
+        );
+        return;
+      }
+
       // Check if parent owner has a valid telegramId before sending notification
       if (!parentOwner.telegramId || parentOwner.telegramId === '') {
         console.log(
@@ -1308,12 +1316,6 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         );
         return;
       }
-
-      // For development/testing purposes, send notification even if same user
-      // if (parentOwner.telegramId === childUser.telegramId) {
-      //   console.log('Child password creator is the same as parent owner, skipping notification');
-      //   return;
-      // }
 
       // Prepare user display name
       const childUserDisplayName =

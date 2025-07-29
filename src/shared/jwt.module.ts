@@ -13,9 +13,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
             'JWT_SECRET is not configured. Please set this environment variable.',
           );
         }
+
+        // Get JWT expiration time from environment variable, default to '24h'
+        const expiresIn = configService.get<string>('JWT_EXPIRES_IN') || '24h';
+
         return {
           secret,
-          signOptions: { expiresIn: '24h' },
+          signOptions: { expiresIn },
         };
       },
       inject: [ConfigService],

@@ -1235,7 +1235,7 @@ export class PasswordService {
 
             const message = `🔐 <b>Secret Shared With You</b> 
 
-User <b>${userName}</b> has shared their "<b>${passwordUser.key}</b>" secret with you 🔁.
+User <b>${userName}</b> has shared a secret with you 🔁.
 
 You can view it under the <b>"Shared with me"</b> tab 📂.
 `;
@@ -1598,9 +1598,12 @@ You can view the response in your secrets list 📋.`;
         `${childPasswords.length} of ${totalCount} total`,
       );
 
-      // If no child passwords found, throw not found
+      // If no child passwords found, throw moved permanently
       if (totalCount === 0) {
-        throw new HttpException('There are no children', HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          'There are no children',
+          HttpStatus.MOVED_PERMANENTLY,
+        );
       }
 
       // Transform child passwords to match passwordReturns format
@@ -2489,9 +2492,12 @@ You can view the response in your secrets list 📋.`;
         .limit(limit)
         .exec();
 
-      // If no child passwords found, throw not found
+      // If no child passwords found, throw moved permanently
       if (totalCount === 0) {
-        throw new HttpException('There are no children', HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          'There are no children',
+          HttpStatus.MOVED_PERMANENTLY,
+        );
       }
 
       // Transform child passwords to match passwordReturns format

@@ -1225,6 +1225,14 @@ export class PasswordService {
               return;
             }
 
+            // Check if the shared user is the same as the secret owner - don't send notification to self
+            if (sharedWithUser._id.toString() === user._id.toString()) {
+              console.log(
+                'Secret owner is the same as shared user, skipping notification',
+              );
+              return;
+            }
+
             console.log(
               `Sending notification to ${sharedWithUser.username} (${sharedWithUser.telegramId})`,
             );

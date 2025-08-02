@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   Request,
+  Req,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { PasswordService } from '../passwords/password.service';
@@ -153,6 +154,17 @@ export class UsersController {
       searchDto.limit,
       searchDto.skip,
     );
+  }
+
+  @Patch('me/privacy-mode')
+  @TelegramDtoAuth()
+  async updateMyPrivacyMode(
+    @Req() req: any,
+    @Body() body: { privacyMode: boolean },
+  ) {
+    // Get current user from JWT token or Telegram data
+    const currentUserId = await this.usersService.getCurrentUserId(req);
+    return this.usersService.updatePrivacyMode(currentUserId, body.privacyMode);
   }
 
   @Delete(':id')

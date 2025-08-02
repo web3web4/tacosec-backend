@@ -283,6 +283,75 @@ As a result:
       .exec();
   }
 
+  async updatePrivacyMode(id: string, privacyMode: boolean): Promise<User> {
+    const user = await this.userModel.findById(id).exec();
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    return this.userModel
+      .findByIdAndUpdate(id, { privacyMode }, { new: true })
+      .exec();
+  }
+
+  async getCurrentUserId(req: any): Promise<string> {
+    // If user is authenticated via JWT token, user data is stored in req.user
+    if (req.user && req.user.id) {
+      return req.user.id;
+    }
+
+    // If user is authenticated via Telegram data, extract telegramId
+    let telegramId: string | null = null;
+
+    // Try to get telegramId from request body
+    if (req.body?.telegramId) {
+      telegramId = req.body.telegramId.toString();
+    } else if (req.body?.initData?.telegramId) {
+      telegramId = req.body.initData.telegramId.toString();
+    }
+
+    // Try to get telegramId from X-Telegram-Init-Data header
+    if (!telegramId) {
+      const headerInitData = req.headers['x-telegram-init-data'];
+      if (headerInitData) {
+        const initDataString = Array.isArray(headerInitData)
+          ? headerInitData[0]
+          : headerInitData;
+        const params = new URLSearchParams(initDataString);
+        const userJson = params.get('user');
+        if (userJson) {
+          try {
+            const user = JSON.parse(decodeURIComponent(userJson));
+            telegramId = user.id?.toString();
+          } catch (e) {
+            console.error(
+              'Failed to parse user data from X-Telegram-Init-Data:',
+              e,
+            );
+          }
+        }
+      }
+    }
+
+    if (!telegramId) {
+      throw new HttpException(
+        'Unable to identify current user',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    // Find user by telegramId and return their MongoDB _id
+    return this.findUserIdByTelegramId(telegramId);
+  }
+
+  private async findUserIdByTelegramId(telegramId: string): Promise<string> {
+    const user = await this.userModel.findOne({ telegramId }).exec();
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+    return user._id.toString();
+  }
+
   async remove(id: string): Promise<User> {
     return this.userModel
       .findByIdAndUpdate(id, { isActive: false }, { new: true })

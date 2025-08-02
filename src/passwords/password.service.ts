@@ -292,6 +292,7 @@ export class PasswordService {
     username: string,
     userId?: string,
     currentUserTelegramId?: string,
+    currentUserPrivacyMode?: boolean,
   ): Promise<SharedWithMeResponse> {
     try {
       if (!username && !userId) {
@@ -316,6 +317,7 @@ export class PasswordService {
         username,
         finalUserId,
         currentUserTelegramId,
+        currentUserPrivacyMode,
       );
       return sharedWithMe;
     } catch (error) {
@@ -328,6 +330,7 @@ export class PasswordService {
     username: string,
     userId?: string,
     currentUserTelegramId?: string,
+    currentUserPrivacyMode?: boolean,
   ): Promise<SharedWithMeResponse> {
     try {
       if (!username && !userId) {
@@ -448,22 +451,33 @@ export class PasswordService {
               updatedAt: password.updatedAt,
             };
 
-            // If owner has privacy mode disabled OR current user is the owner, include createdAt and view info
+            // If current user has privacy mode enabled, don't include createdAt and view info
+            if (currentUserPrivacyMode) {
+              return baseData as {
+                id: string;
+                key: string;
+                value: string;
+                description: string;
+                username: string;
+                sharedWith: any[];
+                reports: any[];
+                updatedAt: Date;
+              };
+            }
+
+            // If current user has privacy mode disabled, check owner's privacy mode for each secret
             if (!ownerPrivacyMode || isOwner) {
               const result: any = {
                 ...baseData,
                 createdAt: password.createdAt,
                 viewsCount: secretViews.length,
+                secretViews: secretViews,
               };
-
-              // Include secretViews if owner has privacy mode disabled OR user is the owner
-              if (!ownerPrivacyMode || isOwner) {
-                result.secretViews = secretViews;
-              }
 
               return result;
             }
 
+            // Owner has privacy mode enabled, don't include createdAt and view info
             return baseData as {
               id: string;
               key: string;
@@ -544,18 +558,30 @@ export class PasswordService {
         .filter(([username]) => username !== 'unknown')
         .map(([username, passwords]) => ({
           username,
-          passwords: (passwords as any[]).map((p) => ({
-            id: p.id,
-            key: p.key,
-            value: p.value,
-            description: p.description,
-            createdAt: p.createdAt,
-            updatedAt: p.updatedAt,
-            sharedWith: p.sharedWith,
-            reports: p.reports,
-            viewsCount: p.secretViews?.length || 0,
-            secretViews: p.secretViews,
-          })),
+          passwords: (passwords as any[]).map((p) => {
+            const passwordData: any = {
+              id: p.id,
+              key: p.key,
+              value: p.value,
+              description: p.description,
+              updatedAt: p.updatedAt,
+              sharedWith: p.sharedWith,
+              reports: p.reports,
+            };
+
+            // Add optional fields if they exist (they were already filtered based on privacy settings)
+            if (p.createdAt) {
+              passwordData.createdAt = p.createdAt;
+            }
+            if (p.secretViews) {
+              passwordData.secretViews = p.secretViews;
+              passwordData.viewsCount = p.secretViews.length;
+            } else {
+              passwordData.viewsCount = 0;
+            }
+
+            return passwordData;
+          }),
           count: (passwords as any[]).length,
         }));
 
@@ -2133,14 +2159,16 @@ You can view the response in your secrets list 📋.`;
       let userId: string | undefined;
       let username: string | undefined;
       let currentUserTelegramId: string | undefined;
+      let currentUserPrivacyMode = false;
 
       if (req?.user && req.user.id) {
         userId = req.user.id;
         username = req.user.username;
-        // Get telegramId from user data
+        // Get telegramId and privacyMode from user data
         const user = await this.userModel.findById(userId).exec();
         if (user) {
           currentUserTelegramId = user.telegramId;
+          currentUserPrivacyMode = user.privacyMode || false;
         }
       } else if (req?.headers?.['x-telegram-init-data']) {
         const headerInitData = req.headers['x-telegram-init-data'] as string;
@@ -2148,7 +2176,7 @@ You can view the response in your secrets list 📋.`;
           this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
         username = parsedData.username;
         currentUserTelegramId = parsedData.telegramId;
-        // Try to find userId from username
+        // Try to find userId from username and get privacyMode
         if (username) {
           const user = await this.userModel
             .findOne({
@@ -2158,6 +2186,7 @@ You can view the response in your secrets list 📋.`;
             .exec();
           if (user) {
             userId = user._id.toString();
+            currentUserPrivacyMode = user.privacyMode || false;
           }
         }
       } else {
@@ -2183,6 +2212,7 @@ You can view the response in your secrets list 📋.`;
           username,
           userId,
           currentUserTelegramId,
+          currentUserPrivacyMode,
         );
       }
 
@@ -2294,14 +2324,11 @@ You can view the response in your secrets list 📋.`;
           .filter((password) => password.userId) // Filter out passwords without userId
           .map(async (password) => {
             const passwordUserId = password.userId.toString();
-            const ownerPrivacyMode =
-              ownerPrivacyMap.get(passwordUserId) || false;
             const ownerUsername = ownerUsernameMap.get(passwordUserId);
             const ownerTelegramId = ownerTelegramIdMap.get(passwordUserId);
+            const ownerPrivacyMode =
+              ownerPrivacyMap.get(passwordUserId) || false;
             const isOwner = currentUserTelegramId === ownerTelegramId;
-
-            // Ensure ownerPrivacyMode is properly converted to boolean
-            const privacyModeEnabled = Boolean(ownerPrivacyMode);
 
             const baseData = {
               _id: password._id,
@@ -2316,8 +2343,13 @@ You can view the response in your secrets list 📋.`;
 
             const result: any = { ...baseData };
 
-            // Add createdAt and view information based on privacy mode and ownership
-            if (!privacyModeEnabled || isOwner) {
+            // If current user has privacy mode enabled, don't include createdAt and view info
+            if (currentUserPrivacyMode) {
+              return result;
+            }
+
+            // If current user has privacy mode disabled, check owner's privacy mode for each secret
+            if (!ownerPrivacyMode || isOwner) {
               // Fetch additional data from database
               const fullPassword = await this.passwordModel
                 .findById(password._id)
@@ -2328,11 +2360,7 @@ You can view the response in your secrets list 📋.`;
               if (fullPassword) {
                 result.createdAt = fullPassword.createdAt;
                 result.viewsCount = (fullPassword.secretViews || []).length;
-
-                // Include secretViews if owner has privacy mode disabled OR user is the owner
-                if (!privacyModeEnabled || isOwner) {
-                  result.secretViews = fullPassword.secretViews || [];
-                }
+                result.secretViews = fullPassword.secretViews || [];
               }
             }
 

@@ -305,9 +305,9 @@ As a result:
 
     // Try to get telegramId from request body
     if (req.body?.telegramId) {
-      telegramId = req.body.telegramId.toString();
+      telegramId = String(req.body.telegramId);
     } else if (req.body?.initData?.telegramId) {
-      telegramId = req.body.initData.telegramId.toString();
+      telegramId = String(req.body.initData.telegramId);
     }
 
     // Try to get telegramId from X-Telegram-Init-Data header
@@ -322,7 +322,7 @@ As a result:
         if (userJson) {
           try {
             const user = JSON.parse(decodeURIComponent(userJson));
-            telegramId = user.id?.toString();
+            telegramId = user.id ? String(user.id) : '';
           } catch (e) {
             console.error(
               'Failed to parse user data from X-Telegram-Init-Data:',
@@ -385,7 +385,7 @@ As a result:
 
       // Find the user by telegram ID
       const user = await this.userModel
-        .findOne({ telegramId: userData.id.toString() })
+        .findOne({ telegramId: userData.id ? String(userData.id) : '' })
         .exec();
       if (!user) {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);

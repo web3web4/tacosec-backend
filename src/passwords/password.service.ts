@@ -309,7 +309,7 @@ export class PasswordService {
           })
           .exec();
         if (user) {
-          finalUserId = user._id.toString();
+          finalUserId = user._id ? String(user._id) : '';
         }
       }
 
@@ -382,19 +382,32 @@ export class PasswordService {
 
       // Get all secret owners to check their privacy mode
       const secretOwnerIds = [
-        ...new Set(sharedPasswords.map((p) => p.userId.toString())),
+        ...new Set(
+          sharedPasswords
+            .map((p) => (p.userId ? String(p.userId) : ''))
+            .filter((id) => id),
+        ),
       ];
       const secretOwners = await this.userModel
         .find({ _id: { $in: secretOwnerIds } })
         .exec();
       const ownerPrivacyMap = new Map(
-        secretOwners.map((owner) => [owner._id.toString(), owner.privacyMode]),
+        secretOwners.map((owner) => [
+          owner._id ? String(owner._id) : '',
+          owner.privacyMode,
+        ]),
       );
       const ownerUsernameMap = new Map(
-        secretOwners.map((owner) => [owner._id.toString(), owner.username]),
+        secretOwners.map((owner) => [
+          owner._id ? String(owner._id) : '',
+          owner.username,
+        ]),
       );
       const ownerTelegramIdMap = new Map(
-        secretOwners.map((owner) => [owner._id.toString(), owner.telegramId]),
+        secretOwners.map((owner) => [
+          owner._id ? String(owner._id) : '',
+          owner.telegramId,
+        ]),
       );
 
       const resolvedPasswords = await Promise.all(
@@ -432,7 +445,9 @@ export class PasswordService {
             );
 
             // Check owner's privacy mode
-            const passwordUserId = password.userId.toString();
+            const passwordUserId = password.userId
+              ? String(password.userId)
+              : '';
             const ownerPrivacyMode =
               ownerPrivacyMap.get(passwordUserId) || false;
             const ownerTelegramId = ownerTelegramIdMap.get(passwordUserId);
@@ -635,7 +650,10 @@ export class PasswordService {
       }
 
       // Check if the user is the owner of the password
-      if (password.userId.toString() !== user._id.toString()) {
+      if (
+        (password.userId ? String(password.userId) : '') !==
+        (user._id ? String(user._id) : '')
+      ) {
         throw new HttpException(
           'You are not authorized to update this password',
           HttpStatus.FORBIDDEN,
@@ -726,7 +744,7 @@ export class PasswordService {
               .exec();
             if (sharedUser) {
               finalUsername = sharedUser.username;
-              finalUserId = sharedUser._id.toString();
+              finalUserId = sharedUser._id ? String(sharedUser._id) : '';
             }
           }
           // Case 4: Only publicAddress provided - find user by public address
@@ -744,7 +762,7 @@ export class PasswordService {
               if (user.isActive) {
                 sharedUser = user;
                 finalUsername = user.username;
-                finalUserId = user._id.toString();
+                finalUserId = user._id ? String(user._id) : '';
                 finalPublicAddress = shared.publicAddress;
               }
             } else {
@@ -1116,7 +1134,7 @@ export class PasswordService {
                 .exec();
               if (sharedUser) {
                 finalUsername = sharedUser.username;
-                finalUserId = sharedUser._id.toString();
+                finalUserId = sharedUser._id ? String(sharedUser._id) : '';
               }
             }
             // Case 4: Only publicAddress provided - find user by public address
@@ -1138,7 +1156,7 @@ export class PasswordService {
                 if (user.isActive) {
                   sharedUser = user;
                   finalUsername = user.username;
-                  finalUserId = user._id.toString();
+                  finalUserId = user._id ? String(user._id) : '';
                   finalPublicAddress = shared.publicAddress;
                 }
               } else {
@@ -1322,7 +1340,10 @@ export class PasswordService {
             }
 
             // Check if the shared user is the same as the secret owner - don't send notification to self
-            if (sharedWithUser._id.toString() === user._id.toString()) {
+            if (
+              (sharedWithUser._id ? String(sharedWithUser._id) : '') ===
+              (user._id ? String(user._id) : '')
+            ) {
               console.log(
                 'Secret owner is the same as shared user, skipping notification',
               );
@@ -1406,7 +1427,10 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
       }
 
       // Check if child user is the same as parent owner - don't send notification to self
-      if (parentOwner._id.toString() === childUser._id.toString()) {
+      if (
+        (parentOwner._id ? String(parentOwner._id) : '') ===
+        (childUser._id ? String(childUser._id) : '')
+      ) {
         console.log(
           'Child password creator is the same as parent owner, skipping notification',
         );
@@ -1526,7 +1550,11 @@ You can view the response in your secrets list 📋.`;
       }
 
       // Check if the authenticated user is the owner of the password
-      if (!password.userId.equals(new Types.ObjectId(user._id.toString()))) {
+      if (
+        !password.userId.equals(
+          new Types.ObjectId(user._id ? String(user._id) : ''),
+        )
+      ) {
         throw new HttpException(
           'You are not authorized to delete this secret',
           HttpStatus.FORBIDDEN,
@@ -1574,7 +1602,11 @@ You can view the response in your secrets list 📋.`;
       }
 
       // Check if the authenticated user is the owner of the password
-      if (!password.userId.equals(new Types.ObjectId(user._id.toString()))) {
+      if (
+        !password.userId.equals(
+          new Types.ObjectId(user._id ? String(user._id) : ''),
+        )
+      ) {
         throw new HttpException(
           'You are not authorized to modify this secret',
           HttpStatus.FORBIDDEN,
@@ -1610,6 +1642,7 @@ You can view the response in your secrets list 📋.`;
     telegramId: string,
     page: number = 1,
     limit: number = 10,
+    currentUserPrivacyMode: boolean = false,
   ): Promise<{
     passwords: passwordReturns[];
     pagination: {
@@ -1651,7 +1684,7 @@ You can view the response in your secrets list 📋.`;
 
       // Check if the authenticated user is the owner of the parent password OR has access to it OR owns any child password
       const isOwner = parentPassword.userId.equals(
-        new Types.ObjectId(user._id.toString()),
+        new Types.ObjectId(user._id ? String(user._id) : ''),
       );
       const hasAccess =
         parentPassword.sharedWith &&
@@ -1662,7 +1695,7 @@ You can view the response in your secrets list 📋.`;
       // Check if user owns any child password
       const ownsChildPassword = await this.passwordModel.exists({
         parent_secret_id: new Types.ObjectId(parentId),
-        userId: new Types.ObjectId(user._id.toString()),
+        userId: new Types.ObjectId(user._id ? String(user._id) : ''),
         isActive: true,
       });
 
@@ -1692,7 +1725,7 @@ You can view the response in your secrets list 📋.`;
       const childPasswords = await this.passwordModel
         .find(baseQuery)
         .select(
-          'key value description updatedAt createdAt sharedWith type hidden initData',
+          'key value description updatedAt createdAt sharedWith type hidden initData userId secretViews',
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -1708,6 +1741,35 @@ You can view the response in your secrets list 📋.`;
       if (totalCount === 0) {
         throw new HttpException('There are no children', HttpStatus.NOT_FOUND);
       }
+
+      // Get unique user IDs from child passwords
+      const userIds = [
+        ...new Set(
+          childPasswords
+            .map((password) => (password.userId ? String(password.userId) : ''))
+            .filter((id) => id),
+        ),
+      ];
+
+      // Fetch privacy modes for all owners
+      const ownerPrivacyMap = new Map<string, boolean>();
+      const owners = await this.userModel
+        .find({ _id: { $in: userIds } })
+        .select('_id privacyMode telegramId')
+        .exec();
+      owners.forEach((owner) => {
+        ownerPrivacyMap.set(
+          owner._id ? String(owner._id) : '',
+          owner.privacyMode || false,
+        );
+      });
+
+      // Get current user info to check ownership
+      const currentUser = await this.userModel
+        .findOne({ telegramId })
+        .select('_id')
+        .exec();
+      const currentUserId = currentUser?._id ? String(currentUser._id) : '';
 
       // Transform child passwords to match passwordReturns format
       const passwordWithReports = await Promise.all(
@@ -1741,7 +1803,13 @@ You can view the response in your secrets list 📋.`;
             }),
           );
 
-          return {
+          // Get owner privacy mode and check if current user is owner
+          const passwordUserId = password.userId ? String(password.userId) : '';
+          const ownerPrivacyMode = ownerPrivacyMap.get(passwordUserId) || false;
+          const isCurrentUserOwner = passwordUserId === currentUserId;
+
+          // Base password data
+          const passwordData: any = {
             _id: password._id,
             key: password.key,
             value: password.value,
@@ -1750,10 +1818,23 @@ You can view the response in your secrets list 📋.`;
             sharedWith: password.sharedWith,
             username: password.initData?.username || 'Unknown', // Include username of password owner
             updatedAt: password.updatedAt,
-            createdAt: password.createdAt,
             hidden: password.hidden || false,
             reports: reportInfo,
           };
+
+          // Apply privacy logic: if current user has privacy mode enabled, don't include createdAt and view info
+          // Otherwise, check each secret individually based on owner's privacy mode
+          if (!currentUserPrivacyMode) {
+            // If owner doesn't have privacy mode enabled OR current user is the owner, include createdAt and view info
+            if (!ownerPrivacyMode || isCurrentUserOwner) {
+              passwordData.createdAt = password.createdAt;
+              const secretViews = password.secretViews || [];
+              passwordData.viewsCount = secretViews.length;
+              passwordData.secretViews = secretViews;
+            }
+          }
+
+          return passwordData;
         }),
       );
 
@@ -2185,7 +2266,7 @@ You can view the response in your secrets list 📋.`;
             })
             .exec();
           if (user) {
-            userId = user._id.toString();
+            userId = user._id ? String(user._id) : '';
             currentUserPrivacyMode = user.privacyMode || false;
           }
         }
@@ -2303,19 +2384,32 @@ You can view the response in your secrets list 📋.`;
 
       // Get all secret owners to check their privacy mode
       const secretOwnerIds = [
-        ...new Set(sharedPasswords.map((p) => p.userId.toString())),
+        ...new Set(
+          sharedPasswords
+            .map((p) => (p.userId ? String(p.userId) : ''))
+            .filter((id) => id),
+        ),
       ];
       const secretOwners = await this.userModel
         .find({ _id: { $in: secretOwnerIds } })
         .exec();
       const ownerPrivacyMap = new Map(
-        secretOwners.map((owner) => [owner._id.toString(), owner.privacyMode]),
+        secretOwners.map((owner) => [
+          owner._id ? String(owner._id) : '',
+          owner.privacyMode,
+        ]),
       );
       const ownerUsernameMap = new Map(
-        secretOwners.map((owner) => [owner._id.toString(), owner.username]),
+        secretOwners.map((owner) => [
+          owner._id ? String(owner._id) : '',
+          owner.username,
+        ]),
       );
       const ownerTelegramIdMap = new Map(
-        secretOwners.map((owner) => [owner._id.toString(), owner.telegramId]),
+        secretOwners.map((owner) => [
+          owner._id ? String(owner._id) : '',
+          owner.telegramId,
+        ]),
       );
 
       // Transform the data similar to getSharedWithMe method
@@ -2323,7 +2417,9 @@ You can view the response in your secrets list 📋.`;
         sharedPasswords
           .filter((password) => password.userId) // Filter out passwords without userId
           .map(async (password) => {
-            const passwordUserId = password.userId.toString();
+            const passwordUserId = password.userId
+              ? String(password.userId)
+              : '';
             const ownerUsername = ownerUsernameMap.get(passwordUserId);
             const ownerTelegramId = ownerTelegramIdMap.get(passwordUserId);
             const ownerPrivacyMode =
@@ -2528,7 +2624,11 @@ You can view the response in your secrets list 📋.`;
       }
 
       // Check if the authenticated user is the owner of the password
-      if (!password.userId.equals(new Types.ObjectId(user._id.toString()))) {
+      if (
+        !password.userId.equals(
+          new Types.ObjectId(user._id ? String(user._id) : ''),
+        )
+      ) {
         throw new HttpException(
           'You are not authorized to delete this secret',
           HttpStatus.FORBIDDEN,
@@ -2567,7 +2667,11 @@ You can view the response in your secrets list 📋.`;
       }
 
       // Check if the authenticated user is the owner of the password
-      if (!password.userId.equals(new Types.ObjectId(user._id.toString()))) {
+      if (
+        !password.userId.equals(
+          new Types.ObjectId(user._id ? String(user._id) : ''),
+        )
+      ) {
         throw new HttpException(
           'You are not authorized to modify this secret',
           HttpStatus.FORBIDDEN,
@@ -2593,6 +2697,7 @@ You can view the response in your secrets list 📋.`;
     userId: string,
     page: number = 1,
     limit: number = 10,
+    currentUserPrivacyMode: boolean = false,
   ): Promise<{
     passwords: passwordReturns[];
     pagination: {
@@ -2634,7 +2739,7 @@ You can view the response in your secrets list 📋.`;
 
       // Check if the authenticated user is the owner of the parent password OR has access to it OR owns any child password
       const isOwner = parentPassword.userId.equals(
-        new Types.ObjectId(user._id.toString()),
+        new Types.ObjectId(user._id ? String(user._id) : ''),
       );
       const hasAccess =
         parentPassword.sharedWith &&
@@ -2645,7 +2750,7 @@ You can view the response in your secrets list 📋.`;
       // Check if user owns any child password
       const ownsChildPassword = await this.passwordModel.exists({
         parent_secret_id: new Types.ObjectId(parentId),
-        userId: new Types.ObjectId(user._id.toString()),
+        userId: new Types.ObjectId(user._id ? String(user._id) : ''),
         isActive: true,
       });
 
@@ -2675,7 +2780,7 @@ You can view the response in your secrets list 📋.`;
       const childPasswords = await this.passwordModel
         .find(baseQuery)
         .select(
-          'key value description updatedAt createdAt sharedWith type hidden initData',
+          'key value description updatedAt createdAt sharedWith type hidden initData userId secretViews',
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -2686,6 +2791,28 @@ You can view the response in your secrets list 📋.`;
       if (totalCount === 0) {
         throw new HttpException('There are no children', HttpStatus.NOT_FOUND);
       }
+
+      // Get unique user IDs from child passwords
+      const userIds = [
+        ...new Set(
+          childPasswords
+            .map((password) => (password.userId ? String(password.userId) : ''))
+            .filter((id) => id),
+        ),
+      ];
+
+      // Fetch privacy modes for all owners
+      const ownerPrivacyMap = new Map<string, boolean>();
+      const owners = await this.userModel
+        .find({ _id: { $in: userIds } })
+        .select('_id privacyMode')
+        .exec();
+      owners.forEach((owner) => {
+        ownerPrivacyMap.set(
+          owner._id ? String(owner._id) : '',
+          owner.privacyMode || false,
+        );
+      });
 
       // Transform child passwords to match passwordReturns format
       const passwordWithReports = await Promise.all(
@@ -2718,18 +2845,38 @@ You can view the response in your secrets list 📋.`;
             }),
           );
 
-          return {
+          // Get owner privacy mode and check if current user is owner
+          const passwordUserId = password.userId ? String(password.userId) : '';
+          const ownerPrivacyMode = ownerPrivacyMap.get(passwordUserId) || false;
+          const isCurrentUserOwner = passwordUserId === userId;
+
+          // Base password data
+          const passwordData: any = {
             _id: password._id,
             key: password.key,
             value: password.value,
             description: password.description,
             type: password.type,
             sharedWith: password.sharedWith,
+            username: password.initData?.username || 'Unknown', // Include username of password owner
             updatedAt: password.updatedAt,
-            createdAt: password.createdAt,
             hidden: password.hidden || false,
             reports: reportInfo,
           };
+
+          // Apply privacy logic: if current user has privacy mode enabled, don't include createdAt and view info
+          // Otherwise, check each secret individually based on owner's privacy mode
+          if (!currentUserPrivacyMode) {
+            // If owner doesn't have privacy mode enabled OR current user is the owner, include createdAt and view info
+            if (!ownerPrivacyMode || isCurrentUserOwner) {
+              passwordData.createdAt = password.createdAt;
+              const secretViews = password.secretViews || [];
+              passwordData.viewsCount = secretViews.length;
+              passwordData.secretViews = secretViews;
+            }
+          }
+
+          return passwordData;
         }),
       );
 
@@ -2794,8 +2941,8 @@ You can view the response in your secrets list 📋.`;
     limit?: number,
   ): Promise<SharedWithDto[] | PaginatedResponse<SharedWithDto>> {
     // Parse pagination parameters if provided
-    const pageNumber = page ? parseInt(page.toString(), 10) : undefined;
-    const limitNumber = limit ? parseInt(limit.toString(), 10) : undefined;
+    const pageNumber = page ? parseInt(String(page), 10) : undefined;
+    const limitNumber = limit ? parseInt(String(limit), 10) : undefined;
 
     // If JWT token exists, use userId; otherwise use telegramId
     if (req?.user && req.user.id) {
@@ -2854,11 +3001,17 @@ You can view the response in your secrets list 📋.`;
           throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
         }
 
-        console.log('Password userId:', password.userId.toString());
-        console.log('User _id:', user._id.toString());
+        console.log(
+          'Password userId:',
+          password.userId ? String(password.userId) : '',
+        );
+        console.log('User _id:', user._id ? String(user._id) : '');
 
         // Check if the user is the owner of the password
-        if (password.userId.toString() !== user._id.toString()) {
+        if (
+          (password.userId ? String(password.userId) : '') !==
+          (user._id ? String(user._id) : '')
+        ) {
           throw new HttpException(
             'You are not authorized to delete this password',
             HttpStatus.FORBIDDEN,
@@ -2927,12 +3080,37 @@ You can view the response in your secrets list 📋.`;
     page: number,
     limit: number,
   ) {
+    // Extract current user's privacy mode
+    let currentUserPrivacyMode = false;
+
     // If JWT token exists, use userId; otherwise use telegramId
     if (req?.user && req.user.id) {
-      return this.getChildPasswordsByUserId(parentId, req.user.id, page, limit);
+      const currentUser = await this.userModel
+        .findById(req.user.id)
+        .select('privacyMode')
+        .exec();
+      currentUserPrivacyMode = currentUser?.privacyMode || false;
+      return this.getChildPasswordsByUserId(
+        parentId,
+        req.user.id,
+        page,
+        limit,
+        currentUserPrivacyMode,
+      );
     } else {
       const telegramId = this.extractTelegramIdFromRequest(req);
-      return this.getChildPasswords(parentId, telegramId, page, limit);
+      const currentUser = await this.userModel
+        .findOne({ telegramId })
+        .select('privacyMode')
+        .exec();
+      currentUserPrivacyMode = currentUser?.privacyMode || false;
+      return this.getChildPasswords(
+        parentId,
+        telegramId,
+        page,
+        limit,
+        currentUserPrivacyMode,
+      );
     }
   }
 
@@ -2973,7 +3151,10 @@ You can view the response in your secrets list 📋.`;
         }
 
         // Check if the user is the owner of the password
-        if (password.userId.toString() !== user._id.toString()) {
+        if (
+          (password.userId ? String(password.userId) : '') !==
+          (user._id ? String(user._id) : '')
+        ) {
           throw new HttpException(
             'You are not authorized to modify this secret',
             HttpStatus.FORBIDDEN,
@@ -3134,7 +3315,9 @@ You can view the response in your secrets list 📋.`;
       }
 
       // Check privacy mode and ownership
-      const isOwner = secret.userId.toString() === user._id.toString();
+      const isOwner =
+        (secret.userId ? String(secret.userId) : '') ===
+        (user._id ? String(user._id) : '');
 
       if (secretOwner.privacyMode && !isOwner) {
         throw new HttpException(

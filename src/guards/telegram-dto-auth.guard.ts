@@ -108,10 +108,10 @@ export class TelegramDtoAuthGuard implements CanActivate {
         ) {
           if (
             telegramDataDto.telegramId !==
-              telegramDataBody.telegramId.toString() ||
+              String(telegramDataBody.telegramId || '') ||
             telegramDataDto.hash !== telegramDataBody.hash ||
             telegramDataDto.authDate !==
-              parseInt(telegramDataBody.authDate.toString())
+              parseInt(String(telegramDataBody.authDate || 0))
           ) {
             throw new UnauthorizedException('Invalid Telegram data');
           } else {
@@ -122,10 +122,10 @@ export class TelegramDtoAuthGuard implements CanActivate {
           if (telegramDataBody.initData) {
             if (
               telegramDataDto.telegramId !==
-                telegramDataBody.initData.telegramId.toString() ||
+                String(telegramDataBody.initData?.telegramId || '') ||
               telegramDataDto.hash !== telegramDataBody.initData.hash ||
               telegramDataDto.authDate !==
-                parseInt(telegramDataBody.initData.authDate.toString())
+                parseInt(String(telegramDataBody.initData?.authDate || 0))
             ) {
               throw new UnauthorizedException('Invalid Telegram data');
             } else {
@@ -252,12 +252,12 @@ export class TelegramDtoAuthGuard implements CanActivate {
     }
 
     return {
-      telegramId: user.id.toString(),
-      firstName: user.first_name,
-      lastName: user.last_name,
-      username: user.username,
+      telegramId: user.id ? user.id.toString() : '',
+      firstName: user.first_name || '',
+      lastName: user.last_name || '',
+      username: user.username || '',
       authDate: parseInt(params.get('auth_date') || '0'),
-      hash: params.get('hash'),
+      hash: params.get('hash') || '',
     };
   }
 }

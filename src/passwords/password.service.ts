@@ -1,10 +1,10 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-// import { Request } from 'express';
+import { Request } from 'express';
 
 // Extend Request interface to include user property
-interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     telegramId: string;
@@ -565,7 +565,7 @@ export class PasswordService {
         );
       }
 
-      const headerInitData = req.headers['x-telegram-init-data'];
+      const headerInitData = req.headers['x-telegram-init-data'] as string;
       const parsedData =
         this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
       const telegramId = parsedData.telegramId;
@@ -833,7 +833,7 @@ export class PasswordService {
     }
     // If no JWT token, fallback to telegramId from X-Telegram-Init-Data header
     else if (req?.headers?.['x-telegram-init-data']) {
-      const headerInitData = req.headers['x-telegram-init-data'];
+      const headerInitData = req.headers['x-telegram-init-data'] as string;
       const parsedData =
         this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
       return parsedData.telegramId;
@@ -856,7 +856,7 @@ export class PasswordService {
     }
     // Only use X-Telegram-Init-Data header if no JWT token
     else if (req?.headers?.['x-telegram-init-data']) {
-      const headerInitData = req.headers['x-telegram-init-data'];
+      const headerInitData = req.headers['x-telegram-init-data'] as string;
       const parsedData =
         this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
       return parsedData.telegramId;
@@ -879,7 +879,7 @@ export class PasswordService {
     }
     // Only use X-Telegram-Init-Data header if no JWT token
     else if (req?.headers?.['x-telegram-init-data']) {
-      const headerInitData = req.headers['x-telegram-init-data'];
+      const headerInitData = req.headers['x-telegram-init-data'] as string;
       const parsedData =
         this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
       return parsedData.username;
@@ -910,7 +910,7 @@ export class PasswordService {
     }
     // Use X-Telegram-Init-Data header
     else if (req?.headers?.['x-telegram-init-data']) {
-      const headerInitData = req.headers['x-telegram-init-data'];
+      const headerInitData = req.headers['x-telegram-init-data'] as string;
       const parsedData =
         this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
       telegramId = parsedData.telegramId;
@@ -2060,7 +2060,7 @@ You can view the response in your secrets list 📋.`;
         userId = req.user.id;
         username = req.user.username;
       } else if (req?.headers?.['x-telegram-init-data']) {
-        const headerInitData = req.headers['x-telegram-init-data'];
+        const headerInitData = req.headers['x-telegram-init-data'] as string;
         const parsedData =
           this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
         username = parsedData.username;
@@ -2708,7 +2708,7 @@ You can view the response in your secrets list 📋.`;
       else {
         // Parse X-Telegram-Init-Data header directly
         if (req?.headers?.['x-telegram-init-data']) {
-          const headerInitData = req.headers['x-telegram-init-data'];
+          const headerInitData = req.headers['x-telegram-init-data'] as string;
           const parsedData =
             this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
           telegramId = parsedData.telegramId;
@@ -2808,7 +2808,7 @@ You can view the response in your secrets list 📋.`;
       else {
         // Parse X-Telegram-Init-Data header directly
         if (req?.headers?.['x-telegram-init-data']) {
-          const headerInitData = req.headers['x-telegram-init-data'];
+          const headerInitData = req.headers['x-telegram-init-data'] as string;
           const parsedData =
             this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
           telegramId = parsedData.telegramId;
@@ -2826,6 +2826,153 @@ You can view the response in your secrets list 📋.`;
         throw error;
       }
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Record a secret view for a secret
+   * @param secretId - The ID of the secret being viewed
+   * @param telegramId - The telegram ID of the viewer
+   * @param username - The username of the viewer (optional)
+   * @returns Updated password document
+   */
+  async recordSecretView(
+    secretId: string,
+    telegramId: string,
+    username?: string,
+  ): Promise<Password> {
+    try {
+      // Check if secret exists
+      const secret = await this.passwordModel.findById(secretId).exec();
+      if (!secret) {
+        throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if this telegram user already viewed this secret today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const existingViewToday = secret.secretViews?.find(
+        (view) =>
+          view.telegramId === telegramId &&
+          view.viewedAt >= today &&
+          view.viewedAt < tomorrow,
+      );
+
+      // If no view today, add new view
+      if (!existingViewToday) {
+        const newView = {
+          telegramId,
+          username,
+          viewedAt: new Date(),
+        };
+
+        const updatedSecret = await this.passwordModel
+          .findByIdAndUpdate(
+            secretId,
+            { $push: { secretViews: newView } },
+            { new: true },
+          )
+          .exec();
+
+        return updatedSecret;
+      }
+
+      return secret;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to record secret view',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Get secret view statistics for a secret
+   * @param secretId - The ID of the secret
+   * @param req - The authenticated request
+   * @returns View statistics including count and viewer details
+   */
+  async getSecretViewStats(
+    secretId: string,
+    req: AuthenticatedRequest,
+  ): Promise<{
+    totalViews: number;
+    uniqueViewers: number;
+    viewDetails: Array<{
+      telegramId: string;
+      username?: string;
+      viewedAt: Date;
+    }>;
+  }> {
+    try {
+      let telegramId: string;
+
+      // Priority 1: JWT authentication
+      if (req?.user?.telegramId) {
+        telegramId = req.user.telegramId;
+      }
+      // Priority 2: Telegram authentication
+      else if (req?.headers?.['x-telegram-init-data']) {
+        const headerInitData = req.headers['x-telegram-init-data'] as string;
+        const parsedData =
+          this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+        telegramId = parsedData.telegramId;
+      } else {
+        throw new HttpException(
+          'No authentication data provided',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Find the secret and verify ownership
+      const secret = await this.passwordModel.findById(secretId).exec();
+      if (!secret) {
+        throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Find the user to verify ownership
+      const user = await this.userModel
+        .findOne({ telegramId, isActive: true })
+        .exec();
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if user owns this secret
+      if (secret.userId.toString() !== user._id.toString()) {
+        throw new HttpException(
+          'You can only view statistics for your own secrets',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      const secretViews = secret.secretViews || [];
+      const uniqueViewers = new Set(secretViews.map((view) => view.telegramId))
+        .size;
+
+      return {
+        totalViews: secretViews.length,
+        uniqueViewers,
+        viewDetails: secretViews.map((view) => ({
+          telegramId: view.telegramId,
+          username: view.username,
+          viewedAt: view.viewedAt,
+        })),
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to get secret view statistics',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

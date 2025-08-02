@@ -7,28 +7,17 @@ import {
   Param,
   Delete,
   Query,
-  // HttpException,
-  // HttpStatus,
+  HttpException,
+  HttpStatus,
   Request,
 } from '@nestjs/common';
 
-// Extend Request interface to include user property
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    telegramId: string;
-    username: string;
-    firstName: string;
-    lastName: string;
-    [key: string]: any;
-  };
-}
-import { PasswordService } from './password.service';
+import { PasswordService, AuthenticatedRequest } from './password.service';
+// import { CreatePasswordDto } from './dto/create-password.dto';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
-
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
-import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { TelegramService } from '../telegram/telegram.service';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 // import { Types } from 'mongoose';
 // import { VerifyPasswordData } from './interfaces/verify-password.interface';
 import { Password } from './schemas/password.schema';
@@ -184,4 +173,42 @@ export class PasswordController {
 
   //   return { isValid };
   // }
+
+  @Patch('secret-view/:id')
+  @TelegramDtoAuth(true)
+  async recordSecretView(
+    @Param('id') secretId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    // Extract telegram data from X-Telegram-Init-Data header
+    const telegramInitData = req.headers['x-telegram-init-data'] as string;
+
+    if (!telegramInitData) {
+      throw new HttpException(
+        'X-Telegram-Init-Data header is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Parse telegram init data to extract telegramId and username
+    const parsedData =
+      this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
+    const telegramId = parsedData.telegramId;
+    const username = parsedData.username;
+
+    return this.passwordService.recordSecretView(
+      secretId,
+      telegramId,
+      username,
+    );
+  }
+
+  @Get('secret-view-stats/:id')
+  @TelegramDtoAuth(true)
+  async getSecretViewStats(
+    @Param('id') secretId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.passwordService.getSecretViewStats(secretId, req);
+  }
 }

@@ -40,6 +40,9 @@ export class User {
 
   @Prop({ default: 0 })
   reportCount: number;
+
+  @Prop({ default: false })
+  privacyMode: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

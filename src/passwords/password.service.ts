@@ -89,7 +89,7 @@ export class PasswordService {
           ],
         })
         .select(
-          'key value description updatedAt createdAt sharedWith type hidden',
+          'key value description updatedAt createdAt sharedWith type hidden secretViews',
         )
         .sort({ createdAt: -1 })
         .exec();
@@ -125,6 +125,7 @@ export class PasswordService {
             }),
           );
 
+          const secretViews = password.secretViews || [];
           return {
             _id: password._id,
             key: password.key,
@@ -136,6 +137,8 @@ export class PasswordService {
             createdAt: password.createdAt,
             hidden: password.hidden || false,
             reports: reportInfo,
+            viewsCount: secretViews.length,
+            secretViews: secretViews,
           };
         }),
       );
@@ -176,7 +179,7 @@ export class PasswordService {
           ],
         })
         .select(
-          'key value description updatedAt createdAt sharedWith type hidden',
+          'key value description updatedAt createdAt sharedWith type hidden secretViews',
         )
         .sort({ createdAt: -1 })
         .exec();
@@ -213,6 +216,7 @@ export class PasswordService {
             }),
           );
 
+          const secretViews = password.secretViews || [];
           return {
             _id: password._id,
             key: password.key,
@@ -224,6 +228,8 @@ export class PasswordService {
             createdAt: password.createdAt,
             hidden: password.hidden || false,
             reports: reportInfo, // Include report information
+            viewsCount: secretViews.length,
+            secretViews: secretViews,
           };
         }),
       );
@@ -285,6 +291,7 @@ export class PasswordService {
   async findPasswordsSharedWithMe(
     username: string,
     userId?: string,
+    currentUserTelegramId?: string,
   ): Promise<SharedWithMeResponse> {
     try {
       if (!username && !userId) {
@@ -305,7 +312,11 @@ export class PasswordService {
         }
       }
 
-      const sharedWithMe = await this.getSharedWithMe(username, finalUserId);
+      const sharedWithMe = await this.getSharedWithMe(
+        username,
+        finalUserId,
+        currentUserTelegramId,
+      );
       return sharedWithMe;
     } catch (error) {
       console.log('error', error);
@@ -316,6 +327,7 @@ export class PasswordService {
   async getSharedWithMe(
     username: string,
     userId?: string,
+    currentUserTelegramId?: string,
   ): Promise<SharedWithMeResponse> {
     try {
       if (!username && !userId) {
@@ -336,7 +348,7 @@ export class PasswordService {
             ],
           })
           .select(
-            ' _id key value description initData.username sharedWith createdAt updatedAt ',
+            ' _id key value description initData.username sharedWith createdAt updatedAt userId secretViews ',
           )
           .sort({ createdAt: -1 })
           .lean()
@@ -355,7 +367,7 @@ export class PasswordService {
             ],
           })
           .select(
-            ' _id key value description initData.username sharedWith createdAt updatedAt ',
+            ' _id key value description initData.username sharedWith createdAt updatedAt userId secretViews ',
           )
           .sort({ createdAt: -1 })
           .lean()
@@ -365,60 +377,104 @@ export class PasswordService {
         return { sharedWithMe: [], userCount: 0 };
       }
 
+      // Get all secret owners to check their privacy mode
+      const secretOwnerIds = [
+        ...new Set(sharedPasswords.map((p) => p.userId.toString())),
+      ];
+      const secretOwners = await this.userModel
+        .find({ _id: { $in: secretOwnerIds } })
+        .exec();
+      const ownerPrivacyMap = new Map(
+        secretOwners.map((owner) => [owner._id.toString(), owner.privacyMode]),
+      );
+      const ownerUsernameMap = new Map(
+        secretOwners.map((owner) => [owner._id.toString(), owner.username]),
+      );
+      const ownerTelegramIdMap = new Map(
+        secretOwners.map((owner) => [owner._id.toString(), owner.telegramId]),
+      );
+
       const resolvedPasswords = await Promise.all(
-        sharedPasswords.map(async (password) => {
-          // Find unresolved reports for this password
-          // Handle both ObjectId and string formats for secret_id
-          const reports = await this.reportModel
-            .find({
-              $or: [
-                { secret_id: password._id },
-                { secret_id: password._id.toString() },
-              ],
-              resolved: false,
-            })
-            .exec();
+        sharedPasswords
+          .filter((password) => password.userId) // Filter out passwords without userId
+          .map(async (password) => {
+            // Find unresolved reports for this password
+            // Handle both ObjectId and string formats for secret_id
+            const reports = await this.reportModel
+              .find({
+                $or: [
+                  { secret_id: password._id },
+                  { secret_id: password._id.toString() },
+                ],
+                resolved: false,
+              })
+              .exec();
 
-          const transformedReports = await Promise.all(
-            reports.map(async (report) => {
-              // Find the reporter user by telegramId
-              const reporterUser = await this.userModel
-                .findOne({ telegramId: report.reporterTelegramId })
-                .select('username')
-                .exec();
+            const transformedReports = await Promise.all(
+              reports.map(async (report) => {
+                // Find the reporter user by telegramId
+                const reporterUser = await this.userModel
+                  .findOne({ telegramId: report.reporterTelegramId })
+                  .select('username')
+                  .exec();
 
-              return {
-                id: report._id.toString(),
-                reporterUsername: reporterUser?.username || 'unknown',
-                report_type: report.report_type,
-                reason: report.reason,
-                createdAt: report.createdAt,
+                return {
+                  id: report._id.toString(),
+                  reporterUsername: reporterUser?.username || 'unknown',
+                  report_type: report.report_type,
+                  reason: report.reason,
+                  createdAt: report.createdAt,
+                };
+              }),
+            );
+
+            // Check owner's privacy mode
+            const passwordUserId = password.userId.toString();
+            const ownerPrivacyMode =
+              ownerPrivacyMap.get(passwordUserId) || false;
+            const ownerTelegramId = ownerTelegramIdMap.get(passwordUserId);
+            const ownerUsername = ownerUsernameMap.get(passwordUserId);
+            const isOwner = currentUserTelegramId === ownerTelegramId;
+            const secretViews = password.secretViews || [];
+
+            const baseData = {
+              id: password._id.toString(),
+              key: password.key,
+              value: password.value,
+              description: password.description,
+              username: ownerUsername || password.initData.username,
+              sharedWith: password.sharedWith || [], // Include sharedWith field in response
+              reports: transformedReports,
+              updatedAt: password.updatedAt,
+            };
+
+            // If owner has privacy mode disabled OR current user is the owner, include createdAt and view info
+            if (!ownerPrivacyMode || isOwner) {
+              const result: any = {
+                ...baseData,
+                createdAt: password.createdAt,
+                viewsCount: secretViews.length,
               };
-            }),
-          );
 
-          return {
-            id: password._id.toString(),
-            key: password.key,
-            value: password.value,
-            description: password.description,
-            username: password.initData.username,
-            sharedWith: password.sharedWith || [], // Include sharedWith field in response
-            reports: transformedReports,
-            createdAt: password.createdAt,
-            updatedAt: password.updatedAt,
-          } as {
-            id: string;
-            key: string;
-            value: string;
-            description: string;
-            username: string;
-            sharedWith: any[];
-            reports: any[];
-            createdAt: Date;
-            updatedAt: Date;
-          };
-        }),
+              // Include secretViews if owner has privacy mode disabled OR user is the owner
+              if (!ownerPrivacyMode || isOwner) {
+                result.secretViews = secretViews;
+              }
+
+              return result;
+            }
+
+            return baseData as {
+              id: string;
+              key: string;
+              value: string;
+              description: string;
+              username: string;
+              sharedWith: any[];
+              reports: any[];
+              updatedAt: Date;
+            };
+          }),
       );
 
       const groupedByOwner = resolvedPasswords.reduce(
@@ -432,8 +488,9 @@ export class PasswordService {
               description: string;
               sharedWith: any[];
               reports: any[];
-              createdAt: Date;
+              createdAt?: Date;
               updatedAt: Date;
+              secretViews?: any[];
             }>
           >,
           password: {
@@ -444,8 +501,9 @@ export class PasswordService {
             username: string;
             sharedWith: any[];
             reports: any[];
-            createdAt: Date;
+            createdAt?: Date;
             updatedAt: Date;
+            secretViews?: any[];
           },
         ) => {
           const ownerUsername = password.username;
@@ -455,16 +513,26 @@ export class PasswordService {
           }
 
           if (password.key && password.value) {
-            acc[ownerUsername].push({
+            const passwordData: any = {
               id: password.id,
               key: password.key,
               value: password.value,
               description: password.description,
-              createdAt: password.createdAt,
               updatedAt: password.updatedAt,
               sharedWith: password.sharedWith || [],
               reports: password.reports,
-            });
+            };
+
+            // Add optional fields if they exist
+            if (password.createdAt) {
+              passwordData.createdAt = password.createdAt;
+            }
+            if (password.secretViews) {
+              passwordData.secretViews = password.secretViews;
+            }
+            passwordData.viewsCount = password.secretViews?.length || 0;
+
+            acc[ownerUsername].push(passwordData);
           }
 
           return acc;
@@ -476,7 +544,7 @@ export class PasswordService {
         .filter(([username]) => username !== 'unknown')
         .map(([username, passwords]) => ({
           username,
-          passwords: passwords.map((p) => ({
+          passwords: (passwords as any[]).map((p) => ({
             id: p.id,
             key: p.key,
             value: p.value,
@@ -485,8 +553,10 @@ export class PasswordService {
             updatedAt: p.updatedAt,
             sharedWith: p.sharedWith,
             reports: p.reports,
+            viewsCount: p.secretViews?.length || 0,
+            secretViews: p.secretViews,
           })),
-          count: passwords.length,
+          count: (passwords as any[]).length,
         }));
 
       result.sort((a, b) => b.count - a.count);
@@ -1746,7 +1816,7 @@ You can view the response in your secrets list 📋.`;
       const passwords = await this.passwordModel
         .find(baseQuery)
         .select(
-          'key value description updatedAt createdAt sharedWith type hidden',
+          'key value description updatedAt createdAt sharedWith type hidden secretViews',
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -1785,6 +1855,7 @@ You can view the response in your secrets list 📋.`;
             }),
           );
 
+          const secretViews = password.secretViews || [];
           return {
             _id: password._id,
             key: password.key,
@@ -1796,6 +1867,8 @@ You can view the response in your secrets list 📋.`;
             createdAt: password.createdAt,
             hidden: password.hidden || false,
             reports: reportInfo,
+            viewsCount: secretViews.length,
+            secretViews: secretViews,
           };
         }),
       );
@@ -1916,6 +1989,7 @@ You can view the response in your secrets list 📋.`;
             }),
           );
 
+          const secretViews = password.secretViews || [];
           return {
             _id: password._id,
             key: password.key,
@@ -1927,6 +2001,8 @@ You can view the response in your secrets list 📋.`;
             createdAt: password.createdAt,
             hidden: password.hidden || false,
             reports: reportInfo,
+            viewsCount: secretViews.length,
+            secretViews: secretViews,
           };
         }),
       );
@@ -2051,19 +2127,27 @@ You can view the response in your secrets list 📋.`;
     page?: number,
     limit?: number,
   ): Promise<SharedWithMeResponse | PaginatedResponse<any>> {
+    console.log('Service: findPasswordsSharedWithMeWithPagination called');
     try {
-      // Extract userId and username from request
+      // Extract userId, username and telegramId from request
       let userId: string | undefined;
       let username: string | undefined;
+      let currentUserTelegramId: string | undefined;
 
       if (req?.user && req.user.id) {
         userId = req.user.id;
         username = req.user.username;
+        // Get telegramId from user data
+        const user = await this.userModel.findById(userId).exec();
+        if (user) {
+          currentUserTelegramId = user.telegramId;
+        }
       } else if (req?.headers?.['x-telegram-init-data']) {
         const headerInitData = req.headers['x-telegram-init-data'] as string;
         const parsedData =
           this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
         username = parsedData.username;
+        currentUserTelegramId = parsedData.telegramId;
         // Try to find userId from username
         if (username) {
           const user = await this.userModel
@@ -2095,7 +2179,11 @@ You can view the response in your secrets list 📋.`;
         if (!username && !userId) {
           throw new Error('Username or userId is required');
         }
-        return this.findPasswordsSharedWithMe(username, userId);
+        return this.findPasswordsSharedWithMe(
+          username,
+          userId,
+          currentUserTelegramId,
+        );
       }
 
       // Calculate pagination
@@ -2121,13 +2209,18 @@ You can view the response in your secrets list 📋.`;
           sharedPasswords = await this.passwordModel
             .find(baseQuery)
             .select(
-              ' _id key value description initData.username sharedWith createdAt updatedAt ',
+              ' _id key value description initData.username sharedWith updatedAt userId ',
             )
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .lean()
             .exec();
+          console.log(
+            'Database query result (userId):',
+            sharedPasswords.length,
+            'passwords found',
+          );
         }
       }
 
@@ -2148,13 +2241,18 @@ You can view the response in your secrets list 📋.`;
           sharedPasswords = await this.passwordModel
             .find(baseQuery)
             .select(
-              ' _id key value description initData.username sharedWith createdAt updatedAt ',
+              ' _id key value description initData.username sharedWith updatedAt userId ',
             )
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .lean()
             .exec();
+          console.log(
+            'Database query result (username):',
+            sharedPasswords.length,
+            'passwords found',
+          );
         }
       }
 
@@ -2173,17 +2271,74 @@ You can view the response in your secrets list 📋.`;
         };
       }
 
+      // Get all secret owners to check their privacy mode
+      const secretOwnerIds = [
+        ...new Set(sharedPasswords.map((p) => p.userId.toString())),
+      ];
+      const secretOwners = await this.userModel
+        .find({ _id: { $in: secretOwnerIds } })
+        .exec();
+      const ownerPrivacyMap = new Map(
+        secretOwners.map((owner) => [owner._id.toString(), owner.privacyMode]),
+      );
+      const ownerUsernameMap = new Map(
+        secretOwners.map((owner) => [owner._id.toString(), owner.username]),
+      );
+      const ownerTelegramIdMap = new Map(
+        secretOwners.map((owner) => [owner._id.toString(), owner.telegramId]),
+      );
+
       // Transform the data similar to getSharedWithMe method
-      const transformedData = sharedPasswords.map((password) => ({
-        _id: password._id,
-        key: password.key,
-        value: password.value,
-        description: password.description,
-        sharedBy: password.initData?.username || 'Unknown',
-        sharedWith: password.sharedWith || [], // Include sharedWith field in response
-        createdAt: password.createdAt,
-        updatedAt: password.updatedAt,
-      }));
+      const transformedData = await Promise.all(
+        sharedPasswords
+          .filter((password) => password.userId) // Filter out passwords without userId
+          .map(async (password) => {
+            const passwordUserId = password.userId.toString();
+            const ownerPrivacyMode =
+              ownerPrivacyMap.get(passwordUserId) || false;
+            const ownerUsername = ownerUsernameMap.get(passwordUserId);
+            const ownerTelegramId = ownerTelegramIdMap.get(passwordUserId);
+            const isOwner = currentUserTelegramId === ownerTelegramId;
+
+            // Ensure ownerPrivacyMode is properly converted to boolean
+            const privacyModeEnabled = Boolean(ownerPrivacyMode);
+
+            const baseData = {
+              _id: password._id,
+              key: password.key,
+              value: password.value,
+              description: password.description,
+              sharedBy:
+                ownerUsername || password.initData?.username || 'Unknown',
+              sharedWith: password.sharedWith || [], // Include sharedWith field in response
+              updatedAt: password.updatedAt,
+            };
+
+            const result: any = { ...baseData };
+
+            // Add createdAt and view information based on privacy mode and ownership
+            if (!privacyModeEnabled || isOwner) {
+              // Fetch additional data from database
+              const fullPassword = await this.passwordModel
+                .findById(password._id)
+                .select('createdAt secretViews')
+                .lean()
+                .exec();
+
+              if (fullPassword) {
+                result.createdAt = fullPassword.createdAt;
+                result.viewsCount = (fullPassword.secretViews || []).length;
+
+                // Include secretViews if owner has privacy mode disabled OR user is the owner
+                if (!privacyModeEnabled || isOwner) {
+                  result.secretViews = fullPassword.secretViews || [];
+                }
+              }
+            }
+
+            return result;
+          }),
+      );
 
       // Calculate pagination info
       const totalPages = Math.ceil(totalCount / limit);
@@ -2944,13 +3099,24 @@ You can view the response in your secrets list 📋.`;
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
 
-      // Check if user owns this secret
-      if (secret.userId.toString() !== user._id.toString()) {
+      // Find the secret owner to check privacy mode
+      const secretOwner = await this.userModel.findById(secret.userId).exec();
+      if (!secretOwner) {
+        throw new HttpException('Secret owner not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check privacy mode and ownership
+      const isOwner = secret.userId.toString() === user._id.toString();
+
+      if (secretOwner.privacyMode && !isOwner) {
         throw new HttpException(
-          'You can only view statistics for your own secrets',
+          'The secret owner has enabled privacy mode, so statistics cannot be viewed',
           HttpStatus.FORBIDDEN,
         );
       }
+
+      // If privacy mode is false, allow access with valid telegram auth
+      // If privacy mode is true, only allow access for owner
 
       const secretViews = secret.secretViews || [];
       const uniqueViewers = new Set(secretViews.map((view) => view.telegramId))

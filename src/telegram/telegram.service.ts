@@ -91,6 +91,18 @@ export class TelegramService {
       return false;
     }
 
+    // Check user's privacy mode
+    try {
+      const user = await this.usersService.findByTelegramId(String(userId));
+      if (user && user.privacyMode) {
+        // Replace message with privacy-friendly text
+        message = 'please check your data';
+        console.log('User has privacy mode enabled, using generic message');
+      }
+    } catch (error) {
+      console.log('Could not check user privacy mode, proceeding with original message:', error.message);
+    }
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         console.log(`Attempt ${attempt} to send message to user ${userId}`);

@@ -3212,6 +3212,30 @@ You can view the response in your secrets list 📋.`;
         throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
       }
 
+      // Get the viewing user
+      const viewingUser = await this.userModel
+        .findOne({ telegramId })
+        .select('privacyMode')
+        .exec();
+      if (!viewingUser) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Get the secret owner
+      const secretOwner = await this.userModel
+        .findById(secret.userId)
+        .select('privacyMode')
+        .exec();
+      if (!secretOwner) {
+        throw new HttpException('Secret owner not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check privacy settings - if either the viewing user or secret owner has privacy mode enabled, don't record the view
+      if (viewingUser.privacyMode || secretOwner.privacyMode) {
+        // Return the secret without recording the view
+        return secret;
+      }
+
       // Check if this telegram user already viewed this secret today
       const today = new Date();
       today.setHours(0, 0, 0, 0);

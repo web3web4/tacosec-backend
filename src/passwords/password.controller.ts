@@ -99,7 +99,6 @@ export class PasswordController {
     const pageNumber = page ? parseInt(page, 10) : undefined;
     const limitNumber = limit ? parseInt(limit, 10) : undefined;
 
-    // Use pagination-enabled method with req object
     return this.passwordService.findPasswordsSharedWithMeWithPagination(
       req,
       pageNumber,

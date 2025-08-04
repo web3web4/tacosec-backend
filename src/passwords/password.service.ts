@@ -1465,7 +1465,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
       // Create the notification message
       const message = `🔐 <b>Child Secret Response</b>
 
-User <b>${childUserDisplayName}</b> has responded to your secret "<b>${parentPassword.key}</b>" with a new secret "<b>${childSecretName}</b>" 🔄
+User <b>${childUserDisplayName}</b> has responded to your secret with a new secret " 🔄
 
 📅 <b>Response Date & Time:</b> ${dateTime}
 

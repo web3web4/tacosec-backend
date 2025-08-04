@@ -3215,7 +3215,7 @@ You can view the response in your secrets list 📋.`;
       // Get the viewing user
       const viewingUser = await this.userModel
         .findOne({ telegramId })
-        .select('privacyMode')
+        .select('privacyMode firstName lastName')
         .exec();
       if (!viewingUser) {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
@@ -3254,6 +3254,8 @@ You can view the response in your secrets list 📋.`;
         const newView = {
           telegramId,
           username,
+          firstName: viewingUser.firstName,
+          lastName: viewingUser.lastName,
           viewedAt: new Date(),
         };
 
@@ -3295,6 +3297,8 @@ You can view the response in your secrets list 📋.`;
     viewDetails: Array<{
       telegramId: string;
       username?: string;
+      firstName?: string;
+      lastName?: string;
       viewedAt: Date;
     }>;
   }> {
@@ -3354,17 +3358,43 @@ You can view the response in your secrets list 📋.`;
       // If privacy mode is true, only allow access for owner
 
       const secretViews = secret.secretViews || [];
+
+      // Get user details for each view to include firstName and lastName
+      const viewDetailsWithUserInfo = await Promise.all(
+        secretViews.map(async (view) => {
+          // Try to get user info from database if firstName/lastName not in view
+          if (!view.firstName || !view.lastName) {
+            const userInfo = await this.userModel
+              .findOne({ telegramId: view.telegramId })
+              .select('firstName lastName')
+              .exec();
+
+            return {
+              telegramId: view.telegramId,
+              username: view.username,
+              firstName: userInfo?.firstName || view.firstName || '',
+              lastName: userInfo?.lastName || view.lastName || '',
+              viewedAt: view.viewedAt,
+            };
+          }
+
+          return {
+            telegramId: view.telegramId,
+            username: view.username,
+            firstName: view.firstName,
+            lastName: view.lastName,
+            viewedAt: view.viewedAt,
+          };
+        }),
+      );
+
       const uniqueViewers = new Set(secretViews.map((view) => view.telegramId))
         .size;
 
       return {
         totalViews: secretViews.length,
         uniqueViewers,
-        viewDetails: secretViews.map((view) => ({
-          telegramId: view.telegramId,
-          username: view.username,
-          viewedAt: view.viewedAt,
-        })),
+        viewDetails: viewDetailsWithUserInfo,
       };
     } catch (error) {
       if (error instanceof HttpException) {

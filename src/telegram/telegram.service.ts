@@ -100,7 +100,10 @@ export class TelegramService {
         console.log('User has privacy mode enabled, using generic message');
       }
     } catch (error) {
-      console.log('Could not check user privacy mode, proceeding with original message:', error.message);
+      console.log(
+        'Could not check user privacy mode, proceeding with original message:',
+        error.message,
+      );
     }
 
     for (let attempt = 1; attempt <= retries; attempt++) {

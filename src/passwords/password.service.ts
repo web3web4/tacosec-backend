@@ -3231,8 +3231,15 @@ You can view the response in your secrets list 📋.`;
       }
 
       // Check if the viewing user is the owner of the secret
-      if (secretOwner.telegramId === telegramId) {
+      console.log('Checking ownership:', {
+        secretOwnerTelegramId: secretOwner.telegramId,
+        viewingUserTelegramId: telegramId,
+        isOwner: String(secretOwner.telegramId) === String(telegramId)
+      });
+      
+      if (String(secretOwner.telegramId) === String(telegramId)) {
         // Owner viewing their own secret - don't record the view
+        console.log('Owner viewing own secret - not recording view');
         return secret;
       }
 

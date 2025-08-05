@@ -3224,10 +3224,16 @@ You can view the response in your secrets list 📋.`;
       // Get the secret owner
       const secretOwner = await this.userModel
         .findById(secret.userId)
-        .select('privacyMode')
+        .select('privacyMode telegramId')
         .exec();
       if (!secretOwner) {
         throw new HttpException('Secret owner not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check if the viewing user is the owner of the secret
+      if (secretOwner.telegramId === telegramId) {
+        // Owner viewing their own secret - don't record the view
+        return secret;
       }
 
       // Check privacy settings - if either the viewing user or secret owner has privacy mode enabled, don't record the view
@@ -3236,21 +3242,13 @@ You can view the response in your secrets list 📋.`;
         return secret;
       }
 
-      // Check if this telegram user already viewed this secret today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const existingViewToday = secret.secretViews?.find(
-        (view) =>
-          view.telegramId === telegramId &&
-          view.viewedAt >= today &&
-          view.viewedAt < tomorrow,
+      // Check if this telegram user has already viewed this secret before (ever)
+      const existingView = secret.secretViews?.find(
+        (view) => view.telegramId === telegramId,
       );
 
-      // If no view today, add new view
-      if (!existingViewToday) {
+      // If user has never viewed this secret before, add new view
+      if (!existingView) {
         const newView = {
           telegramId,
           username,
@@ -3270,6 +3268,7 @@ You can view the response in your secrets list 📋.`;
         return updatedSecret;
       }
 
+      // User has already viewed this secret before - don't record another view
       return secret;
     } catch (error) {
       if (error instanceof HttpException) {

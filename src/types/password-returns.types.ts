@@ -22,4 +22,6 @@ export type passwordReturns = {
   type: Type;
   hidden: boolean;
   reports: PasswordReportInfo[]; // Array of unresolved reports for this password
+  firstName?: string; // First name of the password owner
+  lastName?: string; // Last name of the password owner
 };

@@ -1751,17 +1751,23 @@ You can view the response in your secrets list 📋.`;
         ),
       ];
 
-      // Fetch privacy modes for all owners
+      // Fetch privacy modes and user info for all owners
       const ownerPrivacyMap = new Map<string, boolean>();
+      const ownerInfoMap = new Map<
+        string,
+        { firstName?: string; lastName?: string }
+      >();
       const owners = await this.userModel
         .find({ _id: { $in: userIds } })
-        .select('_id privacyMode telegramId')
+        .select('_id privacyMode telegramId firstName lastName')
         .exec();
       owners.forEach((owner) => {
-        ownerPrivacyMap.set(
-          owner._id ? String(owner._id) : '',
-          owner.privacyMode || false,
-        );
+        const ownerId = owner._id ? String(owner._id) : '';
+        ownerPrivacyMap.set(ownerId, owner.privacyMode || false);
+        ownerInfoMap.set(ownerId, {
+          firstName: owner.firstName,
+          lastName: owner.lastName,
+        });
       });
 
       // Get current user info to check ownership
@@ -1808,6 +1814,9 @@ You can view the response in your secrets list 📋.`;
           const ownerPrivacyMode = ownerPrivacyMap.get(passwordUserId) || false;
           const isCurrentUserOwner = passwordUserId === currentUserId;
 
+          // Get owner info for firstName and lastName
+          const ownerInfo = ownerInfoMap.get(passwordUserId) || {};
+
           // Base password data
           const passwordData: any = {
             _id: password._id,
@@ -1817,6 +1826,8 @@ You can view the response in your secrets list 📋.`;
             type: password.type,
             sharedWith: password.sharedWith,
             username: password.initData?.username || 'Unknown', // Include username of password owner
+            firstName: ownerInfo.firstName,
+            lastName: ownerInfo.lastName,
             updatedAt: password.updatedAt,
             hidden: password.hidden || false,
             reports: reportInfo,
@@ -2801,17 +2812,23 @@ You can view the response in your secrets list 📋.`;
         ),
       ];
 
-      // Fetch privacy modes for all owners
+      // Fetch privacy modes and user info for all owners
       const ownerPrivacyMap = new Map<string, boolean>();
+      const ownerInfoMap = new Map<
+        string,
+        { firstName?: string; lastName?: string }
+      >();
       const owners = await this.userModel
         .find({ _id: { $in: userIds } })
-        .select('_id privacyMode')
+        .select('_id privacyMode firstName lastName')
         .exec();
       owners.forEach((owner) => {
-        ownerPrivacyMap.set(
-          owner._id ? String(owner._id) : '',
-          owner.privacyMode || false,
-        );
+        const ownerId = owner._id ? String(owner._id) : '';
+        ownerPrivacyMap.set(ownerId, owner.privacyMode || false);
+        ownerInfoMap.set(ownerId, {
+          firstName: owner.firstName,
+          lastName: owner.lastName,
+        });
       });
 
       // Transform child passwords to match passwordReturns format
@@ -2850,6 +2867,9 @@ You can view the response in your secrets list 📋.`;
           const ownerPrivacyMode = ownerPrivacyMap.get(passwordUserId) || false;
           const isCurrentUserOwner = passwordUserId === userId;
 
+          // Get owner info for firstName and lastName
+          const ownerInfo = ownerInfoMap.get(passwordUserId) || {};
+
           // Base password data
           const passwordData: any = {
             _id: password._id,
@@ -2859,6 +2879,8 @@ You can view the response in your secrets list 📋.`;
             type: password.type,
             sharedWith: password.sharedWith,
             username: password.initData?.username || 'Unknown', // Include username of password owner
+            firstName: ownerInfo.firstName,
+            lastName: ownerInfo.lastName,
             updatedAt: password.updatedAt,
             hidden: password.hidden || false,
             reports: reportInfo,
@@ -3211,11 +3233,11 @@ You can view the response in your secrets list 📋.`;
       if (!secret) {
         throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
       }
-      
+
       console.log('🔍 SECRET FOUND:', {
         secretId: secret._id,
         secretUserId: secret.userId,
-        secretUserIdType: typeof secret.userId
+        secretUserIdType: typeof secret.userId,
       });
 
       // Get the viewing user
@@ -3240,21 +3262,37 @@ You can view the response in your secrets list 📋.`;
       console.log('✅ SECRET OWNER FOUND:', {
         ownerId: secretOwner._id,
         ownerTelegramId: secretOwner.telegramId,
-        ownerUsername: secretOwner.username
+        ownerUsername: secretOwner.username,
       });
 
       // Check if the viewing user is the owner of the secret
       console.log('=== SECRET VIEW DEBUG ===');
       console.log('Secret ID:', secretId);
       console.log('Secret userId:', secret.userId);
-      console.log('Secret owner telegramId:', secretOwner.telegramId, 'type:', typeof secretOwner.telegramId);
+      console.log(
+        'Secret owner telegramId:',
+        secretOwner.telegramId,
+        'type:',
+        typeof secretOwner.telegramId,
+      );
       console.log('Secret owner username:', secretOwner.username);
-      console.log('Viewing user telegramId:', telegramId, 'type:', typeof telegramId);
+      console.log(
+        'Viewing user telegramId:',
+        telegramId,
+        'type:',
+        typeof telegramId,
+      );
       console.log('Viewing user username:', username);
-      console.log('Are they equal (strict):', secretOwner.telegramId === telegramId);
-      console.log('Are they equal (string):', String(secretOwner.telegramId) === String(telegramId));
+      console.log(
+        'Are they equal (strict):',
+        secretOwner.telegramId === telegramId,
+      );
+      console.log(
+        'Are they equal (string):',
+        String(secretOwner.telegramId) === String(telegramId),
+      );
       console.log('========================');
-      
+
       if (String(secretOwner.telegramId) === String(telegramId)) {
         // Owner viewing their own secret - don't record the view
         console.log('🚫 Owner viewing own secret - not recording view');
@@ -3274,7 +3312,11 @@ You can view the response in your secrets list 📋.`;
 
       // If user has never viewed this secret before, add new view
       if (!existingView) {
-        console.log('✅ Recording new secret view for user:', telegramId, username);
+        console.log(
+          '✅ Recording new secret view for user:',
+          telegramId,
+          username,
+        );
         const newView = {
           telegramId,
           username,
@@ -3293,7 +3335,9 @@ You can view the response in your secrets list 📋.`;
 
         return updatedSecret;
       } else {
-        console.log('🔄 User has already viewed this secret before - not recording');
+        console.log(
+          '🔄 User has already viewed this secret before - not recording',
+        );
       }
 
       // User has already viewed this secret before - don't record another view

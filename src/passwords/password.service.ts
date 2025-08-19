@@ -3365,6 +3365,7 @@ You can view the response in your secrets list 📋.`;
   ): Promise<{
     totalViews: number;
     uniqueViewers: number;
+    totalSharedUsers: number;
     viewDetails: Array<{
       telegramId: string;
       username?: string;
@@ -3462,9 +3463,13 @@ You can view the response in your secrets list 📋.`;
       const uniqueViewers = new Set(secretViews.map((view) => view.telegramId))
         .size;
 
+      // Calculate total number of users the secret has been shared with
+      const totalSharedUsers = secret.sharedWith ? secret.sharedWith.length : 0;
+
       return {
         totalViews: secretViews.length,
         uniqueViewers,
+        totalSharedUsers,
         viewDetails: viewDetailsWithUserInfo,
       };
     } catch (error) {

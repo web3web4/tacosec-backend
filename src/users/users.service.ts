@@ -417,11 +417,12 @@ As a result:
 
   /**
    * Search users by username using full-text search for autocomplete
+   * Prioritizes previously shared contacts
    * @param searchQuery The search query string
    * @param currentUserTelegramId The telegram ID of the current user to exclude from results
    * @param limit Maximum number of results to return
    * @param skip Number of results to skip
-   * @returns Array of users matching the search query
+   * @returns Array of users matching the search query with previously shared contacts prioritized
    */
   async searchUsersByUsername(
     searchQuery: string,
@@ -430,7 +431,12 @@ As a result:
     limit: number = 10,
     skip: number = 0,
   ): Promise<{
-    data: { username: string; firstName?: string; lastName?: string }[];
+    data: {
+      username: string;
+      firstName?: string;
+      lastName?: string;
+      isPreviouslyShared?: boolean;
+    }[];
     total: number;
   }> {
     // Get current user to exclude from results
@@ -441,6 +447,26 @@ As a result:
     if (!currentUser) {
       throw new HttpException('Current user not found', HttpStatus.NOT_FOUND);
     }
+
+    // Get previously shared usernames from passwords
+    const sharedPasswords = await this.passwordModel
+      .find({
+        userId: currentUser._id,
+        isActive: true,
+        'sharedWith.0': { $exists: true }, // Has at least one shared contact
+      })
+      .select('sharedWith')
+      .exec();
+
+    // Extract unique usernames that have been shared with
+    const sharedUsernames = new Set<string>();
+    sharedPasswords.forEach((password) => {
+      password.sharedWith?.forEach((shared) => {
+        if (shared.username) {
+          sharedUsernames.add(shared.username.toLowerCase());
+        }
+      });
+    });
 
     // Build search query
     const searchFilter: any = {
@@ -466,25 +492,44 @@ As a result:
       };
     }
 
-    // Execute search with pagination
-    const [users, total] = await Promise.all([
-      this.userModel
-        .find(searchFilter)
-        .select('username firstName lastName -_id')
-        .limit(limit)
-        .skip(skip)
-        .sort({ username: 1 }) // Sort alphabetically
-        .exec(),
-      this.userModel.countDocuments(searchFilter).exec(),
-    ]);
+    // Execute search without pagination first to sort properly
+    const allUsers = await this.userModel
+      .find(searchFilter)
+      .select('username firstName lastName -_id')
+      .exec();
 
-    return {
-      data: users.map((user) => ({
+    // Separate users into previously shared and new contacts
+    const previouslySharedUsers: any[] = [];
+    const newUsers: any[] = [];
+
+    allUsers.forEach((user) => {
+      const userObj = {
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
-      })),
-      total,
+        isPreviouslyShared: sharedUsernames.has(user.username.toLowerCase()),
+      };
+
+      if (sharedUsernames.has(user.username.toLowerCase())) {
+        previouslySharedUsers.push(userObj);
+      } else {
+        newUsers.push(userObj);
+      }
+    });
+
+    // Sort each group alphabetically
+    previouslySharedUsers.sort((a, b) => a.username.localeCompare(b.username));
+    newUsers.sort((a, b) => a.username.localeCompare(b.username));
+
+    // Combine arrays with previously shared users first
+    const sortedUsers = [...previouslySharedUsers, ...newUsers];
+
+    // Apply pagination to the sorted results
+    const paginatedUsers = sortedUsers.slice(skip, skip + limit);
+
+    return {
+      data: paginatedUsers,
+      total: sortedUsers.length,
     };
   }
 }

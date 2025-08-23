@@ -132,9 +132,11 @@ export class UsersController {
 
   /**
    * Search users by username with configurable search type
+   * Prioritizes previously shared contacts in results
    * Supports both 'starts_with' and 'contains' search modes
    * GET /users/search/autocomplete?query=john&searchType=starts_with&limit=10&skip=0
    * GET /users/search/autocomplete?query=john&searchType=contains&limit=10&skip=0
+   * Returns users with isPreviouslyShared flag indicating if they were shared with before
    */
   @Get('search/autocomplete')
   @TelegramDtoAuth()

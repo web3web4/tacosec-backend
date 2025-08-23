@@ -3373,6 +3373,17 @@ You can view the response in your secrets list 📋.`;
       lastName?: string;
       viewedAt: Date;
     }>;
+    notViewedUsers: Array<{
+      username?: string;
+      firstName?: string;
+      lastName?: string;
+      telegramId?: string;
+    }>;
+    notViewedUsersCount: number;
+    unknownUsers: Array<{
+      username?: string;
+    }>;
+    unknownCount: number;
   }> {
     try {
       let telegramId: string;
@@ -3466,11 +3477,58 @@ You can view the response in your secrets list 📋.`;
       // Calculate total number of users the secret has been shared with
       const totalSharedUsers = secret.sharedWith ? secret.sharedWith.length : 0;
 
+      // Get telegramIds of users who have viewed the secret
+      const viewedTelegramIds = new Set(
+        secretViews.map((view) => view.telegramId),
+      );
+
+      // Process shared users to categorize them
+      const notViewedUsers = [];
+      const unknownUsers = [];
+      let unknownCount = 0;
+
+      if (secret.sharedWith && secret.sharedWith.length > 0) {
+        for (const sharedUser of secret.sharedWith) {
+          // Find user details from database
+          const userDetails = await this.userModel
+            .findOne({ username: sharedUser.username })
+            .select('telegramId firstName lastName privacyMode')
+            .exec();
+
+          if (userDetails) {
+            // Check if user has privacy mode enabled
+            if (userDetails.privacyMode) {
+              unknownUsers.push({
+                username: sharedUser.username,
+              });
+              unknownCount++;
+            } else if (!viewedTelegramIds.has(userDetails.telegramId)) {
+              // User hasn't viewed the secret and doesn't have privacy mode
+              notViewedUsers.push({
+                username: sharedUser.username,
+                firstName: userDetails.firstName,
+                lastName: userDetails.lastName,
+                telegramId: userDetails.telegramId,
+              });
+            }
+          } else {
+            // User not found in database, add to not viewed
+            notViewedUsers.push({
+              username: sharedUser.username,
+            });
+          }
+        }
+      }
+
       return {
         totalViews: secretViews.length,
         uniqueViewers,
         totalSharedUsers,
         viewDetails: viewDetailsWithUserInfo,
+        notViewedUsers,
+        notViewedUsersCount: notViewedUsers.length,
+        unknownUsers,
+        unknownCount,
       };
     } catch (error) {
       if (error instanceof HttpException) {

@@ -3302,6 +3302,16 @@ You can view the response in your secrets list 📋.`;
       // Check privacy settings - if either the viewing user or secret owner has privacy mode enabled, don't record the view
       if (viewingUser.privacyMode || secretOwner.privacyMode) {
         // Return the secret without recording the view
+        if (secretOwner.privacyMode) {
+          console.log(
+            '🔒 Secret owner has privacy mode enabled - not recording view',
+          );
+        }
+        if (viewingUser.privacyMode) {
+          console.log(
+            '🔒 Viewing user has privacy mode enabled - not recording view',
+          );
+        }
         return secret;
       }
 
@@ -3425,20 +3435,23 @@ You can view the response in your secrets list 📋.`;
         throw new HttpException('Secret owner not found', HttpStatus.NOT_FOUND);
       }
 
-      // Check privacy mode and ownership
+      // Check if user is owner or has access to the secret
       const isOwner =
         (secret.userId ? String(secret.userId) : '') ===
         (user._id ? String(user._id) : '');
 
-      if (secretOwner.privacyMode && !isOwner) {
+      // Check if secret is shared with the user
+      const isSharedWithUser = secret.sharedWith?.some(
+        (sharedUser) => sharedUser.username === user.username
+      );
+
+      // Only allow access if user is owner or secret is shared with them
+      if (!isOwner && !isSharedWithUser) {
         throw new HttpException(
-          'The secret owner has enabled privacy mode, so statistics cannot be viewed',
+          'You do not have permission to view statistics for this secret',
           HttpStatus.FORBIDDEN,
         );
       }
-
-      // If privacy mode is false, allow access with valid telegram auth
-      // If privacy mode is true, only allow access for owner
 
       const secretViews = secret.secretViews || [];
 
@@ -3496,13 +3509,19 @@ You can view the response in your secrets list 📋.`;
             .exec();
 
           if (userDetails) {
-            // Check if user has privacy mode enabled
-            if (userDetails.privacyMode) {
+            // Check if user has privacy mode enabled AND hasn't viewed the secret
+            if (
+              userDetails.privacyMode &&
+              !viewedTelegramIds.has(userDetails.telegramId)
+            ) {
               unknownUsers.push({
                 username: sharedUser.username,
               });
               unknownCount++;
-            } else if (!viewedTelegramIds.has(userDetails.telegramId)) {
+            } else if (
+              !userDetails.privacyMode &&
+              !viewedTelegramIds.has(userDetails.telegramId)
+            ) {
               // User hasn't viewed the secret and doesn't have privacy mode
               notViewedUsers.push({
                 username: sharedUser.username,
@@ -3511,6 +3530,8 @@ You can view the response in your secrets list 📋.`;
                 telegramId: userDetails.telegramId,
               });
             }
+            // Note: Users with privacyMode=true who have viewed the secret
+            // will only appear in viewDetails without being added to unknownUsers
           } else {
             // User not found in database, add to not viewed
             notViewedUsers.push({

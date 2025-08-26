@@ -1236,6 +1236,7 @@ export class PasswordService {
           passwordData.parent_secret_id,
           user,
           passwordData.key,
+          passwordObj._id,
         );
       }
 
@@ -1365,9 +1366,22 @@ User <b>${userName}</b> has shared a secret with you 🔁.
 You can view it under the <b>"Shared with me"</b> tab 📂.
 `;
 
+            const replyMarkup = {
+              inline_keyboard: [
+                [
+                  {
+                    text: 'Open Secret',
+                    url: `https://t.me/Taco_Front_Test_bot/Taco_Front_Test?startapp=${passwordUser._id}_shared_`,
+                  },
+                ],
+              ],
+            };
+
             const result = await this.telegramService.sendMessage(
               Number(sharedWithUser.telegramId),
               message,
+              3,
+              replyMarkup,
             );
 
             console.log(
@@ -1404,6 +1418,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
     parentSecretId: string,
     childUser: UserDocument,
     childSecretName: string,
+    childSecretId: string,
   ): Promise<void> {
     try {
       // Find the parent password
@@ -1471,6 +1486,24 @@ User <b>${childUserDisplayName}</b> has responded to your secret with a new secr
 
 You can view the response in your secrets list 📋.`;
 
+      // Create the reply markup with inline keyboard
+      const replyMarkup = {
+        inline_keyboard: [
+          [
+            {
+              text: 'Open Reply',
+              url: `https://t.me/Taco_Front_Test_bot/Taco_Front_Test?startapp=${parentSecretId}_mydata_${childSecretId}`,
+            },
+          ],
+        ],
+      };
+
+      // Log the reply_markup structure and contents
+      console.log(
+        'Reply markup structure:',
+        JSON.stringify(replyMarkup, null, 2),
+      );
+
       console.log(
         `Sending child password notification to parent owner ${parentOwner.username} (${parentOwner.telegramId})`,
       );
@@ -1479,6 +1512,8 @@ You can view the response in your secrets list 📋.`;
       const result = await this.telegramService.sendMessage(
         Number(parentOwner.telegramId),
         message,
+        3,
+        replyMarkup,
       );
 
       console.log(
@@ -3442,7 +3477,7 @@ You can view the response in your secrets list 📋.`;
 
       // Check if secret is shared with the user
       const isSharedWithUser = secret.sharedWith?.some(
-        (sharedUser) => sharedUser.username === user.username
+        (sharedUser) => sharedUser.username === user.username,
       );
 
       // Only allow access if user is owner or secret is shared with them

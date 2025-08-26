@@ -77,6 +77,7 @@ export class TelegramService {
     userId: number,
     message: string,
     retries = 3,
+    replyMarkup?: any,
   ): Promise<boolean> {
     const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
 
@@ -110,11 +111,15 @@ export class TelegramService {
       try {
         console.log(`Attempt ${attempt} to send message to user ${userId}`);
 
-        const requestBody = {
+        const requestBody: any = {
           chat_id: userId,
           text: message,
           parse_mode: 'HTML',
         };
+
+        if (replyMarkup) {
+          requestBody.reply_markup = replyMarkup;
+        }
 
         console.log('Request body:', JSON.stringify(requestBody));
 

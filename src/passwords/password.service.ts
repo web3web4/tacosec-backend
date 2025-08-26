@@ -3471,22 +3471,26 @@ You can view the response in your secrets list 📋.`;
       }
 
       // Check if user is owner or has access to the secret
-      const isOwner =
-        (secret.userId ? String(secret.userId) : '') ===
-        (user._id ? String(user._id) : '');
+      // const isOwner =
+      //   (secret.userId ? String(secret.userId) : '') ===
+      //   (user._id ? String(user._id) : '');
 
       // Check if secret is shared with the user
-      const isSharedWithUser = secret.sharedWith?.some(
-        (sharedUser) => sharedUser.username === user.username,
-      );
+      // const isSharedWithUser = secret.sharedWith?.some((sharedUser) => {
+      //   const usernameMatch = sharedUser.username === user.username;
+      //   const userIdMatch =
+      //     sharedUser.userId && String(sharedUser.userId) === String(user._id);
+
+      //   return usernameMatch || userIdMatch;
+      // });
 
       // Only allow access if user is owner or secret is shared with them
-      if (!isOwner && !isSharedWithUser) {
-        throw new HttpException(
-          'You do not have permission to view statistics for this secret',
-          HttpStatus.FORBIDDEN,
-        );
-      }
+      // if (!isOwner && !isSharedWithUser) {
+      //   throw new HttpException(
+      //     'You do not have permission to view statistics for this secret',
+      //     HttpStatus.FORBIDDEN,
+      //   );
+      // }
 
       const secretViews = secret.secretViews || [];
 

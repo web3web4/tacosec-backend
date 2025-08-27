@@ -3555,6 +3555,9 @@ You can view the response in your secrets list 📋.`;
             ) {
               unknownUsers.push({
                 username: sharedUser.username,
+                firstName: userDetails.firstName,
+                lastName: userDetails.lastName,
+                telegramId: userDetails.telegramId,
               });
               unknownCount++;
             } else if (

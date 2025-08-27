@@ -76,13 +76,52 @@ export class PublicAddressesService {
         })
         .exec();
 
-      // If the address already exists, return an empty array with message
+      // If the address already exists, check ownership
       if (existingAddress) {
+        // Check if the existing address belongs to the same user
+        if (
+          existingAddress.userId.toString() !==
+          (user as UserDocument)._id.toString()
+        ) {
+          throw new HttpException(
+            'This public address already exists and belongs to another user',
+            HttpStatus.CONFLICT,
+          );
+        }
+
+        // If it belongs to the same user, update only the encryptedSecret
+        const updatedEncryptedSecret = createDto.secret
+          ? this.cryptoUtil.encrypt(createDto.secret)
+          : existingAddress.encryptedSecret;
+
+        existingAddress.encryptedSecret = updatedEncryptedSecret;
+        const updatedAddress = await existingAddress.save();
+
+        // Transform the response to include userTelegramId and exclude userId
+        const addressObj = updatedAddress.toObject() as any;
+
+        // Decrypt the secret if it exists
+        const secret = addressObj.encryptedSecret
+          ? this.cryptoUtil.decrypt(addressObj.encryptedSecret)
+          : undefined;
+
+        // Prepare the response data
+        const responseData = [
+          {
+            _id: addressObj._id,
+            publicKey: addressObj.publicKey,
+            secret,
+            userTelegramId: (user as any).telegramId,
+            createdAt: addressObj.createdAt,
+            updatedAt: addressObj.updatedAt,
+          },
+        ];
+
         return {
           success: true,
-          data: [],
-          duplicatesSkipped: 1,
-          message: 'This address already exists and has been skipped.',
+          data: responseData,
+          total: 1,
+          message: 'Public address updated successfully.',
         };
       }
 

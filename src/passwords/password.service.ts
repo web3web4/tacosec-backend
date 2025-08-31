@@ -1238,6 +1238,14 @@ export class PasswordService {
           passwordData.key,
           passwordObj._id,
         );
+
+        // Send notification to users who have the parent secret shared with them
+        await this.sendChildPasswordNotificationToSharedUsers(
+          passwordData.parent_secret_id,
+          user,
+          passwordData.key,
+          passwordObj._id,
+        );
       }
 
       return passwordWithId;
@@ -1293,6 +1301,13 @@ export class PasswordService {
   async sendMessageToUsersBySharedWith(passwordUser: Password) {
     try {
       console.log('sending message to users by shared with internally');
+
+      // Skip sending shared notifications for child secrets
+      if (passwordUser.parent_secret_id) {
+        console.log('Skipping shared notifications for child secret');
+        return;
+      }
+
       const user = await this.userModel.findById(passwordUser.userId).exec();
 
       if (!user) {
@@ -1522,6 +1537,149 @@ You can view the response in your secrets list 📋.`;
     } catch (error) {
       console.error(
         'Error sending child password notification to parent owner:',
+        error.message,
+      );
+      // Don't rethrow to prevent breaking the main operation
+    }
+  }
+
+  private async sendChildPasswordNotificationToSharedUsers(
+    parentSecretId: string,
+    childUser: UserDocument,
+    childSecretName: string,
+    childSecretId: string,
+  ): Promise<void> {
+    try {
+      // Find the parent password
+      const parentPassword = await this.passwordModel
+        .findById(parentSecretId)
+        .exec();
+
+      if (!parentPassword) {
+        console.error('Parent password not found for shared user notification');
+        return;
+      }
+
+      // Find the parent password owner
+      const parentOwner = await this.userModel
+        .findById(parentPassword.userId)
+        .exec();
+
+      if (!parentOwner) {
+        console.error('Parent password owner not found');
+        return;
+      }
+
+      // Get shared users from parent password
+      const sharedWith = parentPassword.sharedWith || [];
+
+      if (sharedWith.length === 0) {
+        console.log('No shared users found for parent password');
+        return;
+      }
+
+      // Prepare child user display name
+      const childUserDisplayName =
+        childUser.firstName && childUser.firstName.trim() !== ''
+          ? `${childUser.firstName} ${childUser.lastName || ''}`.trim()
+          : childUser.username;
+
+      // Prepare parent owner display name
+      const parentOwnerDisplayName =
+        parentOwner.firstName && parentOwner.firstName.trim() !== ''
+          ? `${parentOwner.firstName} ${parentOwner.lastName || ''}`.trim()
+          : parentOwner.username;
+
+      // Get current date and time
+      const now = new Date();
+      const dateTime = now.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short',
+      });
+
+      // Iterate through shared users and send notifications
+      for (const sharedUser of sharedWith) {
+        try {
+          // Find the shared user by username
+          const user = await this.userModel
+            .findOne({ username: sharedUser.username })
+            .exec();
+
+          if (!user) {
+            console.log(`Shared user ${sharedUser.username} not found`);
+            continue;
+          }
+
+          // Check if shared user is the same as child user - don't send notification to self
+          if (
+            (user._id ? String(user._id) : '') ===
+            (childUser._id ? String(childUser._id) : '')
+          ) {
+            console.log(
+              'Child password creator is the same as shared user, skipping notification',
+            );
+            continue;
+          }
+
+          // Check if shared user has a valid telegramId
+          if (!user.telegramId || user.telegramId === '') {
+            console.log(
+              `Shared user ${sharedUser.username} has no valid Telegram ID, skipping notification`,
+            );
+            continue;
+          }
+
+          // Create the notification message
+          const message = `🔐 <b>Reply to Shared Secret</b>
+
+User <b>${childUserDisplayName}</b> has replied to <b>${parentOwnerDisplayName}</b>'s secret that was shared with you 🔄
+
+📅 <b>Reply Date & Time:</b> ${dateTime}
+
+You can view the reply in your shared secrets list 📋.`;
+
+          // Create the reply markup with inline keyboard
+          const replyMarkup = {
+            inline_keyboard: [
+              [
+                {
+                  text: 'Open Reply',
+                  url: `https://t.me/Taco_Front_Test_bot/Taco_Front_Test?startapp=${parentSecretId}_shared_${childSecretId}`,
+                },
+              ],
+            ],
+          };
+
+          console.log(
+            `Sending child password notification to shared user ${user.username} (${user.telegramId})`,
+          );
+
+          // Send the notification
+          const result = await this.telegramService.sendMessage(
+            Number(user.telegramId),
+            message,
+            3,
+            replyMarkup,
+          );
+
+          console.log(
+            `Child password notification sent to shared user ${user.username}, result: ${result}`,
+          );
+        } catch (userError) {
+          console.error(
+            `Error sending notification to shared user ${sharedUser.username}:`,
+            userError.message,
+          );
+          // Continue with next user
+        }
+      }
+    } catch (error) {
+      console.error(
+        'Error sending child password notification to shared users:',
         error.message,
       );
       // Don't rethrow to prevent breaking the main operation

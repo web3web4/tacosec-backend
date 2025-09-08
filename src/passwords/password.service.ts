@@ -32,6 +32,7 @@ import { SharedWithDto } from './dto/shared-with.dto';
 import { PaginatedResponse } from './dto/pagination.dto';
 import { TelegramService } from '../telegram/telegram.service';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
+import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class PasswordService {
   constructor(
@@ -42,6 +43,7 @@ export class PasswordService {
     private publicAddressModel: Model<PublicAddressDocument>,
     private readonly telegramService: TelegramService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
+    private readonly configService: ConfigService,
   ) {}
 
   private async hashPassword(password: string): Promise<string> {
@@ -1386,7 +1388,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
                 [
                   {
                     text: 'Open Secret',
-                    url: `https://t.me/Taco_Front_Test_bot/Taco_Front_Test?startapp=${passwordUser._id}_shared_`,
+                    url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${passwordUser._id}_shared_`,
                   },
                 ],
               ],
@@ -1507,7 +1509,7 @@ You can view the response in your secrets list 📋.`;
           [
             {
               text: 'Open Reply',
-              url: `https://t.me/Taco_Front_Test_bot/Taco_Front_Test?startapp=${parentSecretId}_mydata_${childSecretId}`,
+              url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${parentSecretId}_mydata_${childSecretId}`,
             },
           ],
         ],
@@ -1648,7 +1650,7 @@ You can view the reply in your shared secrets list 📋.`;
               [
                 {
                   text: 'Open Reply',
-                  url: `https://t.me/Taco_Front_Test_bot/Taco_Front_Test?startapp=${parentSecretId}_shared_${childSecretId}`,
+                  url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${parentSecretId}_shared_${childSecretId}`,
                 },
               ],
             ],

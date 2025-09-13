@@ -14,7 +14,6 @@ import { ConfigService } from '@nestjs/config';
 export class CryptoUtil {
   private readonly algorithm = 'aes-256-cbc';
   private readonly key: Buffer;
-  private readonly iv: Buffer;
 
   constructor(private readonly configService: ConfigService) {
     // Get encryption key from environment or throw error
@@ -29,45 +28,85 @@ export class CryptoUtil {
 
     // Create a buffer from the hex string key
     this.key = Buffer.from(encryptionKey, 'hex');
-
-    // For simplicity, we're using a fixed IV, but in production
-    // you might want to store IVs with the encrypted data
-    this.iv = Buffer.from('1234567890123456');
   }
 
   /**
-   * Encrypts a string
+   * Encrypts a string with a unique IV for each encryption
    * @param text Plain text to encrypt
-   * @returns Encrypted text in hex format
+   * @returns Encrypted text with IV prepended in hex format (IV:EncryptedData)
    */
   encrypt(text: string): string {
     if (!text) return '';
 
-    const cipher = crypto.createCipheriv(this.algorithm, this.key, this.iv);
+    // Generate a unique random IV for each encryption
+    const iv = crypto.randomBytes(16);
+
+    const cipher = crypto.createCipheriv(this.algorithm, this.key, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return encrypted;
+
+    // Prepend IV to encrypted data (IV:EncryptedData)
+    return iv.toString('hex') + ':' + encrypted;
   }
 
   /**
-   * Decrypts a string
-   * @param encryptedText Encrypted text in hex format
+   * Decrypts a string that was encrypted with a unique IV
+   * @param encryptedText Encrypted text with IV prepended in hex format (IV:EncryptedData)
    * @returns Decrypted plain text
    */
   decrypt(encryptedText: string): string {
     if (!encryptedText) return '';
 
     try {
+      // Split IV and encrypted data
+      const parts = encryptedText.split(':');
+      if (parts.length !== 2) {
+        throw new Error(
+          'Invalid encrypted data format. Expected IV:EncryptedData',
+        );
+      }
+
+      const iv = Buffer.from(parts[0], 'hex');
+      const encrypted = parts[1];
+
+      const decipher = crypto.createDecipheriv(this.algorithm, this.key, iv);
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    } catch (error) {
+      console.error('Decryption error:', error);
+      return ''; // Return empty string on error
+    }
+  }
+
+  /**
+   * Attempts to decrypt data, trying new format first, then legacy format
+   * @param encryptedText Encrypted text (either new format with IV or legacy format)
+   * @returns Decrypted plain text
+   */
+  decryptSafe(encryptedText: string): string {
+    if (!encryptedText) return '';
+
+    // Try new format first (contains ':')
+    if (encryptedText.includes(':')) {
+      return this.decrypt(encryptedText);
+    }
+
+    // Fall back to legacy format
+    try {
+      // Use the old fixed IV for backward compatibility
+      const legacyIv = Buffer.from('1234567890123456');
+
       const decipher = crypto.createDecipheriv(
         this.algorithm,
         this.key,
-        this.iv,
+        legacyIv,
       );
       let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
       return decrypted;
     } catch (error) {
-      console.error('Decryption error:', error);
+      console.error('Legacy decryption error:', error);
       return ''; // Return empty string on error
     }
   }

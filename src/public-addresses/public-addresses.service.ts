@@ -102,7 +102,7 @@ export class PublicAddressesService {
 
         // Decrypt the secret if it exists
         const secret = addressObj.encryptedSecret
-          ? this.cryptoUtil.decrypt(addressObj.encryptedSecret)
+          ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
           : undefined;
 
         // Prepare the response data
@@ -144,7 +144,7 @@ export class PublicAddressesService {
 
       // Decrypt the secret if it exists
       const secret = addressObj.encryptedSecret
-        ? this.cryptoUtil.decrypt(addressObj.encryptedSecret)
+        ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
         : undefined;
 
       // Prepare the response data
@@ -302,7 +302,7 @@ export class PublicAddressesService {
 
         // Decrypt the secret if it exists
         const secret = addressObj.encryptedSecret
-          ? this.cryptoUtil.decrypt(addressObj.encryptedSecret)
+          ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
           : undefined;
 
         // Return the fields in the desired order
@@ -394,7 +394,7 @@ export class PublicAddressesService {
 
         // Decrypt the secret if it exists
         const secret = addressObj.encryptedSecret
-          ? this.cryptoUtil.decrypt(addressObj.encryptedSecret)
+          ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
           : undefined;
 
         // Return the fields in the desired order
@@ -462,7 +462,7 @@ export class PublicAddressesService {
 
         // Decrypt the secret if it exists
         const secret = addressObj.encryptedSecret
-          ? this.cryptoUtil.decrypt(addressObj.encryptedSecret)
+          ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
           : undefined;
 
         // Return the fields in the desired order

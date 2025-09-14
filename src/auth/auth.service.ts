@@ -37,26 +37,50 @@ export class AuthService {
   ) {}
 
   async login(
-    loginDto: LoginDto,
+    loginDto: LoginDto | undefined,
     telegramInitData?: string,
   ): Promise<LoginResponse | any> {
-    const { publicAddress } = loginDto;
-
     try {
+      // If X-Telegram-Init-Data header is provided, handle Telegram authentication
+      if (telegramInitData) {
+        // If loginDto is provided, use existing logic with publicAddress
+        if (loginDto) {
+          const { publicAddress } = loginDto;
+          const addressRecord = await this.publicAddressModel
+            .findOne({ publicKey: publicAddress })
+            .populate('userId')
+            .exec();
+          return this.handleTelegramLogin(
+            publicAddress,
+            telegramInitData,
+            addressRecord,
+          );
+        } else {
+          // If no loginDto, handle pure Telegram authentication
+          return this.handlePureTelegramLogin(telegramInitData);
+        }
+      }
+
+      // If no telegramInitData, loginDto is required
+      if (!loginDto) {
+        throw new HttpException(
+          {
+            success: false,
+            message:
+              'Login data is required when not using Telegram authentication',
+            error: 'Bad Request',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const { publicAddress } = loginDto;
+
       // Find the public address in the database
       const addressRecord = await this.publicAddressModel
         .findOne({ publicKey: publicAddress })
         .populate('userId')
         .exec();
-
-      // If X-Telegram-Init-Data header is provided, handle Telegram authentication
-      if (telegramInitData) {
-        return this.handleTelegramLogin(
-          publicAddress,
-          telegramInitData,
-          addressRecord,
-        );
-      }
 
       // Original login logic when no Telegram data is provided
       if (!addressRecord) {
@@ -140,6 +164,87 @@ export class AuthService {
         {
           success: false,
           message: 'Internal server error during login',
+          error: 'Internal Server Error',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  private async handlePureTelegramLogin(
+    telegramInitData: string,
+  ): Promise<LoginResponse> {
+    try {
+      // Validate Telegram init data
+      const isValid =
+        this.telegramValidator.validateTelegramInitData(telegramInitData);
+      if (!isValid) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Invalid Telegram authentication data or signature',
+            error: 'Unauthorized',
+          },
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      // Parse Telegram data
+      const telegramData =
+        this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
+
+      // Check if user already exists
+      let user = await this.userModel
+        .findOne({ telegramId: telegramData.telegramId })
+        .exec();
+
+      if (user) {
+        // User exists, update their data and generate token
+        user.firstName = telegramData.firstName || user.firstName;
+        user.lastName = telegramData.lastName || user.lastName;
+        user.username = telegramData.username || user.username;
+        user.authDate = new Date(telegramData.authDate * 1000);
+        user.hash = telegramData.hash;
+
+        await user.save();
+      } else {
+        // User doesn't exist, create new user
+        const newUser = new this.userModel({
+          telegramId: telegramData.telegramId,
+          firstName: telegramData.firstName || '',
+          lastName: telegramData.lastName || '',
+          username: telegramData.username || '',
+          authDate: new Date(telegramData.authDate * 1000),
+          hash: telegramData.hash,
+          role: Role.USER,
+          isActive: true,
+        });
+
+        user = await newUser.save();
+      }
+
+      // Create JWT payload
+      const payload = {
+        sub: user._id.toString(),
+        telegramId: user.telegramId,
+        username: user.username,
+        role: user.role,
+      };
+
+      // Generate JWT token
+      const access_token = this.jwtService.sign(payload);
+
+      return {
+        access_token,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Error during pure Telegram authentication',
           error: 'Internal Server Error',
         },
         HttpStatus.INTERNAL_SERVER_ERROR,

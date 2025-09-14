@@ -17,7 +17,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
-    @Body() loginDto: LoginDto,
+    @Body() loginDto: LoginDto | undefined,
     @Request() req: ExpressRequest,
   ): Promise<LoginResponse | any> {
     const telegramInitData = req.headers['x-telegram-init-data'] as string;

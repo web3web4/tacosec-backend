@@ -124,6 +124,17 @@ describe('UsersService', () => {
           provide: TelegramService,
           useValue: telegramServiceMock,
         },
+        {
+          provide: PublicAddressesService,
+          useValue: {
+            getLatestAddressByTelegramId: jest.fn().mockResolvedValue({
+              success: true,
+              data: {
+                publicKey: 'mock-public-address',
+              },
+            }),
+          },
+        },
       ],
     }).compile();
 

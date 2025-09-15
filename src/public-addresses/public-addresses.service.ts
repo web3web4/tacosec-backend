@@ -498,4 +498,77 @@ export class PublicAddressesService {
       );
     }
   }
+
+  async getLatestAddressByTelegramId(
+    telegramId: string,
+  ): Promise<ApiResponse<PublicAddressResponse>> {
+    try {
+      // Find the user by telegramId first
+      const user = await this.usersService.findByTelegramId(telegramId);
+      if (!user) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'User not found',
+            error: 'Not Found',
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Get the latest address by sorting by createdAt in descending order
+      const latestAddress = await this.publicAddressModel
+        .findOne({ userId: (user as UserDocument)._id })
+        .sort({ createdAt: -1 })
+        .exec();
+
+      if (!latestAddress) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'No addresses found for this user',
+            error: 'Not Found',
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const addressObj = latestAddress.toObject() as any;
+
+      // Decrypt the secret if it exists
+      const secret = addressObj.encryptedSecret
+        ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
+        : undefined;
+
+      // Return the latest address
+      const responseData = {
+        _id: addressObj._id,
+        publicKey: addressObj.publicKey,
+        secret,
+        userTelegramId: user.telegramId,
+        createdAt: addressObj.createdAt,
+        updatedAt: addressObj.updatedAt,
+      };
+
+      return {
+        success: true,
+        data: responseData,
+      };
+    } catch (error) {
+      // If it's already an HttpException, just pass it through
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // Generic error handler
+      throw new HttpException(
+        {
+          success: false,
+          message: error.message || 'Failed to retrieve latest address',
+          error: 'Bad Request',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 }

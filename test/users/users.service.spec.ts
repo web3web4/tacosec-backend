@@ -16,6 +16,7 @@ import { HttpService } from '@nestjs/axios';
 import { of } from 'rxjs';
 import { AxiosResponse } from 'axios';
 import { TelegramService } from '../../src/telegram/telegram.service';
+import { PublicAddressesService } from '../../src/public-addresses/public-addresses.service';
 
 describe('UsersService', () => {
   let service: UsersService;

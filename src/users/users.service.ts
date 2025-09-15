@@ -18,6 +18,7 @@ import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
 import { TelegramService } from '../telegram/telegram.service';
 import { SearchType } from './dto/search-users.dto';
+import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 
 @Injectable()
 export class UsersService {
@@ -27,6 +28,7 @@ export class UsersService {
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
     private readonly httpService: HttpService,
     private readonly telegramService: TelegramService,
+    private readonly publicAddressesService: PublicAddressesService,
   ) {}
 
   async createAndUpdateUser(telegramInitDto: TelegramInitDto): Promise<User> {
@@ -436,6 +438,7 @@ As a result:
       firstName?: string;
       lastName?: string;
       isPreviouslyShared?: boolean;
+      latestPublicAddress?: string;
     }[];
     total: number;
   }> {
@@ -495,19 +498,37 @@ As a result:
     // Execute search without pagination first to sort properly
     const allUsers = await this.userModel
       .find(searchFilter)
-      .select('username firstName lastName -_id')
+      .select('username firstName lastName telegramId -_id')
       .exec();
 
     // Separate users into previously shared and new contacts
     const previouslySharedUsers: any[] = [];
     const newUsers: any[] = [];
 
-    allUsers.forEach((user) => {
+    // Process each user and get their latest public address
+    for (const user of allUsers) {
+      let latestPublicAddress: string | undefined;
+
+      try {
+        // Get the latest public address for this user
+        const addressResponse =
+          await this.publicAddressesService.getLatestAddressByTelegramId(
+            user.telegramId,
+          );
+        if (addressResponse.success && addressResponse.data) {
+          latestPublicAddress = addressResponse.data.publicKey;
+        }
+      } catch (error) {
+        // If no address found or error, latestPublicAddress remains undefined
+        latestPublicAddress = undefined;
+      }
+
       const userObj = {
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
         isPreviouslyShared: sharedUsernames.has(user.username.toLowerCase()),
+        latestPublicAddress,
       };
 
       if (sharedUsernames.has(user.username.toLowerCase())) {
@@ -515,7 +536,7 @@ As a result:
       } else {
         newUsers.push(userObj);
       }
-    });
+    }
 
     // Sort each group alphabetically
     previouslySharedUsers.sort((a, b) => a.username.localeCompare(b.username));

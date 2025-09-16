@@ -14,7 +14,6 @@ import { ConfigModule } from '@nestjs/config';
 import { TelegramModule } from '../telegram/telegram.module';
 import { ReportsModule } from '../reports/reports.module';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
-import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 
 @Module({
   imports: [
@@ -36,7 +35,6 @@ import { PublicAddressesService } from '../public-addresses/public-addresses.ser
     TelegramDtoAuthGuard,
     RolesGuard,
     TelegramValidatorService,
-    PublicAddressesService,
   ],
   exports: [UsersService, RolesGuard],
 })

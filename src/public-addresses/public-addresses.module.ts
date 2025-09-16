@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SharedJwtModule } from '../shared/jwt.module';
 import {
@@ -20,7 +20,7 @@ import { CryptoModule } from '../utils/crypto.module';
       { name: User.name, schema: UserSchema },
     ]),
     SharedJwtModule,
-    UsersModule,
+    forwardRef(() => UsersModule),
     TelegramModule,
     CryptoModule,
   ],

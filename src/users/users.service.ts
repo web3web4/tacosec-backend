@@ -3,6 +3,8 @@ import {
   HttpException,
   HttpStatus,
   InternalServerErrorException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -28,6 +30,7 @@ export class UsersService {
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
     private readonly httpService: HttpService,
     private readonly telegramService: TelegramService,
+    @Inject(forwardRef(() => PublicAddressesService))
     private readonly publicAddressesService: PublicAddressesService,
   ) {}
 

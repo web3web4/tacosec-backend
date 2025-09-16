@@ -1,4 +1,10 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  HttpException,
+  HttpStatus,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -40,6 +46,7 @@ export class PublicAddressesService {
   constructor(
     @InjectModel(PublicAddress.name)
     private publicAddressModel: Model<PublicAddressDocument>,
+    @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     private readonly cryptoUtil: CryptoUtil,
   ) {}

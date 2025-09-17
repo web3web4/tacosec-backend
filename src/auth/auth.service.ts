@@ -454,15 +454,46 @@ export class AuthService {
       .exec();
 
     if (existingTelegramUser) {
-      throw new HttpException(
-        {
-          success: false,
-          message:
-            'User already exists. Linking is only possible with new users',
-          error: 'Conflict',
-        },
-        HttpStatus.CONFLICT,
-      );
+      // User exists, update their data
+      existingTelegramUser.firstName =
+        telegramData.firstName || existingTelegramUser.firstName;
+      existingTelegramUser.lastName =
+        telegramData.lastName || existingTelegramUser.lastName;
+      existingTelegramUser.username =
+        telegramData.username || existingTelegramUser.username;
+      existingTelegramUser.authDate = new Date(telegramData.authDate * 1000);
+      existingTelegramUser.hash = telegramData.hash;
+
+      const savedUser = await existingTelegramUser.save();
+
+      // Check if public address already exists for this user
+      const existingAddress = await this.publicAddressModel
+        .findOne({ publicKey: publicAddress })
+        .exec();
+
+      if (!existingAddress) {
+        // Create a new public address record
+        const newAddressRecord = new this.publicAddressModel({
+          publicKey: publicAddress,
+          userId: savedUser._id,
+        });
+        await newAddressRecord.save();
+      }
+
+      // Create JWT payload
+      const payload = {
+        sub: savedUser._id.toString(),
+        telegramId: savedUser.telegramId,
+        username: savedUser.username,
+        role: savedUser.role,
+      };
+
+      // Generate JWT token
+      const access_token = this.jwtService.sign(payload);
+
+      return {
+        access_token,
+      };
     }
 
     // Create new user with Telegram data
@@ -494,11 +525,19 @@ export class AuthService {
       savedUser._id.toString(),
     );
 
-    // Return user data (similar to signup)
-    const userObject = savedUser.toObject();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _id: _, ...userWithoutId } = userObject;
+    // Create JWT payload
+    const payload = {
+      sub: savedUser._id.toString(),
+      telegramId: savedUser.telegramId,
+      username: savedUser.username,
+      role: savedUser.role,
+    };
 
-    return userWithoutId;
+    // Generate JWT token
+    const access_token = this.jwtService.sign(payload);
+
+    return {
+      access_token,
+    };
   }
 }

@@ -505,18 +505,21 @@ export class AuthService {
 
       const savedUser = await existingTelegramUser.save();
 
-      // Check if public address already exists for this user
-      const existingAddress = await this.publicAddressModel
-        .findOne({ publicKey: publicAddress })
-        .exec();
+      // Only create public address record if publicAddress is provided and valid
+      if (publicAddress && publicAddress.trim() !== '') {
+        // Check if public address already exists for this user
+        const existingAddress = await this.publicAddressModel
+          .findOne({ publicKey: publicAddress })
+          .exec();
 
-      if (!existingAddress) {
-        // Create a new public address record
-        const newAddressRecord = new this.publicAddressModel({
-          publicKey: publicAddress,
-          userId: savedUser._id,
-        });
-        await newAddressRecord.save();
+        if (!existingAddress) {
+          // Create a new public address record
+          const newAddressRecord = new this.publicAddressModel({
+            publicKey: publicAddress,
+            userId: savedUser._id,
+          });
+          await newAddressRecord.save();
+        }
       }
 
       // Create JWT payload
@@ -549,20 +552,23 @@ export class AuthService {
 
     const savedUser = await newUser.save();
 
-    // Create a new public address record for the new user
-    const newAddressRecord = new this.publicAddressModel({
-      publicKey: publicAddress,
-      userId: savedUser._id,
-    });
+    // Only create public address record if publicAddress is provided and valid
+    if (publicAddress && publicAddress.trim() !== '') {
+      // Create a new public address record for the new user
+      const newAddressRecord = new this.publicAddressModel({
+        publicKey: publicAddress,
+        userId: savedUser._id,
+      });
 
-    await newAddressRecord.save();
+      await newAddressRecord.save();
 
-    // Update shared secrets that contain this public address
-    await this.updateSharedSecretsForNewUser(
-      publicAddress,
-      savedUser.username,
-      savedUser._id.toString(),
-    );
+      // Update shared secrets that contain this public address
+      await this.updateSharedSecretsForNewUser(
+        publicAddress,
+        savedUser.username,
+        savedUser._id.toString(),
+      );
+    }
 
     // Create JWT payload
     const payload = {

@@ -15,6 +15,7 @@ import { PasswordService } from '../passwords/password.service';
 import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
 import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
+import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { Roles, Role } from '../decorators/roles.decorator';
 import {
@@ -131,27 +132,39 @@ export class UsersController {
   }
 
   /**
-   * Search users by username with configurable search type
+   * Search users by username with autocomplete functionality
    * Prioritizes previously shared contacts in results
    * Supports both 'starts_with' and 'contains' search modes
    * GET /users/search/autocomplete?query=john&searchType=starts_with&limit=10&skip=0
    * GET /users/search/autocomplete?query=john&searchType=contains&limit=10&skip=0
    * Returns users with isPreviouslyShared flag indicating if they were shared with before
+   *
+   * Authentication: Supports both JWT token (Bearer) and Telegram init data (x-telegram-init-data header)
+   * Priority: JWT token > Telegram init data
    */
   @Get('search/autocomplete')
-  @TelegramDtoAuth()
+  @FlexibleAuth()
   async searchUsersAutocomplete(
     @Query() searchDto: SearchUsersDto,
     @Request() req: Request,
   ) {
-    // Extract telegram ID from auth data
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
+    let telegramId: string;
+
+    // Check authentication method and extract telegram ID accordingly
+    if ((req as any).authMethod === 'jwt') {
+      // JWT authentication - get telegramId from user data
+      telegramId = (req as any).user.telegramId;
+    } else {
+      // Telegram authentication - extract from telegram data
+      const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+        req.headers['x-telegram-init-data'],
+      );
+      telegramId = teleDtoData.telegramId;
+    }
 
     return this.usersService.searchUsersByUsername(
       searchDto.query || '',
-      teleDtoData.telegramId,
+      telegramId,
       searchDto.searchType,
       searchDto.limit,
       searchDto.skip,

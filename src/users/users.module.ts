@@ -6,6 +6,7 @@ import { UsersController } from './users.controller';
 import { User, UserSchema } from './schemas/user.schema';
 import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
+import { FlexibleAuthGuard } from '../guards/flexible-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { HttpModule } from '@nestjs/axios';
 import { PasswordModule } from '../passwords/password.module';
@@ -33,6 +34,7 @@ import { PublicAddressesModule } from '../public-addresses/public-addresses.modu
   providers: [
     UsersService,
     TelegramDtoAuthGuard,
+    FlexibleAuthGuard,
     RolesGuard,
     TelegramValidatorService,
   ],

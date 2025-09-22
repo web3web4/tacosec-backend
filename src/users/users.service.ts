@@ -452,6 +452,14 @@ As a result:
     }[];
     total: number;
   }> {
+    console.log('searchUsersByUsername called with:', {
+      searchQuery,
+      currentUserTelegramId,
+      searchType,
+      limit,
+      skip,
+    });
+
     // Get current user to exclude from results
     const currentUser = await this.userModel
       .findOne({ telegramId: currentUserTelegramId })
@@ -467,7 +475,7 @@ As a result:
 
     if (isPublicAddressQuery) {
       // Handle public address search
-      return this.searchByPublicAddress(searchQuery, currentUser);
+      return this.searchByPublicAddress(searchQuery, currentUser, true);
     } else {
       // Handle username search (existing logic)
       return this.searchByUsername(
@@ -481,14 +489,13 @@ As a result:
   }
 
   /**
-   * Search for user by public address
-   * @param publicAddress - The public address to search for
-   * @param currentUser - The current user making the search
-   * @returns User information if found, empty array if not found
+   * Search for users by public address
+   * Finds the user associated with the given public address
    */
   private async searchByPublicAddress(
     publicAddress: string,
     currentUser: any,
+    allowCurrentUser: boolean = false,
   ): Promise<{
     data: {
       username: string;
@@ -516,10 +523,11 @@ As a result:
 
       const user = publicAddressRecord.userId as any;
 
-      // Check if user is active and not the current user
+      // Check if user is active and optionally exclude current user
       if (
         !user.isActive ||
-        user._id.toString() === currentUser._id.toString()
+        (!allowCurrentUser &&
+          user._id.toString() === currentUser._id.toString())
       ) {
         return {
           data: [],
@@ -571,6 +579,7 @@ As a result:
         total: 1,
       };
     } catch (error) {
+      console.error('Error in searchByPublicAddress:', error);
       // If any error occurs, return empty result
       return {
         data: [],

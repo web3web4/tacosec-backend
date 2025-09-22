@@ -14,8 +14,8 @@ export class AddressDetectorUtil {
 
     const trimmedQuery = query.trim();
 
-    // Empty or very short strings are likely usernames
-    if (trimmedQuery.length < 10) {
+    // Check if query is too short to be a valid public address
+    if (trimmedQuery.length < 26) {
       return false;
     }
 

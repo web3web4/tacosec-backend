@@ -21,6 +21,11 @@ import { lastValueFrom } from 'rxjs';
 import { TelegramService } from '../telegram/telegram.service';
 import { SearchType } from './dto/search-users.dto';
 import { PublicAddressesService } from '../public-addresses/public-addresses.service';
+import { AddressDetectorUtil } from '../utils/address-detector.util';
+import {
+  PublicAddress,
+  PublicAddressDocument,
+} from '../public-addresses/schemas/public-address.schema';
 
 @Injectable()
 export class UsersService {
@@ -28,6 +33,8 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private passwordService: PasswordService,
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
+    @InjectModel(PublicAddress.name)
+    private publicAddressModel: Model<PublicAddressDocument>,
     private readonly httpService: HttpService,
     private readonly telegramService: TelegramService,
     @Inject(forwardRef(() => PublicAddressesService))
@@ -421,12 +428,12 @@ As a result:
   }
 
   /**
-   * Search users by username using full-text search for autocomplete
-   * Prioritizes previously shared contacts
-   * @param searchQuery The search query string
-   * @param currentUserTelegramId The telegram ID of the current user to exclude from results
-   * @param limit Maximum number of results to return
-   * @param skip Number of results to skip
+   * Search users by username or public address with pagination and prioritization
+   * @param searchQuery - The search query (username or public address)
+   * @param currentUserTelegramId - Telegram ID of the current user
+   * @param searchType - Type of search (starts_with or contains)
+   * @param limit - Maximum number of results to return
+   * @param skip - Number of results to skip for pagination
    * @returns Array of users matching the search query with previously shared contacts prioritized
    */
   async searchUsersByUsername(
@@ -454,6 +461,149 @@ As a result:
       throw new HttpException('Current user not found', HttpStatus.NOT_FOUND);
     }
 
+    // Check if the search query is a public address or username
+    const isPublicAddressQuery =
+      AddressDetectorUtil.isPublicAddress(searchQuery);
+
+    if (isPublicAddressQuery) {
+      // Handle public address search
+      return this.searchByPublicAddress(searchQuery, currentUser);
+    } else {
+      // Handle username search (existing logic)
+      return this.searchByUsername(
+        searchQuery,
+        currentUser,
+        searchType,
+        limit,
+        skip,
+      );
+    }
+  }
+
+  /**
+   * Search for user by public address
+   * @param publicAddress - The public address to search for
+   * @param currentUser - The current user making the search
+   * @returns User information if found, empty array if not found
+   */
+  private async searchByPublicAddress(
+    publicAddress: string,
+    currentUser: any,
+  ): Promise<{
+    data: {
+      username: string;
+      firstName?: string;
+      lastName?: string;
+      isPreviouslyShared?: boolean;
+      latestPublicAddress?: string;
+    }[];
+    total: number;
+  }> {
+    try {
+      // Find the public address record
+      const publicAddressRecord = await this.publicAddressModel
+        .findOne({ publicKey: publicAddress })
+        .populate('userId')
+        .exec();
+
+      // If no public address found, return empty result
+      if (!publicAddressRecord || !publicAddressRecord.userId) {
+        return {
+          data: [],
+          total: 0,
+        };
+      }
+
+      const user = publicAddressRecord.userId as any;
+
+      // Check if user is active and not the current user
+      if (
+        !user.isActive ||
+        user._id.toString() === currentUser._id.toString()
+      ) {
+        return {
+          data: [],
+          total: 0,
+        };
+      }
+
+      // Check if user has telegram account linked
+      let displayUsername = user.username;
+      if (!user.telegramId) {
+        displayUsername = 'User has no Telegram account currently';
+      }
+
+      // Check if this user was previously shared with
+      const sharedPasswords = await this.passwordModel
+        .find({
+          userId: currentUser._id,
+          isActive: true,
+          'sharedWith.0': { $exists: true },
+        })
+        .select('sharedWith')
+        .exec();
+
+      let isPreviouslyShared = false;
+      sharedPasswords.forEach((password) => {
+        password.sharedWith?.forEach((shared) => {
+          if (
+            shared.username &&
+            shared.username.toLowerCase() === user.username?.toLowerCase()
+          ) {
+            isPreviouslyShared = true;
+          }
+          if (shared.publicAddress === publicAddress) {
+            isPreviouslyShared = true;
+          }
+        });
+      });
+
+      const result = {
+        username: displayUsername,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        isPreviouslyShared,
+        latestPublicAddress: publicAddress,
+      };
+
+      return {
+        data: [result],
+        total: 1,
+      };
+    } catch (error) {
+      // If any error occurs, return empty result
+      return {
+        data: [],
+        total: 0,
+      };
+    }
+  }
+
+  /**
+   * Search users by username (existing logic extracted to separate method)
+   * @param searchQuery - The username search query
+   * @param currentUser - The current user making the search
+   * @param searchType - Type of search (starts_with or contains)
+   * @param limit - Maximum number of results to return
+   * @param skip - Number of results to skip for pagination
+   * @returns Array of users matching the username search
+   */
+  private async searchByUsername(
+    searchQuery: string,
+    currentUser: any,
+    searchType: SearchType,
+    limit: number,
+    skip: number,
+  ): Promise<{
+    data: {
+      username: string;
+      firstName?: string;
+      lastName?: string;
+      isPreviouslyShared?: boolean;
+      latestPublicAddress?: string;
+    }[];
+    total: number;
+  }> {
     // Get previously shared usernames from passwords
     const sharedPasswords = await this.passwordModel
       .find({

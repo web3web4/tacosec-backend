@@ -5,6 +5,10 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { User, UserSchema } from './schemas/user.schema';
 import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
+import {
+  PublicAddress,
+  PublicAddressSchema,
+} from '../public-addresses/schemas/public-address.schema';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { FlexibleAuthGuard } from '../guards/flexible-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
@@ -21,6 +25,7 @@ import { PublicAddressesModule } from '../public-addresses/public-addresses.modu
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Password.name, schema: PasswordSchema },
+      { name: PublicAddress.name, schema: PublicAddressSchema },
     ]),
     SharedJwtModule,
     ConfigModule,

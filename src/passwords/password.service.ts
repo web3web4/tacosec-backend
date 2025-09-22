@@ -1099,6 +1099,7 @@ export class PasswordService {
             let finalUsername = shared.username;
             let finalUserId = shared.userId;
             let finalPublicAddress = shared.publicAddress;
+            let shouldSendTelegramNotification = false;
 
             // Case 1: Both userId and username provided - use userId and ignore username
             if (shared.userId && shared.username) {
@@ -1111,6 +1112,10 @@ export class PasswordService {
               if (sharedUser) {
                 finalUsername = sharedUser.username;
                 finalUserId = shared.userId;
+                // Check if user has telegramId for notification
+                if (sharedUser.telegramId) {
+                  shouldSendTelegramNotification = true;
+                }
               }
             }
             // Case 2: Only userId provided - find username
@@ -1124,9 +1129,13 @@ export class PasswordService {
               if (sharedUser) {
                 finalUsername = sharedUser.username;
                 finalUserId = shared.userId;
+                // Check if user has telegramId for notification
+                if (sharedUser.telegramId) {
+                  shouldSendTelegramNotification = true;
+                }
               }
             }
-            // Case 3: Only username provided - find userId
+            // Case 3: Only username provided - find userId and check if it's a registered user
             else if (shared.username && !shared.userId) {
               sharedUser = await this.userModel
                 .findOne({
@@ -1137,6 +1146,16 @@ export class PasswordService {
               if (sharedUser) {
                 finalUsername = sharedUser.username;
                 finalUserId = sharedUser._id ? String(sharedUser._id) : '';
+                // Check if user has telegramId for notification
+                if (sharedUser.telegramId) {
+                  shouldSendTelegramNotification = true;
+                }
+              } else {
+                // Username not found in registered users, treat as Telegram username
+                // Keep the username for Telegram notification but no userId
+                finalUsername = shared.username;
+                finalUserId = undefined;
+                shouldSendTelegramNotification = true;
               }
             }
             // Case 4: Only publicAddress provided - find user by public address
@@ -1160,12 +1179,15 @@ export class PasswordService {
                   finalUsername = user.username;
                   finalUserId = user._id ? String(user._id) : '';
                   finalPublicAddress = shared.publicAddress;
+                  // Check if user has telegramId for notification
+                  if (user.telegramId) {
+                    shouldSendTelegramNotification = true;
+                  }
                 }
               } else {
-                // If no user found for this public address, keep only the public address
-                finalPublicAddress = shared.publicAddress;
-                finalUsername = undefined;
-                finalUserId = undefined;
+                // If no user found for this public address, ignore the sharing
+                // Return null to filter out this entry
+                return null;
               }
             }
 
@@ -1174,8 +1196,14 @@ export class PasswordService {
               username: finalUsername,
               userId: finalUserId,
               publicAddress: finalPublicAddress,
+              shouldSendTelegramNotification,
             };
           }),
+        );
+
+        // Filter out null entries (ignored public addresses)
+        processedSharedWith = processedSharedWith.filter(
+          (item) => item !== null,
         );
       }
 

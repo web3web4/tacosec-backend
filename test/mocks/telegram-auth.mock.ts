@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TelegramDtoAuthGuard } from '../../src/telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../../src/guards/telegram-dto-auth.guard';
 import { TelegramValidatorService } from '../../src/telegram/telegram-validator.service';
 import { TelegramInitDto } from '../../src/telegram/dto/telegram-init.dto';
 

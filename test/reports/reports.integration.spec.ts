@@ -6,7 +6,7 @@ import { TelegramValidatorService } from '../../src/telegram/telegram-validator.
 import { getModelToken } from '@nestjs/mongoose';
 import { User } from '../../src/users/schemas/user.schema';
 import { Report } from '../../src/reports/schemas/report.schema';
-import { TelegramDtoAuthGuard } from '../../src/telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../../src/guards/telegram-dto-auth.guard';
 import { TelegramService } from '../../src/telegram/telegram.service';
 import {
   ReportUserDto,

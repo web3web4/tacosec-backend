@@ -421,7 +421,7 @@ describe('PasswordService', () => {
       } as any);
 
       const result = await service.findPasswordsSharedWithMeWithPagination(
-        'testuser',
+        { user: { id: 'testuser', username: 'testuser' } } as any,
         page,
         limit,
       );
@@ -480,7 +480,7 @@ describe('PasswordService', () => {
         .mockResolvedValue(mockSharedPasswords as SharedWithMeResponse);
 
       const result = await service.findPasswordsSharedWithMeWithPagination(
-        'testuser',
+        { user: { id: 'testuser', username: 'testuser' } } as any,
         undefined,
         undefined,
       );
@@ -504,7 +504,11 @@ describe('PasswordService', () => {
         );
 
       await expect(
-        service.findPasswordsSharedWithMeWithPagination('', 1, 10),
+        service.findPasswordsSharedWithMeWithPagination(
+          { user: { id: '', username: '' } } as any,
+          1,
+          10,
+        ),
       ).rejects.toThrow(
         new HttpException('Username is required', HttpStatus.BAD_REQUEST),
       );

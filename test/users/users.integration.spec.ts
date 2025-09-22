@@ -8,7 +8,7 @@ import { UsersService } from '../../src/users/users.service';
 import { TelegramValidatorService } from '../../src/telegram/telegram-validator.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { User } from '../../src/users/schemas/user.schema';
-import { TelegramDtoAuthGuard } from '../../src/telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../../src/guards/telegram-dto-auth.guard';
 import { TelegramService } from '../../src/telegram/telegram.service';
 import { TelegramClientService } from '../../src/telegram-client/telegram-client.service';
 // import { Types } from 'mongoose';

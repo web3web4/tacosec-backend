@@ -295,10 +295,11 @@ export class PasswordService {
     userId?: string,
     currentUserTelegramId?: string,
     currentUserPrivacyMode?: boolean,
+    publicAddress?: string,
   ): Promise<SharedWithMeResponse> {
     try {
-      if (!username && !userId) {
-        throw new Error('Username or userId is required');
+      if (!username && !userId && !publicAddress) {
+        throw new Error('Username, userId, or publicAddress is required');
       }
 
       // Try to find userId from username if not provided
@@ -320,6 +321,7 @@ export class PasswordService {
         finalUserId,
         currentUserTelegramId,
         currentUserPrivacyMode,
+        publicAddress,
       );
       return sharedWithMe;
     } catch (error) {
@@ -333,17 +335,19 @@ export class PasswordService {
     userId?: string,
     currentUserTelegramId?: string,
     currentUserPrivacyMode?: boolean,
+    publicAddress?: string,
   ): Promise<SharedWithMeResponse> {
     try {
-      if (!username && !userId) {
-        throw new Error('Username or userId is required');
+      if (!username && !userId && !publicAddress) {
+        throw new Error('Username, userId, or publicAddress is required');
       }
 
-      let sharedPasswords: any[] = [];
+      let allSharedPasswords: any[] = [];
+      const passwordIds = new Set<string>(); // To track unique password IDs for deduplication
 
-      // First, try searching by userId if available
+      // Search by userId if available
       if (userId) {
-        sharedPasswords = await this.passwordModel
+        const userIdResults = await this.passwordModel
           .find({
             'sharedWith.userId': userId,
             isActive: true,
@@ -358,11 +362,20 @@ export class PasswordService {
           .sort({ createdAt: -1 })
           .lean()
           .exec();
+
+        // Add unique results to the collection
+        userIdResults.forEach((password) => {
+          const passwordId = password._id.toString();
+          if (!passwordIds.has(passwordId)) {
+            passwordIds.add(passwordId);
+            allSharedPasswords.push(password);
+          }
+        });
       }
 
-      // If no results found with userId and username exists, try searching by username
-      if (sharedPasswords.length === 0 && username) {
-        sharedPasswords = await this.passwordModel
+      // Search by username if available
+      if (username) {
+        const usernameResults = await this.passwordModel
           .find({
             'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') }, //case insensitive
             isActive: true,
@@ -377,7 +390,51 @@ export class PasswordService {
           .sort({ createdAt: -1 })
           .lean()
           .exec();
+
+        // Add unique results to the collection
+        usernameResults.forEach((password) => {
+          const passwordId = password._id.toString();
+          if (!passwordIds.has(passwordId)) {
+            passwordIds.add(passwordId);
+            allSharedPasswords.push(password);
+          }
+        });
       }
+
+      // Search by publicAddress if available
+      if (publicAddress) {
+        const publicAddressResults = await this.passwordModel
+          .find({
+            'sharedWith.publicAddress': publicAddress,
+            isActive: true,
+            $or: [
+              { parent_secret_id: { $exists: false } },
+              { parent_secret_id: null },
+            ],
+          })
+          .select(
+            ' _id key value description initData.username sharedWith createdAt updatedAt userId secretViews ',
+          )
+          .sort({ createdAt: -1 })
+          .lean()
+          .exec();
+
+        // Add unique results to the collection
+        publicAddressResults.forEach((password) => {
+          const passwordId = password._id.toString();
+          if (!passwordIds.has(passwordId)) {
+            passwordIds.add(passwordId);
+            allSharedPasswords.push(password);
+          }
+        });
+      }
+
+      // Sort the combined results by creation date (newest first)
+      const sharedPasswords = allSharedPasswords.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+
       if (!sharedPasswords?.length) {
         return { sharedWithMe: [], userCount: 0 };
       }
@@ -2491,20 +2548,28 @@ You can view the reply in your shared secrets list 📋.`;
   ): Promise<SharedWithMeResponse | PaginatedResponse<any>> {
     console.log('Service: findPasswordsSharedWithMeWithPagination called');
     try {
-      // Extract userId, username and telegramId from request
+      // Extract userId, username, telegramId and publicAddress from request
       let userId: string | undefined;
       let username: string | undefined;
       let currentUserTelegramId: string | undefined;
       let currentUserPrivacyMode = false;
+      let publicAddress: string | undefined;
 
       if (req?.user && req.user.id) {
         userId = req.user.id;
         username = req.user.username;
-        // Get telegramId and privacyMode from user data
+        // Get telegramId, privacyMode and publicAddress from user data
         const user = await this.userModel.findById(userId).exec();
         if (user) {
           currentUserTelegramId = user.telegramId;
           currentUserPrivacyMode = user.privacyMode || false;
+          // Get user's public address if available
+          const userPublicAddress = await this.publicAddressModel
+            .findOne({ userId: user._id })
+            .exec();
+          if (userPublicAddress) {
+            publicAddress = userPublicAddress.publicKey;
+          }
         }
       } else if (req?.headers?.['x-telegram-init-data']) {
         const headerInitData = req.headers['x-telegram-init-data'] as string;
@@ -2512,7 +2577,7 @@ You can view the reply in your shared secrets list 📋.`;
           this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
         username = parsedData.username;
         currentUserTelegramId = parsedData.telegramId;
-        // Try to find userId from username and get privacyMode
+        // Try to find userId from username and get privacyMode and publicAddress
         if (username) {
           const user = await this.userModel
             .findOne({
@@ -2523,6 +2588,13 @@ You can view the reply in your shared secrets list 📋.`;
           if (user) {
             userId = user._id ? String(user._id) : '';
             currentUserPrivacyMode = user.privacyMode || false;
+            // Get user's public address if available
+            const userPublicAddress = await this.publicAddressModel
+              .findOne({ userId: user._id })
+              .exec();
+            if (userPublicAddress) {
+              publicAddress = userPublicAddress.publicKey;
+            }
           }
         }
       } else {
@@ -2541,26 +2613,26 @@ You can view the reply in your shared secrets list 📋.`;
         page <= 0 ||
         limit <= 0
       ) {
-        if (!username && !userId) {
-          throw new Error('Username or userId is required');
+        if (!username && !userId && !publicAddress) {
+          throw new Error('Username, userId, or publicAddress is required');
         }
         return this.findPasswordsSharedWithMe(
           username,
           userId,
           currentUserTelegramId,
           currentUserPrivacyMode,
+          publicAddress,
         );
       }
 
       // Calculate pagination
       const skip = (page - 1) * limit;
-      let baseQuery: any;
-      let totalCount = 0;
-      let sharedPasswords: any[] = [];
+      let allSharedPasswords: any[] = [];
+      const passwordIds = new Set<string>(); // To track unique password IDs for deduplication
 
-      // First, try searching by userId if available
+      // Search by userId if available
       if (userId) {
-        baseQuery = {
+        const baseQuery = {
           'sharedWith.userId': userId,
           isActive: true,
           $or: [
@@ -2569,30 +2641,34 @@ You can view the reply in your shared secrets list 📋.`;
           ],
         };
 
-        totalCount = await this.passwordModel.countDocuments(baseQuery).exec();
+        const userIdResults = await this.passwordModel
+          .find(baseQuery)
+          .select(
+            ' _id key value description initData.username sharedWith updatedAt userId ',
+          )
+          .sort({ createdAt: -1 })
+          .lean()
+          .exec();
 
-        if (totalCount > 0) {
-          sharedPasswords = await this.passwordModel
-            .find(baseQuery)
-            .select(
-              ' _id key value description initData.username sharedWith updatedAt userId ',
-            )
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean()
-            .exec();
-          console.log(
-            'Database query result (userId):',
-            sharedPasswords.length,
-            'passwords found',
-          );
-        }
+        // Add unique results to the collection
+        userIdResults.forEach((password) => {
+          const passwordId = password._id.toString();
+          if (!passwordIds.has(passwordId)) {
+            passwordIds.add(passwordId);
+            allSharedPasswords.push(password);
+          }
+        });
+
+        console.log(
+          'Database query result (userId):',
+          userIdResults.length,
+          'passwords found',
+        );
       }
 
-      // If no results found with userId and username exists, try searching by username
-      if (totalCount === 0 && username) {
-        baseQuery = {
+      // Search by username if available
+      if (username) {
+        const baseQuery = {
           'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') },
           isActive: true,
           $or: [
@@ -2601,29 +2677,79 @@ You can view the reply in your shared secrets list 📋.`;
           ],
         };
 
-        totalCount = await this.passwordModel.countDocuments(baseQuery).exec();
+        const usernameResults = await this.passwordModel
+          .find(baseQuery)
+          .select(
+            ' _id key value description initData.username sharedWith updatedAt userId ',
+          )
+          .sort({ createdAt: -1 })
+          .lean()
+          .exec();
 
-        if (totalCount > 0) {
-          sharedPasswords = await this.passwordModel
-            .find(baseQuery)
-            .select(
-              ' _id key value description initData.username sharedWith updatedAt userId ',
-            )
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean()
-            .exec();
-          console.log(
-            'Database query result (username):',
-            sharedPasswords.length,
-            'passwords found',
-          );
-        }
+        // Add unique results to the collection
+        usernameResults.forEach((password) => {
+          const passwordId = password._id.toString();
+          if (!passwordIds.has(passwordId)) {
+            passwordIds.add(passwordId);
+            allSharedPasswords.push(password);
+          }
+        });
+
+        console.log(
+          'Database query result (username):',
+          usernameResults.length,
+          'passwords found',
+        );
       }
 
-      // If no username available and no results, stop search and return empty result
-      if (totalCount === 0 && !username) {
+      // Search by publicAddress if available
+      if (publicAddress) {
+        const baseQuery = {
+          'sharedWith.publicAddress': publicAddress,
+          isActive: true,
+          $or: [
+            { parent_secret_id: { $exists: false } },
+            { parent_secret_id: null },
+          ],
+        };
+
+        const publicAddressResults = await this.passwordModel
+          .find(baseQuery)
+          .select(
+            ' _id key value description initData.username sharedWith updatedAt userId ',
+          )
+          .sort({ createdAt: -1 })
+          .lean()
+          .exec();
+
+        // Add unique results to the collection
+        publicAddressResults.forEach((password) => {
+          const passwordId = password._id.toString();
+          if (!passwordIds.has(passwordId)) {
+            passwordIds.add(passwordId);
+            allSharedPasswords.push(password);
+          }
+        });
+
+        console.log(
+          'Database query result (publicAddress):',
+          publicAddressResults.length,
+          'passwords found',
+        );
+      }
+
+      // Sort the combined results by creation date (newest first)
+      allSharedPasswords.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+
+      // Apply pagination to the combined results
+      const totalCount = allSharedPasswords.length;
+      const sharedPasswords = allSharedPasswords.slice(skip, skip + limit);
+
+      // If no results found and no search criteria available, return empty result
+      if (totalCount === 0 && !username && !publicAddress) {
         return {
           data: [],
           pagination: {

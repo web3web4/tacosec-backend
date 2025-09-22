@@ -706,7 +706,9 @@ export class PasswordService {
       processedUpdate.sharedWith = await Promise.all(
         update.sharedWith.map(async (shared) => {
           let sharedUser;
-          let finalUsername = shared.username;
+          let finalUsername = shared.username
+            ? shared.username.toLowerCase()
+            : shared.username;
           let finalUserId = shared.userId;
           let finalPublicAddress = shared.publicAddress;
 
@@ -719,7 +721,7 @@ export class PasswordService {
               })
               .exec();
             if (sharedUser) {
-              finalUsername = sharedUser.username;
+              finalUsername = sharedUser.username.toLowerCase();
               finalUserId = shared.userId;
             }
           }
@@ -732,7 +734,7 @@ export class PasswordService {
               })
               .exec();
             if (sharedUser) {
-              finalUsername = sharedUser.username;
+              finalUsername = sharedUser.username.toLowerCase();
               finalUserId = shared.userId;
             }
           }
@@ -745,7 +747,7 @@ export class PasswordService {
               })
               .exec();
             if (sharedUser) {
-              finalUsername = sharedUser.username;
+              finalUsername = sharedUser.username.toLowerCase();
               finalUserId = sharedUser._id ? String(sharedUser._id) : '';
             }
           }
@@ -763,7 +765,7 @@ export class PasswordService {
               const user = publicAddressRecord.userId as any;
               if (user.isActive) {
                 sharedUser = user;
-                finalUsername = user.username;
+                finalUsername = user.username.toLowerCase();
                 finalUserId = user._id ? String(user._id) : '';
                 finalPublicAddress = shared.publicAddress;
               }
@@ -1096,8 +1098,10 @@ export class PasswordService {
         processedSharedWith = await Promise.all(
           passwordData.sharedWith.map(async (shared) => {
             let sharedUser;
-            let finalUsername = shared.username;
-            let finalUserId = shared.userId;
+            let finalUsername = shared.username
+              ? shared.username.toLowerCase()
+              : shared.username;
+            let UserId = shared.userId;
             let finalPublicAddress = shared.publicAddress;
             let shouldSendTelegramNotification = false;
 
@@ -1110,8 +1114,8 @@ export class PasswordService {
                 })
                 .exec();
               if (sharedUser) {
-                finalUsername = sharedUser.username;
-                finalUserId = shared.userId;
+                finalUsername = sharedUser.username.toLowerCase();
+                UserId = shared.userId;
                 // Check if user has telegramId for notification
                 if (sharedUser.telegramId) {
                   shouldSendTelegramNotification = true;
@@ -1127,8 +1131,8 @@ export class PasswordService {
                 })
                 .exec();
               if (sharedUser) {
-                finalUsername = sharedUser.username;
-                finalUserId = shared.userId;
+                finalUsername = sharedUser.username.toLowerCase();
+                UserId = shared.userId;
                 // Check if user has telegramId for notification
                 if (sharedUser.telegramId) {
                   shouldSendTelegramNotification = true;
@@ -1137,24 +1141,38 @@ export class PasswordService {
             }
             // Case 3: Only username provided - find userId and check if it's a registered user
             else if (shared.username && !shared.userId) {
+              // Search for active user by username (case-insensitive)
               sharedUser = await this.userModel
                 .findOne({
-                  username: shared.username.toLowerCase(),
+                  username: { $regex: new RegExp(`^${shared.username}$`, 'i') },
                   isActive: true,
                 })
                 .exec();
+
               if (sharedUser) {
-                finalUsername = sharedUser.username;
-                finalUserId = sharedUser._id ? String(sharedUser._id) : '';
+                // User found - populate all details
+                finalUsername = sharedUser.username.toLowerCase();
+                UserId = sharedUser._id ? String(sharedUser._id) : '';
+
                 // Check if user has telegramId for notification
                 if (sharedUser.telegramId) {
                   shouldSendTelegramNotification = true;
                 }
+
+                // Find the public address for this user
+                const publicAddressRecord = await this.publicAddressModel
+                  .findOne({
+                    userId: sharedUser._id,
+                  })
+                  .exec();
+
+                if (publicAddressRecord) {
+                  finalPublicAddress = publicAddressRecord.publicKey;
+                }
               } else {
                 // Username not found in registered users, treat as Telegram username
-                // Keep the username for Telegram notification but no userId
-                finalUsername = shared.username;
-                finalUserId = undefined;
+                finalUsername = shared.username.toLowerCase();
+                UserId = undefined;
                 shouldSendTelegramNotification = true;
               }
             }
@@ -1176,25 +1194,28 @@ export class PasswordService {
                 const user = publicAddressRecord.userId as any;
                 if (user.isActive) {
                   sharedUser = user;
-                  finalUsername = user.username;
-                  finalUserId = user._id ? String(user._id) : '';
+                  finalUsername = user.username.toLowerCase();
+                  UserId = user._id ? String(user._id) : '';
                   finalPublicAddress = shared.publicAddress;
+                  // Always add user to sharedWith if found, regardless of Telegram account
                   // Check if user has telegramId for notification
                   if (user.telegramId) {
                     shouldSendTelegramNotification = true;
                   }
                 }
               } else {
-                // If no user found for this public address, ignore the sharing
-                // Return null to filter out this entry
-                return null;
+                // If no user found for this public address, keep only the public address
+                finalPublicAddress = shared.publicAddress;
+                finalUsername = undefined;
+                UserId = undefined;
+                shouldSendTelegramNotification = false;
               }
             }
 
             return {
               ...shared,
               username: finalUsername,
-              userId: finalUserId,
+              userId: UserId,
               publicAddress: finalPublicAddress,
               shouldSendTelegramNotification,
             };

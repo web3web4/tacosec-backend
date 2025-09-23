@@ -414,13 +414,41 @@ As a result:
     }
   }
 
-  async getTelegramProfile(username: string): Promise<string> {
+  async getTelegramProfile(
+    username: string,
+  ): Promise<{
+    existsInPlatform: boolean;
+    publicAddress?: string;
+    profile: string;
+  }> {
     try {
+      // Use case-insensitive search to handle existing data with mixed case
+      const user = await this.userModel.findOne({ 
+        username: { $regex: new RegExp(`^${username}$`, 'i') } 
+      }).exec();
+      
       const profile = await lastValueFrom(
         this.httpService.get(`https://t.me/${username}`),
       );
-      return profile.data;
+
+      if (user) {
+        const publicAddress = await this.publicAddressModel
+          .findOne({ userId: user._id })
+          .exec();
+        
+        return {
+          existsInPlatform: true,
+          publicAddress: publicAddress ? publicAddress.publicKey : undefined,
+          profile: profile.data,
+        };
+      } else {
+        return {
+          existsInPlatform: false,
+          profile: profile.data,
+        };
+      }
     } catch (error) {
+      console.error('getTelegramProfile - Error:', error);
       throw new InternalServerErrorException(
         error.response?.data || error.message,
       );

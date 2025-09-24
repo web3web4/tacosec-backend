@@ -432,13 +432,26 @@ As a result:
       );
 
       if (user) {
-        const publicAddress = await this.publicAddressModel
-          .findOne({ userId: user._id })
-          .exec();
+        let latestPublicAddress: string | undefined;
+        
+        // Get the latest public address if user has telegramId
+        if (user.telegramId) {
+          try {
+            const addressResponse = await this.publicAddressesService.getLatestAddressByTelegramId(
+              user.telegramId,
+            );
+            if (addressResponse.success && addressResponse.data) {
+              latestPublicAddress = addressResponse.data.publicKey;
+            }
+          } catch (error) {
+            // If no address found, latestPublicAddress remains undefined
+            latestPublicAddress = undefined;
+          }
+        }
         
         return {
           existsInPlatform: true,
-          publicAddress: publicAddress ? publicAddress.publicKey : undefined,
+          publicAddress: latestPublicAddress,
           profile: profile.data,
         };
       } else {

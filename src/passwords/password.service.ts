@@ -2161,11 +2161,28 @@ You can view the reply in your shared secrets list 📋.`;
         ownerPrivacyMap.set(ownerId, owner.privacyMode || false);
 
         let latestPublicAddress: string | undefined;
+        
+        // Try to get latest public address by telegramId first
         if (owner.telegramId) {
           try {
             const addressResponse =
               await this.publicAddressesService.getLatestAddressByTelegramId(
                 owner.telegramId,
+              );
+            if (addressResponse.success && addressResponse.data) {
+              latestPublicAddress = addressResponse.data.publicKey;
+            }
+          } catch (error) {
+            // If no address found by telegramId, try by userId
+          }
+        }
+        
+        // If no address found by telegramId or user has no telegramId, try by userId
+        if (!latestPublicAddress) {
+          try {
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByUserId(
+                ownerId,
               );
             if (addressResponse.success && addressResponse.data) {
               latestPublicAddress = addressResponse.data.publicKey;
@@ -3327,11 +3344,28 @@ You can view the reply in your shared secrets list 📋.`;
         ownerPrivacyMap.set(ownerId, owner.privacyMode || false);
 
         let latestPublicAddress: string | undefined;
+        
+        // Try to get latest public address by telegramId first
         if (owner.telegramId) {
           try {
             const addressResponse =
               await this.publicAddressesService.getLatestAddressByTelegramId(
                 owner.telegramId,
+              );
+            if (addressResponse.success && addressResponse.data) {
+              latestPublicAddress = addressResponse.data.publicKey;
+            }
+          } catch (error) {
+            // If no address found by telegramId, try by userId
+          }
+        }
+        
+        // If no address found by telegramId or user has no telegramId, try by userId
+        if (!latestPublicAddress) {
+          try {
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByUserId(
+                ownerId,
               );
             if (addressResponse.success && addressResponse.data) {
               latestPublicAddress = addressResponse.data.publicKey;

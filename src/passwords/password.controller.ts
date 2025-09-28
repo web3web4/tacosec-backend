@@ -128,7 +128,7 @@ export class PasswordController {
   }
 
   @Get('children/:parentId')
-  @TelegramDtoAuth(true)
+  @FlexibleAuth()
   getChildPasswords(
     @Param('parentId') parentId: string,
     @Query('page') page: string = '1',

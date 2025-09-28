@@ -44,9 +44,9 @@ export class FlexibleAuthGuard implements CanActivate {
         (request as any).user = {
           id: user._id.toString(),
           telegramId: user.telegramId || '',
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
+          username: user.username || '',
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
         };
 
         // Store authentication method for reference

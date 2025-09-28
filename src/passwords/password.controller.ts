@@ -16,8 +16,10 @@ import { PasswordService, AuthenticatedRequest } from './password.service';
 // import { CreatePasswordDto } from './dto/create-password.dto';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
+import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
 import { TelegramService } from '../telegram/telegram.service';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
+import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 // import { Types } from 'mongoose';
 // import { VerifyPasswordData } from './interfaces/verify-password.interface';
 import { Password } from './schemas/password.schema';
@@ -26,8 +28,9 @@ import { Password } from './schemas/password.schema';
 export class PasswordController {
   constructor(
     private readonly passwordService: PasswordService,
-    private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
-    private readonly telegramService: TelegramService,
+    // private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
+    // private readonly telegramService: TelegramService,
+    // private readonly publicAddressesService: PublicAddressesService,
   ) {}
 
   @Post()
@@ -174,40 +177,40 @@ export class PasswordController {
   // }
 
   @Patch('secret-view/:id')
-  @TelegramDtoAuth(true)
+  @FlexibleAuth()
   async recordSecretView(
     @Param('id') secretId: string,
     @Request() req: AuthenticatedRequest,
   ) {
-    // Extract telegram data from X-Telegram-Init-Data header
-    const telegramInitData = req.headers['x-telegram-init-data'] as string;
-
-    if (!telegramInitData) {
-      throw new HttpException(
-        'X-Telegram-Init-Data header is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    // Parse telegram init data to extract telegramId and username
-    const parsedData =
-      this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
-    const telegramId = parsedData.telegramId;
-    const username = parsedData.username;
+    // Extract user authentication data using the service method
+    const { userId, telegramId, username, latestWalletAddress } = 
+      await this.passwordService.extractUserAuthData(req);
 
     return this.passwordService.recordSecretView(
       secretId,
       telegramId,
       username,
+      userId,
+      latestWalletAddress,
     );
   }
 
   @Get('secret-view-stats/:id')
-  @TelegramDtoAuth(true)
+  @FlexibleAuth()
   async getSecretViewStats(
     @Param('id') secretId: string,
     @Request() req: AuthenticatedRequest,
   ) {
-    return this.passwordService.getSecretViewStats(secretId, req);
+    // Extract user authentication data using the service method
+    const { userId, telegramId, username, latestWalletAddress } = 
+      await this.passwordService.extractUserAuthData(req);
+
+    return this.passwordService.getSecretViewStats(
+      secretId, 
+      userId, 
+      telegramId, 
+      username, 
+      latestWalletAddress
+    );
   }
 }

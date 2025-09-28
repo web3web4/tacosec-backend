@@ -3,5 +3,7 @@ export class SecretViewDto {
   username?: string;
   firstName?: string;
   lastName?: string;
+  userId?: string;
+  latestWalletAddress?: string;
   viewedAt: Date;
 }

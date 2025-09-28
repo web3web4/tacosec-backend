@@ -33,6 +33,7 @@ import { PaginatedResponse } from './dto/pagination.dto';
 import { TelegramService } from '../telegram/telegram.service';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { ConfigService } from '@nestjs/config';
+import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 @Injectable()
 export class PasswordService {
   constructor(
@@ -44,7 +45,89 @@ export class PasswordService {
     private readonly telegramService: TelegramService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
     private readonly configService: ConfigService,
+    private readonly publicAddressesService: PublicAddressesService,
   ) {}
+
+  /**
+   * Extract and validate user authentication data from request
+   * @param req - The authenticated request object
+   * @returns User authentication data including userId, telegramId, username, and latest wallet address
+   */
+  async extractUserAuthData(req: AuthenticatedRequest): Promise<{
+    userId: string;
+    telegramId: string;
+    username: string;
+    latestWalletAddress?: string;
+  }> {
+    let telegramId: string;
+    let username: string;
+    let userId: string;
+
+    // Priority 1: JWT authentication - extract user info from req.user
+    if (req?.user?.telegramId) {
+      telegramId = req.user.telegramId;
+      username = req.user.username;
+      userId = req.user.id;
+    }
+    // Priority 2: Telegram authentication - extract from header
+    else if (req?.headers?.['x-telegram-init-data']) {
+      const telegramInitData = req.headers['x-telegram-init-data'] as string;
+      
+      if (!telegramInitData) {
+        throw new HttpException(
+          'Authentication required: provide either JWT token or Telegram init data',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Parse telegram init data to extract telegramId and username
+      const parsedData =
+        this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
+      telegramId = parsedData.telegramId;
+      username = parsedData.username;
+      
+      // Get userId from database using telegramId
+      const user = await this.userModel
+        .findOne({ telegramId })
+        .select('_id')
+        .exec();
+      
+      if (!user) {
+        throw new HttpException(
+          'User not found for the provided Telegram data',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      
+      userId = user._id.toString();
+    } else {
+      throw new HttpException(
+        'Authentication required: provide either JWT token or Telegram init data',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Get the latest wallet address for the user
+    let latestWalletAddress: string | undefined;
+    try {
+      if (telegramId) {
+        const addressResponse = await this.publicAddressesService.getLatestAddressByTelegramId(telegramId);
+        if (addressResponse.success && addressResponse.data) {
+          latestWalletAddress = addressResponse.data.publicKey;
+        }
+      }
+    } catch (error) {
+      // If no address found, latestWalletAddress remains undefined
+      latestWalletAddress = undefined;
+    }
+
+    return {
+      userId,
+      telegramId,
+      username,
+      latestWalletAddress,
+    };
+  }
 
   private async hashPassword(password: string): Promise<string> {
     const salt = await bcrypt.genSalt();
@@ -3590,12 +3673,16 @@ You can view the reply in your shared secrets list 📋.`;
    * @param secretId - The ID of the secret being viewed
    * @param telegramId - The telegram ID of the viewer
    * @param username - The username of the viewer (optional)
+   * @param userId - The user ID of the viewer (optional)
+   * @param latestWalletAddress - The latest wallet address of the viewer (optional)
    * @returns Updated password document
    */
   async recordSecretView(
     secretId: string,
     telegramId: string,
     username?: string,
+    userId?: string,
+    latestWalletAddress?: string,
   ): Promise<Password> {
     try {
       // Check if secret exists
@@ -3700,6 +3787,8 @@ You can view the reply in your shared secrets list 📋.`;
         const newView = {
           telegramId,
           username,
+          userId,
+          latestWalletAddress,
           firstName: viewingUser.firstName,
           lastName: viewingUser.lastName,
           viewedAt: new Date(),
@@ -3734,14 +3823,20 @@ You can view the reply in your shared secrets list 📋.`;
   }
 
   /**
-   * Get secret view statistics for a secret
+   * Get secret view statistics for a secret with deduplication
    * @param secretId - The ID of the secret
-   * @param req - The authenticated request
-   * @returns View statistics including count and viewer details
+   * @param userId - The user ID of the requesting user
+   * @param telegramId - The telegram ID of the requesting user
+   * @param username - The username of the requesting user
+   * @param latestWalletAddress - The latest wallet address of the requesting user
+   * @returns View statistics including count and viewer details with deduplication
    */
   async getSecretViewStats(
     secretId: string,
-    req: AuthenticatedRequest,
+    userId: string,
+    telegramId: string,
+    username: string,
+    latestWalletAddress?: string,
   ): Promise<{
     totalViews: number;
     uniqueViewers: number;
@@ -3751,6 +3846,8 @@ You can view the reply in your shared secrets list 📋.`;
       username?: string;
       firstName?: string;
       lastName?: string;
+      userId?: string;
+      latestWalletAddress?: string;
       viewedAt: Date;
     }>;
     notViewedUsers: Array<{
@@ -3764,37 +3861,37 @@ You can view the reply in your shared secrets list 📋.`;
       username?: string;
     }>;
     unknownCount: number;
+    requestingUserInfo: {
+      userId: string;
+      telegramId: string;
+      username: string;
+      latestWalletAddress?: string;
+      hasViewedSecret: boolean;
+      isOwner: boolean;
+    };
   }> {
     try {
-      let telegramId: string;
-
-      // Priority 1: JWT authentication
-      if (req?.user?.telegramId) {
-        telegramId = req.user.telegramId;
-      }
-      // Priority 2: Telegram authentication
-      else if (req?.headers?.['x-telegram-init-data']) {
-        const headerInitData = req.headers['x-telegram-init-data'] as string;
-        const parsedData =
-          this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
-        telegramId = parsedData.telegramId;
-      } else {
-        throw new HttpException(
-          'No authentication data provided',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
       // Find the secret and verify ownership
       const secret = await this.passwordModel.findById(secretId).exec();
       if (!secret) {
         throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
       }
 
-      // Find the user to verify ownership
-      const user = await this.userModel
-        .findOne({ telegramId, isActive: true })
-        .exec();
+      // Use userId parameter for more efficient user lookup if available
+      let user;
+      if (userId) {
+        user = await this.userModel
+          .findOne({ _id: userId, isActive: true })
+          .exec();
+      }
+      
+      // Fallback to telegramId if userId lookup failed
+      if (!user) {
+        user = await this.userModel
+          .findOne({ telegramId, isActive: true })
+          .exec();
+      }
+      
       if (!user) {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
@@ -3805,33 +3902,47 @@ You can view the reply in your shared secrets list 📋.`;
         throw new HttpException('Secret owner not found', HttpStatus.NOT_FOUND);
       }
 
-      // Check if user is owner or has access to the secret
-      // const isOwner =
-      //   (secret.userId ? String(secret.userId) : '') ===
-      //   (user._id ? String(user._id) : '');
+      // Check if requesting user is the owner
+      const isOwner = String(secret.userId) === String(user._id);
 
-      // Check if secret is shared with the user
-      // const isSharedWithUser = secret.sharedWith?.some((sharedUser) => {
-      //   const usernameMatch = sharedUser.username === user.username;
-      //   const userIdMatch =
-      //     sharedUser.userId && String(sharedUser.userId) === String(user._id);
-
-      //   return usernameMatch || userIdMatch;
-      // });
-
-      // Only allow access if user is owner or secret is shared with them
-      // if (!isOwner && !isSharedWithUser) {
-      //   throw new HttpException(
-      //     'You do not have permission to view statistics for this secret',
-      //     HttpStatus.FORBIDDEN,
-      //   );
-      // }
+      // Check if requesting user has viewed this secret
+      const hasViewedSecret = secret.secretViews?.some(view => 
+        view.telegramId === telegramId || 
+        view.userId === userId || 
+        (view.username && view.username === username) ||
+        (view.latestWalletAddress && latestWalletAddress && view.latestWalletAddress === latestWalletAddress)
+      ) || false;
 
       const secretViews = secret.secretViews || [];
 
-      // Get user details for each view to include firstName and lastName
+      // Enhanced deduplication using all available identifiers including the requesting user's data
+      const uniqueViewsMap = new Map<string, any>();
+      
+      for (const view of secretViews) {
+        // Create a composite key for deduplication using multiple identifiers
+        const deduplicationKeys = [
+          view.userId,
+          view.telegramId,
+          view.username,
+          view.latestWalletAddress
+        ].filter(Boolean); // Remove null/undefined values
+        
+        // Use the most reliable identifier as the primary key (userId > telegramId > username > walletAddress)
+        const primaryKey = view.userId || view.telegramId || view.username || view.latestWalletAddress;
+        
+        // If this user hasn't been seen before, or if this is a more complete record
+        if (!uniqueViewsMap.has(primaryKey) || 
+            (uniqueViewsMap.get(primaryKey) && view.userId && !uniqueViewsMap.get(primaryKey).userId)) {
+          uniqueViewsMap.set(primaryKey, view);
+        }
+      }
+
+      // Convert deduplicated views back to array
+      const deduplicatedViews = Array.from(uniqueViewsMap.values());
+
+      // Get user details for each deduplicated view to include firstName and lastName
       const viewDetailsWithUserInfo = await Promise.all(
-        secretViews.map(async (view) => {
+        deduplicatedViews.map(async (view) => {
           // Try to get user info from database if firstName/lastName not in view
           if (!view.firstName || !view.lastName) {
             const userInfo = await this.userModel
@@ -3842,6 +3953,8 @@ You can view the reply in your shared secrets list 📋.`;
             return {
               telegramId: view.telegramId,
               username: view.username,
+              userId: view.userId,
+              latestWalletAddress: view.latestWalletAddress,
               firstName: userInfo?.firstName || view.firstName || '',
               lastName: userInfo?.lastName || view.lastName || '',
               viewedAt: view.viewedAt,
@@ -3851,6 +3964,8 @@ You can view the reply in your shared secrets list 📋.`;
           return {
             telegramId: view.telegramId,
             username: view.username,
+            userId: view.userId,
+            latestWalletAddress: view.latestWalletAddress,
             firstName: view.firstName,
             lastName: view.lastName,
             viewedAt: view.viewedAt,
@@ -3858,36 +3973,49 @@ You can view the reply in your shared secrets list 📋.`;
         }),
       );
 
-      const uniqueViewers = new Set(secretViews.map((view) => view.telegramId))
-        .size;
+      const uniqueViewers = deduplicatedViews.length;
 
       // Calculate total number of users the secret has been shared with
       const totalSharedUsers = secret.sharedWith ? secret.sharedWith.length : 0;
 
-      // Get telegramIds of users who have viewed the secret
-      const viewedTelegramIds = new Set(
-        secretViews.map((view) => view.telegramId),
-      );
+      // Get identifiers of users who have viewed the secret (from deduplicated views)
+      const viewedUserIdentifiers = new Set();
+      deduplicatedViews.forEach(view => {
+        if (view.telegramId) viewedUserIdentifiers.add(view.telegramId);
+        if (view.userId) viewedUserIdentifiers.add(view.userId);
+        if (view.username) viewedUserIdentifiers.add(view.username);
+        if (view.latestWalletAddress) viewedUserIdentifiers.add(view.latestWalletAddress);
+      });
 
-      // Process shared users to categorize them
+      // Process shared users to categorize them using enhanced matching
       const notViewedUsers = [];
       const unknownUsers = [];
       let unknownCount = 0;
 
       if (secret.sharedWith && secret.sharedWith.length > 0) {
         for (const sharedUser of secret.sharedWith) {
-          // Find user details from database
-          const userDetails = await this.userModel
+          // Find user details from database using multiple lookup methods
+          let userDetails = await this.userModel
             .findOne({ username: sharedUser.username })
-            .select('telegramId firstName lastName privacyMode')
+            .select('telegramId firstName lastName privacyMode _id')
             .exec();
 
+          // Try alternative lookup methods if username lookup failed
+          if (!userDetails && sharedUser.userId) {
+            userDetails = await this.userModel
+              .findById(sharedUser.userId)
+              .select('telegramId firstName lastName privacyMode username')
+              .exec();
+          }
+
           if (userDetails) {
+            // Enhanced check using multiple identifiers
+            const hasViewed = viewedUserIdentifiers.has(userDetails.telegramId) ||
+                            viewedUserIdentifiers.has(String(userDetails._id)) ||
+                            viewedUserIdentifiers.has(userDetails.username);
+
             // Check if user has privacy mode enabled AND hasn't viewed the secret
-            if (
-              userDetails.privacyMode &&
-              !viewedTelegramIds.has(userDetails.telegramId)
-            ) {
+            if (userDetails.privacyMode && !hasViewed) {
               unknownUsers.push({
                 username: sharedUser.username,
                 firstName: userDetails.firstName,
@@ -3895,10 +4023,7 @@ You can view the reply in your shared secrets list 📋.`;
                 telegramId: userDetails.telegramId,
               });
               unknownCount++;
-            } else if (
-              !userDetails.privacyMode &&
-              !viewedTelegramIds.has(userDetails.telegramId)
-            ) {
+            } else if (!userDetails.privacyMode && !hasViewed) {
               // User hasn't viewed the secret and doesn't have privacy mode
               notViewedUsers.push({
                 username: sharedUser.username,
@@ -3919,7 +4044,7 @@ You can view the reply in your shared secrets list 📋.`;
       }
 
       return {
-        totalViews: secretViews.length,
+        totalViews: deduplicatedViews.length, // Use deduplicated count
         uniqueViewers,
         totalSharedUsers,
         viewDetails: viewDetailsWithUserInfo,
@@ -3927,6 +4052,14 @@ You can view the reply in your shared secrets list 📋.`;
         notViewedUsersCount: notViewedUsers.length,
         unknownUsers,
         unknownCount,
+        requestingUserInfo: {
+          userId,
+          telegramId,
+          username,
+          latestWalletAddress,
+          hasViewedSecret,
+          isOwner,
+        },
       };
     } catch (error) {
       if (error instanceof HttpException) {

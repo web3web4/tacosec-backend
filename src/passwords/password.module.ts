@@ -16,6 +16,7 @@ import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
 import { ConfigModule } from '@nestjs/config';
 import { ReportsModule } from '../reports/reports.module';
+import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ReportsModule } from '../reports/reports.module';
     forwardRef(() => UsersModule),
     forwardRef(() => TelegramModule),
     forwardRef(() => ReportsModule),
+    forwardRef(() => PublicAddressesModule),
   ],
   controllers: [PasswordController],
   providers: [PasswordService, TelegramDtoAuthGuard],

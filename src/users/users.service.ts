@@ -414,32 +414,33 @@ As a result:
     }
   }
 
-  async getTelegramProfile(
-    username: string,
-  ): Promise<{
+  async getTelegramProfile(username: string): Promise<{
     existsInPlatform: boolean;
     publicAddress?: string;
     profile: string;
   }> {
     try {
       // Use case-insensitive search to handle existing data with mixed case
-      const user = await this.userModel.findOne({ 
-        username: { $regex: new RegExp(`^${username}$`, 'i') } 
-      }).exec();
-      
+      const user = await this.userModel
+        .findOne({
+          username: { $regex: new RegExp(`^${username}$`, 'i') },
+        })
+        .exec();
+
       const profile = await lastValueFrom(
         this.httpService.get(`https://t.me/${username}`),
       );
 
       if (user) {
         let latestPublicAddress: string | undefined;
-        
+
         // Get the latest public address if user has telegramId
         if (user.telegramId) {
           try {
-            const addressResponse = await this.publicAddressesService.getLatestAddressByTelegramId(
-              user.telegramId,
-            );
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByTelegramId(
+                user.telegramId,
+              );
             if (addressResponse.success && addressResponse.data) {
               latestPublicAddress = addressResponse.data.publicKey;
             }
@@ -448,7 +449,7 @@ As a result:
             latestPublicAddress = undefined;
           }
         }
-        
+
         return {
           existsInPlatform: true,
           publicAddress: latestPublicAddress,

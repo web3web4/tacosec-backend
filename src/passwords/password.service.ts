@@ -64,9 +64,9 @@ export class PasswordService {
     let userId: string;
 
     // Priority 1: JWT authentication - extract user info from req.user
-    if (req?.user?.telegramId) {
-      telegramId = req.user.telegramId;
-      username = req.user.username;
+    if (req?.user?.id) {
+      telegramId = req.user.telegramId || '';
+      username = req.user.username || '';
       userId = req.user.id;
     }
     // Priority 2: Telegram authentication - extract from header

@@ -2947,7 +2947,7 @@ You can view the reply in your shared secrets list 📋.`;
         .find({ userId: { $in: secretOwnerIds } })
         .sort({ createdAt: -1 })
         .exec();
-      
+
       const ownerLatestPublicAddressMap = new Map();
       ownerPublicAddresses.forEach((address) => {
         const userId = String(address.userId);
@@ -2968,7 +2968,8 @@ You can view the reply in your shared secrets list 📋.`;
             const ownerTelegramId = ownerTelegramIdMap.get(passwordUserId);
             const ownerPrivacyMode =
               ownerPrivacyMap.get(passwordUserId) || false;
-            const ownerLatestPublicAddress = ownerLatestPublicAddressMap.get(passwordUserId);
+            const ownerLatestPublicAddress =
+              ownerLatestPublicAddressMap.get(passwordUserId);
             const isOwner = currentUserTelegramId === ownerTelegramId;
 
             const baseData = {
@@ -2978,7 +2979,8 @@ You can view the reply in your shared secrets list 📋.`;
               description: password.description,
               sharedBy: {
                 id: passwordUserId,
-                username: ownerUsername || password.initData?.username || 'Unknown',
+                username:
+                  ownerUsername || password.initData?.username || 'Unknown',
                 telegramId: ownerTelegramId || null,
                 latestPublicAddress: ownerLatestPublicAddress || null,
               },

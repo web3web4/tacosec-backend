@@ -31,21 +31,25 @@ export class ReportController {
     @Body() reportData: ReportUserDto,
     @Request() req: AuthenticatedRequest,
   ) {
-    let telegramId: string;
+    let reporterIdentifier: string;
 
-    // Extract telegramId based on authentication method
+    // Extract reporter identifier based on authentication method
     if ((req as any).authMethod === 'jwt') {
-      // JWT authentication - get telegramId from user data
-      telegramId = (req as any).user.telegramId;
+      // JWT authentication - use userId as identifier
+      reporterIdentifier = (req as any).user.id;
     } else {
-      // Telegram authentication - extract from telegram data
+      // Telegram authentication - use telegramId as identifier
       const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
         req.headers['x-telegram-init-data'] as string,
       );
-      telegramId = teleDtoData.telegramId;
+      reporterIdentifier = teleDtoData.telegramId;
     }
 
-    return this.reportService.reportUser(telegramId, reportData);
+    return this.reportService.reportUser(
+      reporterIdentifier,
+      reportData,
+      (req as any).authMethod,
+    );
   }
 
   @Get('user/:telegramId')

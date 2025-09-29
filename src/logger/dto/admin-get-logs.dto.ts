@@ -1,4 +1,9 @@
-import { IsOptional, IsString, IsDateString, IsNumberString } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsDateString,
+  IsNumberString,
+} from 'class-validator';
 
 export class AdminGetLogsDto {
   @IsOptional()

@@ -31,11 +31,11 @@ export class LoggerController {
    * Save error log endpoint
    * Supports flexible authentication (JWT token or Telegram init data)
    * POST /logger
-   * 
+   *
    * Headers:
    * - Authorization: Bearer <jwt_token> (for JWT auth)
    * - x-telegram-init-data: <telegram_init_data> (for Telegram auth)
-   * 
+   *
    * Body:
    * {
    *   "logData": {
@@ -63,11 +63,11 @@ export class LoggerController {
    * Get error logs endpoint with pagination and filtering
    * Supports flexible authentication (JWT token or Telegram init data)
    * GET /logger
-   * 
+   *
    * Headers:
    * - Authorization: Bearer <jwt_token> (for JWT auth)
    * - x-telegram-init-data: <telegram_init_data> (for Telegram auth)
-   * 
+   *
    * Query Parameters:
    * - page: Page number (default: 1)
    * - limit: Items per page (default: 10)
@@ -89,7 +89,7 @@ export class LoggerController {
    * Get specific error log by ID
    * Supports flexible authentication (JWT token or Telegram init data)
    * GET /logger/:id
-   * 
+   *
    * Headers:
    * - Authorization: Bearer <jwt_token> (for JWT auth)
    * - x-telegram-init-data: <telegram_init_data> (for Telegram auth)
@@ -107,7 +107,7 @@ export class LoggerController {
    * Delete error log by ID
    * Supports flexible authentication (JWT token or Telegram init data)
    * DELETE /logger/:id
-   * 
+   *
    * Headers:
    * - Authorization: Bearer <jwt_token> (for JWT auth)
    * - x-telegram-init-data: <telegram_init_data> (for Telegram auth)
@@ -125,11 +125,11 @@ export class LoggerController {
    * Get error logs statistics
    * Supports flexible authentication (JWT token or Telegram init data)
    * GET /logger/stats/summary
-   * 
+   *
    * Headers:
    * - Authorization: Bearer <jwt_token> (for JWT auth)
    * - x-telegram-init-data: <telegram_init_data> (for Telegram auth)
-   * 
+   *
    * Query Parameters:
    * - days: Number of days to include in stats (default: 7)
    */
@@ -158,7 +158,7 @@ export class LoggerController {
    * Admin endpoint to get all logs with filtering and pagination
    * Only accessible by users with 'admin' role
    * GET /logger/admin/all
-   * 
+   *
    * Query Parameters:
    * - page: Page number (default: 1)
    * - limit: Items per page (default: 10)
@@ -187,9 +187,7 @@ export class LoggerController {
   @Get('admin/:id')
   @UseGuards(FlexibleAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  async getLogByIdForAdmin(
-    @Param('id') id: string,
-  ): Promise<ErrorLog> {
+  async getLogByIdForAdmin(@Param('id') id: string): Promise<ErrorLog> {
     return this.loggerService.getLogByIdForAdmin(id);
   }
 }

@@ -51,7 +51,8 @@ export class LoggerService {
     // Priority 2: Telegram authentication
     if (req?.headers?.['x-telegram-init-data']) {
       const headerInitData = req.headers['x-telegram-init-data'] as string;
-      const parsedData = this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+      const parsedData =
+        this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
       return {
         telegramId: parsedData.telegramId,
         username: parsedData.username,
@@ -314,9 +315,18 @@ export class LoggerService {
       // Search in logData
       if (adminGetLogsDto.search) {
         filter.$or = [
-          { 'logData.message': { $regex: adminGetLogsDto.search, $options: 'i' } },
-          { 'logData.error': { $regex: adminGetLogsDto.search, $options: 'i' } },
-          { 'logData.stack': { $regex: adminGetLogsDto.search, $options: 'i' } },
+          {
+            'logData.message': {
+              $regex: adminGetLogsDto.search,
+              $options: 'i',
+            },
+          },
+          {
+            'logData.error': { $regex: adminGetLogsDto.search, $options: 'i' },
+          },
+          {
+            'logData.stack': { $regex: adminGetLogsDto.search, $options: 'i' },
+          },
         ];
       }
 

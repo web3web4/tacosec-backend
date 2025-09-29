@@ -9,6 +9,7 @@ import {
   Password,
   PasswordDocument,
 } from '../passwords/schemas/password.schema';
+import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 
 @Injectable()
 export class ReportService {
@@ -21,6 +22,7 @@ export class ReportService {
     @InjectModel(Password.name)
     private passwordModel: Model<PasswordDocument>,
     private configService: ConfigService,
+    private publicAddressesService: PublicAddressesService,
   ) {
     // Get the maximum number of reports before ban from environment variables
     // Default to 10 if not specified
@@ -42,20 +44,33 @@ export class ReportService {
   /**
    * Report a user for inappropriate behavior
    * Only allows reporting users who have shared their passwords with the reporter
-   * @param reporterTelegramId The Telegram ID of the user making the report
+   * @param reporterIdentifier The identifier of the user making the report (userId for JWT, telegramId for Telegram auth)
    * @param reportData The report data containing reported username, secret_id, report_type and optional reason
+   * @param authMethod The authentication method used ('jwt' or 'telegram')
    * @returns The created report
    */
   async reportUser(
-    reporterTelegramId: string,
+    reporterIdentifier: string,
     reportData: ReportUserDto,
+    authMethod: 'jwt' | 'telegram' = 'telegram',
   ): Promise<Report> {
     try {
-      // Check if reporter exists
-      const reporter = await this.userModel.findOne({
-        telegramId: reporterTelegramId,
-        isActive: true,
-      });
+      // Find reporter based on authentication method
+      let reporter;
+      if (authMethod === 'jwt') {
+        // For JWT authentication, use userId
+        reporter = await this.userModel.findOne({
+          _id: reporterIdentifier,
+          isActive: true,
+        });
+      } else {
+        // For Telegram authentication, use telegramId
+        reporter = await this.userModel.findOne({
+          telegramId: reporterIdentifier,
+          isActive: true,
+        });
+      }
+
       if (!reporter) {
         throw new HttpException('Reporter not found', HttpStatus.NOT_FOUND);
       }
@@ -106,11 +121,8 @@ export class ReportService {
         );
       }
 
-      // Get the telegramId of the reported user
-      const reportedTelegramId = reportedUser.telegramId;
-
-      // Prevent self-reporting
-      if (reporterTelegramId === reportedTelegramId) {
+      // Prevent self-reporting - compare user IDs instead of telegram IDs
+      if (reporter._id.toString() === reportedUser._id.toString()) {
         throw new HttpException(
           'You cannot report yourself',
           HttpStatus.BAD_REQUEST,
@@ -134,7 +146,15 @@ export class ReportService {
 
       // Check if this user has already reported the same password
       const existingReport = await this.reportModel.findOne({
-        reporterTelegramId,
+        $or: [
+          {
+            reporterTelegramId:
+              authMethod === 'telegram'
+                ? reporterIdentifier
+                : reporter.telegramId,
+          },
+          { 'reporterInfo.userId': reporter._id.toString() },
+        ],
         secret_id: reportData.secret_id,
         resolved: false,
       });
@@ -165,10 +185,80 @@ export class ReportService {
         }
       }
 
-      // Create the report
+      // Get reporter's latest public address
+      let reporterLatestPublicAddress: string | undefined;
+      try {
+        if (reporter.telegramId) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByTelegramId(
+              reporter.telegramId,
+            );
+          if (addressResponse.success && addressResponse.data) {
+            reporterLatestPublicAddress = addressResponse.data.publicKey;
+          }
+        }
+
+        // If no address found by telegramId, try by userId
+        if (!reporterLatestPublicAddress) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByUserId(
+              reporter._id.toString(),
+            );
+          if (addressResponse.success && addressResponse.data) {
+            reporterLatestPublicAddress = addressResponse.data.publicKey;
+          }
+        }
+      } catch (error) {
+        // If no address found, reporterLatestPublicAddress remains undefined
+        reporterLatestPublicAddress = undefined;
+      }
+
+      // Get reported user's latest public address
+      let reportedUserLatestPublicAddress: string | undefined;
+      try {
+        if (reportedUser.telegramId) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByTelegramId(
+              reportedUser.telegramId,
+            );
+          if (addressResponse.success && addressResponse.data) {
+            reportedUserLatestPublicAddress = addressResponse.data.publicKey;
+          }
+        }
+
+        // If no address found by telegramId, try by userId
+        if (!reportedUserLatestPublicAddress) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByUserId(
+              reportedUser._id.toString(),
+            );
+          if (addressResponse.success && addressResponse.data) {
+            reportedUserLatestPublicAddress = addressResponse.data.publicKey;
+          }
+        }
+      } catch (error) {
+        // If no address found, reportedUserLatestPublicAddress remains undefined
+        reportedUserLatestPublicAddress = undefined;
+      }
+
+      // Create the report with comprehensive information
       const report = new this.reportModel({
-        reporterTelegramId,
-        reportedTelegramId,
+        // Legacy fields for backward compatibility
+        reporterTelegramId: reporter.telegramId || null,
+        reportedTelegramId: reportedUser.telegramId || null,
+        // New comprehensive information fields
+        reporterInfo: {
+          username: reporter.username,
+          userId: reporter._id,
+          telegramId: reporter.telegramId,
+          latestPublicAddress: reporterLatestPublicAddress,
+        },
+        reportedUserInfo: {
+          username: reportedUser.username,
+          userId: reportedUser._id,
+          telegramId: reportedUser.telegramId,
+          latestPublicAddress: reportedUserLatestPublicAddress,
+        },
         secret_id: reportData.secret_id,
         report_type: reportData.report_type,
         reason: finalReason,
@@ -176,29 +266,32 @@ export class ReportService {
 
       const savedReport = await report.save();
 
-      // Count total unresolved reports for this user
+      // Count total unresolved reports for this user using both legacy and new fields
       const reportCount = await this.reportModel.countDocuments({
-        reportedTelegramId,
+        $or: [
+          { reportedTelegramId: reportedUser.telegramId },
+          { 'reportedUserInfo.userId': reportedUser._id.toString() },
+        ],
         resolved: false,
       });
 
       // Update the reported user's report count
       await this.userModel.updateOne(
-        { telegramId: reportedTelegramId },
+        { _id: reportedUser._id },
         { reportCount },
       );
 
-      // Check both ban conditions
+      // Check both ban conditions using user ID instead of telegram ID
       const shouldBanByCount = reportCount >= this.maxReportsBeforeBan;
       const shouldBanByPercentage = await this.checkPercentageBanCondition(
-        reportedTelegramId,
+        reportedUser._id.toString(),
         reportCount,
       );
 
       // If either condition is met, restrict sharing
       if (shouldBanByCount || shouldBanByPercentage) {
         await this.userModel.updateOne(
-          { telegramId: reportedTelegramId },
+          { _id: reportedUser._id },
           { sharingRestricted: true },
         );
       }
@@ -214,14 +307,25 @@ export class ReportService {
 
   /**
    * Get all reports for a specific user
-   * @param telegramId The Telegram ID of the reported user
+   * @param userIdentifier The user identifier (can be telegramId or userId)
+   * @param identifierType The type of identifier ('telegram' or 'user')
    * @returns List of reports
    */
-  async getReportsByUser(telegramId: string): Promise<Report[]> {
-    return this.reportModel
-      .find({ reportedTelegramId: telegramId })
-      .sort({ createdAt: -1 })
-      .exec();
+  async getReportsByUser(
+    userIdentifier: string,
+    identifierType: 'telegram' | 'user' = 'telegram',
+  ): Promise<Report[]> {
+    const query =
+      identifierType === 'telegram'
+        ? { reportedTelegramId: userIdentifier }
+        : {
+            $or: [
+              { 'reportedUserInfo.userId': userIdentifier },
+              { reportedTelegramId: userIdentifier },
+            ],
+          };
+
+    return this.reportModel.find(query).sort({ createdAt: -1 }).exec();
   }
 
   /**
@@ -294,11 +398,20 @@ export class ReportService {
 
   /**
    * Check if a user is restricted from sharing passwords
-   * @param telegramId The Telegram ID of the user to check
+   * @param userIdentifier The user identifier (telegramId or userId)
+   * @param identifierType The type of identifier ('telegram' or 'user')
    * @returns Boolean indicating if the user is restricted
    */
-  async isUserRestricted(telegramId: string): Promise<boolean> {
-    const user = await this.userModel.findOne({ telegramId, isActive: true });
+  async isUserRestricted(
+    userIdentifier: string,
+    identifierType: 'telegram' | 'user' = 'telegram',
+  ): Promise<boolean> {
+    const query =
+      identifierType === 'telegram'
+        ? { telegramId: userIdentifier, isActive: true }
+        : { _id: userIdentifier, isActive: true };
+
+    const user = await this.userModel.findOne(query);
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
@@ -320,29 +433,52 @@ export class ReportService {
     report.resolvedAt = new Date();
     const updatedReport = await report.save();
 
-    // Recalculate the report count for the user
+    // Get the reported user ID from the report
+    let reportedUserId: string;
+    if (report.reportedUserInfo && report.reportedUserInfo.userId) {
+      reportedUserId = report.reportedUserInfo.userId.toString();
+    } else if (report.reportedTelegramId) {
+      // Fallback to finding user by telegram ID
+      const user = await this.userModel.findOne({
+        telegramId: report.reportedTelegramId,
+      });
+      if (!user) {
+        throw new HttpException(
+          'Reported user not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      reportedUserId = user._id.toString();
+    } else {
+      throw new HttpException(
+        'Cannot identify reported user',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Recalculate the report count for the user using both legacy and new fields
     const reportCount = await this.reportModel.countDocuments({
-      reportedTelegramId: report.reportedTelegramId,
+      $or: [
+        { reportedTelegramId: report.reportedTelegramId },
+        { 'reportedUserInfo.userId': reportedUserId },
+      ],
       resolved: false,
     });
 
     // Update the user's report count
-    await this.userModel.updateOne(
-      { telegramId: report.reportedTelegramId },
-      { reportCount },
-    );
+    await this.userModel.updateOne({ _id: reportedUserId }, { reportCount });
 
     // Check if user should still be banned after resolving this report
     const shouldStillBanByCount = reportCount >= this.maxReportsBeforeBan;
     const shouldStillBanByPercentage = await this.checkPercentageBanCondition(
-      report.reportedTelegramId,
+      reportedUserId,
       reportCount,
     );
 
     // If neither condition is met, remove restriction
     if (!shouldStillBanByCount && !shouldStillBanByPercentage) {
       await this.userModel.updateOne(
-        { telegramId: report.reportedTelegramId },
+        { _id: reportedUserId },
         { sharingRestricted: false },
       );
     }
@@ -352,18 +488,18 @@ export class ReportService {
 
   /**
    * Check if user should be banned based on percentage of reports
-   * @param reportedTelegramId The Telegram ID of the reported user
+   * @param reportedUserId The user ID of the reported user
    * @param reportCount Current number of unresolved reports
    * @returns Boolean indicating if user should be banned based on percentage
    */
   private async checkPercentageBanCondition(
-    reportedTelegramId: string,
+    reportedUserId: string,
     reportCount: number,
   ): Promise<boolean> {
     try {
-      // Find the reported user
+      // Find the reported user by ID
       const reportedUser = await this.userModel.findOne({
-        telegramId: reportedTelegramId,
+        _id: reportedUserId,
         isActive: true,
       });
 

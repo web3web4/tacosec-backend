@@ -11,6 +11,7 @@ import { UsersModule } from '../users/users.module';
 import { RolesGuard } from '../guards/roles.guard';
 import { ConfigModule } from '@nestjs/config';
 import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
+import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
     SharedJwtModule,
     forwardRef(() => TelegramModule),
     forwardRef(() => UsersModule),
+    forwardRef(() => PublicAddressesModule),
     ConfigModule,
   ],
   controllers: [ReportController],

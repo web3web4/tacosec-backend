@@ -4,15 +4,55 @@ import { ReportType } from '../dto/report-user.dto';
 
 export type ReportDocument = Report & Document;
 
+// Reporter information schema
+@Schema({ _id: false })
+export class ReporterInfo {
+  @Prop({ type: String, required: true })
+  username: string;
+
+  @Prop({ type: Types.ObjectId, required: true, ref: 'User' })
+  userId: Types.ObjectId;
+
+  @Prop({ type: String, required: false })
+  telegramId?: string;
+
+  @Prop({ type: String, required: false })
+  latestPublicAddress?: string;
+}
+
+// Reported user (secret owner) information schema
+@Schema({ _id: false })
+export class ReportedUserInfo {
+  @Prop({ type: String, required: true })
+  username: string;
+
+  @Prop({ type: Types.ObjectId, required: true, ref: 'User' })
+  userId: Types.ObjectId;
+
+  @Prop({ type: String, required: false })
+  telegramId?: string;
+
+  @Prop({ type: String, required: false })
+  latestPublicAddress?: string;
+}
+
 @Schema({ timestamps: true })
 export class Report {
   _id: Types.ObjectId;
 
+  // Legacy fields for backward compatibility
   @Prop({ type: String, required: true })
   reporterTelegramId: string;
 
   @Prop({ type: String, required: true })
   reportedTelegramId: string;
+
+  // New comprehensive information fields
+  @Prop({ type: ReporterInfo, required: true })
+  reporterInfo: ReporterInfo;
+
+  @Prop({ type: ReportedUserInfo, required: true })
+  reportedUserInfo: ReportedUserInfo;
 
   @Prop({ type: Types.ObjectId, required: true, ref: 'Password' })
   secret_id: Types.ObjectId; // Reference to passwords._id
@@ -37,3 +77,6 @@ export class Report {
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);
+export const ReporterInfoSchema = SchemaFactory.createForClass(ReporterInfo);
+export const ReportedUserInfoSchema =
+  SchemaFactory.createForClass(ReportedUserInfo);

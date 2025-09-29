@@ -724,10 +724,57 @@ export class PasswordService {
         {},
       );
 
+      // Get owner information maps
+      const ownerUserIds = [
+        ...new Set(resolvedPasswords.map((p) => p.username)),
+      ];
+      const ownerUsernameMapByUsername = new Map<string, string>();
+      const ownerTelegramIdMapByUsername = new Map<string, string>();
+      const ownerLatestPublicAddressMapByUsername = new Map<string, string>();
+      const ownerUserIdMapByUsername = new Map<string, string>();
+
+      // Fetch owner information for all unique usernames
+      for (const username of ownerUserIds) {
+        if (username && username !== 'unknown') {
+          const ownerUser = await this.userModel
+            .findOne({ username: username.toLowerCase(), isActive: true })
+            .exec();
+
+          if (ownerUser) {
+            const ownerUserId = ownerUser._id ? String(ownerUser._id) : '';
+            ownerUsernameMapByUsername.set(
+              username,
+              ownerUser.username || username,
+            );
+            ownerTelegramIdMapByUsername.set(
+              username,
+              ownerUser.telegramId || '',
+            );
+            ownerUserIdMapByUsername.set(username, ownerUserId);
+
+            // Get latest public address from PublicAddress collection
+            const latestPublicAddress = await this.publicAddressModel
+              .findOne({ userId: ownerUserId })
+              .sort({ createdAt: -1 })
+              .exec();
+            ownerLatestPublicAddressMapByUsername.set(
+              username,
+              latestPublicAddress?.publicKey || '',
+            );
+          }
+        }
+      }
+
       const result = Object.entries(groupedByOwner)
         .filter(([username]) => username !== 'unknown')
         .map(([username, passwords]) => ({
-          username,
+          sharedBy: {
+            userId: ownerUserIdMapByUsername.get(username) || '',
+            username: ownerUsernameMapByUsername.get(username) || username,
+            telegramId: ownerTelegramIdMapByUsername.get(username) || null,
+            latestPublicAddress:
+              ownerLatestPublicAddressMapByUsername.get(username) || null,
+          },
           passwords: (passwords as any[]).map((p) => {
             const passwordData: any = {
               id: p.id,
@@ -2978,7 +3025,7 @@ You can view the reply in your shared secrets list 📋.`;
               value: password.value,
               description: password.description,
               sharedBy: {
-                id: passwordUserId,
+                userId: passwordUserId,
                 username:
                   ownerUsername || password.initData?.username || 'Unknown',
                 telegramId: ownerTelegramId || null,

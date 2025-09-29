@@ -9,8 +9,16 @@ export type SharedPassword = {
   reports?: any[];
 };
 
-export type OwnerPasswords = {
+export type SharedByUser = {
+  userId: string;
   username: string;
+  telegramId: string | null;
+  latestPublicAddress: string | null;
+};
+
+export type OwnerPasswords = {
+  username?: string; // Keep for backward compatibility
+  sharedBy?: SharedByUser; // New structure with complete user info
   passwords: SharedPassword[];
   count: number;
 };

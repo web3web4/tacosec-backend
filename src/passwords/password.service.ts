@@ -120,7 +120,7 @@ export class PasswordService {
           latestWalletAddress = addressResponse.data.publicKey;
         }
       }
-      
+
       // If no address found by telegramId or telegramId is empty, try by userId
       if (!latestWalletAddress && userId) {
         const addressResponse =
@@ -2171,7 +2171,7 @@ You can view the reply in your shared secrets list 📋.`;
         ownerPrivacyMap.set(ownerId, owner.privacyMode || false);
 
         let latestPublicAddress: string | undefined;
-        
+
         // Try to get latest public address by telegramId first
         if (owner.telegramId) {
           try {
@@ -2186,7 +2186,7 @@ You can view the reply in your shared secrets list 📋.`;
             // If no address found by telegramId, try by userId
           }
         }
-        
+
         // If no address found by telegramId or user has no telegramId, try by userId
         if (!latestPublicAddress) {
           try {
@@ -3354,7 +3354,7 @@ You can view the reply in your shared secrets list 📋.`;
         ownerPrivacyMap.set(ownerId, owner.privacyMode || false);
 
         let latestPublicAddress: string | undefined;
-        
+
         // Try to get latest public address by telegramId first
         if (owner.telegramId) {
           try {
@@ -3369,7 +3369,7 @@ You can view the reply in your shared secrets list 📋.`;
             // If no address found by telegramId, try by userId
           }
         }
-        
+
         // If no address found by telegramId or user has no telegramId, try by userId
         if (!latestPublicAddress) {
           try {
@@ -3906,25 +3906,34 @@ You can view the reply in your shared secrets list 📋.`;
 
         // Get the latest public address for the viewing user
         let currentLatestWalletAddress = latestWalletAddress;
-        
+
         try {
           // First try to get address by telegramId if available
           if (telegramId) {
-            const addressByTelegramId = await this.publicAddressesService.getLatestAddressByTelegramId(telegramId);
+            const addressByTelegramId =
+              await this.publicAddressesService.getLatestAddressByTelegramId(
+                telegramId,
+              );
             if (addressByTelegramId.success && addressByTelegramId.data) {
               currentLatestWalletAddress = addressByTelegramId.data.publicKey;
             }
           }
-          
+
           // If no address found by telegramId or telegramId is empty, try by userId
           if (!currentLatestWalletAddress && userId) {
-            const addressByUserId = await this.publicAddressesService.getLatestAddressByUserId(userId);
+            const addressByUserId =
+              await this.publicAddressesService.getLatestAddressByUserId(
+                userId,
+              );
             if (addressByUserId.success && addressByUserId.data) {
               currentLatestWalletAddress = addressByUserId.data.publicKey;
             }
           }
         } catch (error) {
-          console.log('⚠️ Could not retrieve latest wallet address:', error.message);
+          console.log(
+            '⚠️ Could not retrieve latest wallet address:',
+            error.message,
+          );
           // Continue with the provided latestWalletAddress or undefined
         }
 
@@ -4099,31 +4108,94 @@ You can view the reply in your shared secrets list 📋.`;
       // Get user details for each deduplicated view to include firstName and lastName
       const viewDetailsWithUserInfo = await Promise.all(
         deduplicatedViews.map(async (view) => {
+          let userInfo = null;
+          let currentLatestWalletAddress = view.latestWalletAddress;
+
           // Try to get user info from database if firstName/lastName not in view
           if (!view.firstName || !view.lastName) {
-            const userInfo = await this.userModel
+            userInfo = await this.userModel
               .findOne({ telegramId: view.telegramId })
               .select('firstName lastName')
               .exec();
+          }
 
-            return {
-              telegramId: view.telegramId,
-              username: view.username,
-              userId: view.userId,
-              latestWalletAddress: view.latestWalletAddress,
-              firstName: userInfo?.firstName || view.firstName || '',
-              lastName: userInfo?.lastName || view.lastName || '',
-              viewedAt: view.viewedAt,
-            };
+          // If latestWalletAddress is missing, null, or empty, try to fetch the latest one
+          if (
+            !currentLatestWalletAddress ||
+            currentLatestWalletAddress.trim() === ''
+          ) {
+            try {
+              // First try to get address by telegramId if available
+              if (view.telegramId) {
+                const addressResponse =
+                  await this.publicAddressesService.getLatestAddressByTelegramId(
+                    view.telegramId,
+                  );
+                if (addressResponse.success && addressResponse.data) {
+                  currentLatestWalletAddress = addressResponse.data.publicKey;
+                }
+              }
+
+              // If no address found by telegramId, try by userId
+              if (!currentLatestWalletAddress && view.userId) {
+                const addressResponse =
+                  await this.publicAddressesService.getLatestAddressByUserId(
+                    view.userId,
+                  );
+                if (addressResponse.success && addressResponse.data) {
+                  currentLatestWalletAddress = addressResponse.data.publicKey;
+                }
+              }
+
+              // If still no address found, try to find user by username and get their address
+              if (!currentLatestWalletAddress && view.username) {
+                const user = await this.userModel
+                  .findOne({ username: view.username })
+                  .select('_id telegramId')
+                  .exec();
+
+                if (user) {
+                  // Try by telegramId first
+                  if (user.telegramId) {
+                    const addressResponse =
+                      await this.publicAddressesService.getLatestAddressByTelegramId(
+                        user.telegramId,
+                      );
+                    if (addressResponse.success && addressResponse.data) {
+                      currentLatestWalletAddress =
+                        addressResponse.data.publicKey;
+                    }
+                  }
+
+                  // If still no address, try by userId
+                  if (!currentLatestWalletAddress) {
+                    const addressResponse =
+                      await this.publicAddressesService.getLatestAddressByUserId(
+                        user._id.toString(),
+                      );
+                    if (addressResponse.success && addressResponse.data) {
+                      currentLatestWalletAddress =
+                        addressResponse.data.publicKey;
+                    }
+                  }
+                }
+              }
+            } catch (error) {
+              // If address retrieval fails, keep the original address (which might be null/empty)
+              console.log(
+                'Failed to retrieve latest wallet address for view:',
+                error,
+              );
+            }
           }
 
           return {
             telegramId: view.telegramId,
             username: view.username,
             userId: view.userId,
-            latestWalletAddress: view.latestWalletAddress,
-            firstName: view.firstName,
-            lastName: view.lastName,
+            latestWalletAddress: currentLatestWalletAddress,
+            firstName: userInfo?.firstName || view.firstName || '',
+            lastName: userInfo?.lastName || view.lastName || '',
             viewedAt: view.viewedAt,
           };
         }),

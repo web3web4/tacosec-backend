@@ -426,6 +426,96 @@ export class PasswordService {
     }
   }
 
+  /**
+   * Helper function to find user information using any available data
+   * @param userInfo Object containing any combination of username, userId, telegramId, or publicAddress
+   * @returns Complete user information or null if not found
+   */
+  private async findUserByAnyInfo(userInfo: {
+    username?: string;
+    userId?: string;
+    telegramId?: string;
+    publicAddress?: string;
+  }): Promise<{
+    userId: string;
+    username: string;
+    telegramId: string;
+    latestPublicAddress: string;
+  } | null> {
+    try {
+      let user = null;
+
+      // Try to find user by userId first (most reliable)
+      if (userInfo.userId) {
+        user = await this.userModel
+          .findOne({ _id: userInfo.userId, isActive: true })
+          .exec();
+      }
+
+      // If not found, try by username (case-insensitive)
+      if (!user && userInfo.username) {
+        user = await this.userModel
+          .findOne({ 
+            username: { $regex: new RegExp(`^${userInfo.username}$`, 'i') }, 
+            isActive: true 
+          })
+          .exec();
+      }
+
+      // If not found, try by telegramId
+      if (!user && userInfo.telegramId) {
+        user = await this.userModel
+          .findOne({ telegramId: userInfo.telegramId, isActive: true })
+          .exec();
+      }
+
+      // If not found, try by publicAddress
+      if (!user && userInfo.publicAddress) {
+        const publicAddressRecord = await this.publicAddressModel
+          .findOne({ publicKey: userInfo.publicAddress })
+          .populate('userId')
+          .exec();
+
+        if (publicAddressRecord && publicAddressRecord.userId) {
+          const populatedUser = publicAddressRecord.userId as any;
+          if (populatedUser.isActive) {
+            user = populatedUser;
+          }
+        }
+      }
+
+      if (!user) {
+        console.log(`User not found with provided info:`, userInfo);
+        return null;
+      }
+
+      console.log(`Found user:`, {
+        userId: user._id,
+        username: user.username,
+        telegramId: user.telegramId
+      });
+
+      // Get latest public address
+      const latestPublicAddress = await this.publicAddressModel
+        .findOne({ userId: user._id })
+        .sort({ createdAt: -1 })
+        .exec();
+
+      const result = {
+        userId: user._id ? String(user._id) : '',
+        username: user.username || '',
+        telegramId: user.telegramId || '',
+        latestPublicAddress: latestPublicAddress?.publicKey || '',
+      };
+
+      console.log(`Returning user info:`, result);
+      return result;
+    } catch (error) {
+      console.error('Error in findUserByAnyInfo:', error);
+      return null;
+    }
+  }
+
   async getSharedWithMe(
     username: string,
     userId?: string,
@@ -724,7 +814,7 @@ export class PasswordService {
         {},
       );
 
-      // Get owner information maps
+      // Get owner information maps using enhanced user lookup
       const ownerUserIds = [
         ...new Set(resolvedPasswords.map((p) => p.username)),
       ];
@@ -733,34 +823,22 @@ export class PasswordService {
       const ownerLatestPublicAddressMapByUsername = new Map<string, string>();
       const ownerUserIdMapByUsername = new Map<string, string>();
 
-      // Fetch owner information for all unique usernames
+      // Fetch owner information for all unique usernames using enhanced lookup
       for (const username of ownerUserIds) {
         if (username && username !== 'unknown') {
-          const ownerUser = await this.userModel
-            .findOne({ username: username.toLowerCase(), isActive: true })
-            .exec();
+          console.log(`Looking up owner info for username: ${username}`);
+          // Use the enhanced user lookup function
+          const ownerInfo = await this.findUserByAnyInfo({ username });
 
-          if (ownerUser) {
-            const ownerUserId = ownerUser._id ? String(ownerUser._id) : '';
-            ownerUsernameMapByUsername.set(
-              username,
-              ownerUser.username || username,
-            );
-            ownerTelegramIdMapByUsername.set(
-              username,
-              ownerUser.telegramId || '',
-            );
-            ownerUserIdMapByUsername.set(username, ownerUserId);
+          console.log(`Owner info result for ${username}:`, ownerInfo);
 
-            // Get latest public address from PublicAddress collection
-            const latestPublicAddress = await this.publicAddressModel
-              .findOne({ userId: ownerUserId })
-              .sort({ createdAt: -1 })
-              .exec();
-            ownerLatestPublicAddressMapByUsername.set(
-              username,
-              latestPublicAddress?.publicKey || '',
-            );
+          if (ownerInfo) {
+            ownerUsernameMapByUsername.set(username, ownerInfo.username || username);
+            ownerTelegramIdMapByUsername.set(username, ownerInfo.telegramId || '');
+            ownerUserIdMapByUsername.set(username, ownerInfo.userId);
+            ownerLatestPublicAddressMapByUsername.set(username, ownerInfo.latestPublicAddress || '');
+          } else {
+            console.log(`No owner info found for username: ${username}`);
           }
         }
       }
@@ -900,89 +978,35 @@ export class PasswordService {
       initData = parsedData;
     }
 
-    // Process sharedWith array to ensure both userId and username are present
+    // Process sharedWith array to ensure both userId and username are present using enhanced lookup
     const processedUpdate = { ...update };
     if (update.sharedWith?.length > 0) {
       processedUpdate.sharedWith = await Promise.all(
         update.sharedWith.map(async (shared) => {
-          let sharedUser;
-          let finalUsername = shared.username
-            ? shared.username.toLowerCase()
-            : shared.username;
-          let finalUserId = shared.userId;
-          let finalPublicAddress = shared.publicAddress;
+          // Use the enhanced user lookup function to find complete user information
+          const userInfo = await this.findUserByAnyInfo({
+            username: shared.username,
+            userId: shared.userId,
+            publicAddress: shared.publicAddress,
+          });
 
-          // Case 1: Both userId and username provided - use userId and ignore username
-          if (shared.userId && shared.username) {
-            sharedUser = await this.userModel
-              .findOne({
-                _id: shared.userId,
-                isActive: true,
-              })
-              .exec();
-            if (sharedUser) {
-              finalUsername = sharedUser.username.toLowerCase();
-              finalUserId = shared.userId;
-            }
+          if (userInfo) {
+            // If user found, use complete information
+            return {
+              ...shared,
+              username: userInfo.username.toLowerCase(),
+              userId: userInfo.userId,
+              publicAddress: shared.publicAddress || userInfo.latestPublicAddress,
+            };
+          } else {
+            // If no user found, keep only the available information
+            return {
+              ...shared,
+              username: shared.username ? shared.username.toLowerCase() : undefined,
+              userId: shared.userId || undefined,
+              publicAddress: shared.publicAddress || undefined,
+            };
           }
-          // Case 2: Only userId provided - find username
-          else if (shared.userId && !shared.username) {
-            sharedUser = await this.userModel
-              .findOne({
-                _id: shared.userId,
-                isActive: true,
-              })
-              .exec();
-            if (sharedUser) {
-              finalUsername = sharedUser.username.toLowerCase();
-              finalUserId = shared.userId;
-            }
-          }
-          // Case 3: Only username provided - find userId
-          else if (shared.username && !shared.userId) {
-            sharedUser = await this.userModel
-              .findOne({
-                username: shared.username.toLowerCase(),
-                isActive: true,
-              })
-              .exec();
-            if (sharedUser) {
-              finalUsername = sharedUser.username.toLowerCase();
-              finalUserId = sharedUser._id ? String(sharedUser._id) : '';
-            }
-          }
-          // Case 4: Only publicAddress provided - find user by public address
-          else if (shared.publicAddress && !shared.userId && !shared.username) {
-            // First, find the public address record
-            const publicAddressRecord = await this.publicAddressModel
-              .findOne({
-                publicKey: shared.publicAddress,
-              })
-              .populate('userId')
-              .exec();
-
-            if (publicAddressRecord && publicAddressRecord.userId) {
-              const user = publicAddressRecord.userId as any;
-              if (user.isActive) {
-                sharedUser = user;
-                finalUsername = user.username.toLowerCase();
-                finalUserId = user._id ? String(user._id) : '';
-                finalPublicAddress = shared.publicAddress;
-              }
-            } else {
-              // If no user found for this public address, keep only the public address
-              finalPublicAddress = shared.publicAddress;
-              finalUsername = undefined;
-              finalUserId = undefined;
-            }
-          }
-
-          return {
-            ...shared,
-            username: finalUsername,
-            userId: finalUserId,
-            publicAddress: finalPublicAddress,
-          };
         }),
       );
     }
@@ -1297,128 +1321,48 @@ export class PasswordService {
       if (passwordData.sharedWith?.length > 0) {
         processedSharedWith = await Promise.all(
           passwordData.sharedWith.map(async (shared) => {
-            let sharedUser;
-            let finalUsername = shared.username
-              ? shared.username.toLowerCase()
-              : shared.username;
-            let UserId = shared.userId;
-            let finalPublicAddress = shared.publicAddress;
             let shouldSendTelegramNotification = false;
 
-            // Case 1: Both userId and username provided - use userId and ignore username
-            if (shared.userId && shared.username) {
-              sharedUser = await this.userModel
-                .findOne({
-                  _id: shared.userId,
-                  isActive: true,
-                })
-                .exec();
-              if (sharedUser) {
-                finalUsername = sharedUser.username.toLowerCase();
-                UserId = shared.userId;
-                // Check if user has telegramId for notification
-                if (sharedUser.telegramId) {
-                  shouldSendTelegramNotification = true;
-                }
-              }
-            }
-            // Case 2: Only userId provided - find username
-            else if (shared.userId && !shared.username) {
-              sharedUser = await this.userModel
-                .findOne({
-                  _id: shared.userId,
-                  isActive: true,
-                })
-                .exec();
-              if (sharedUser) {
-                finalUsername = sharedUser.username.toLowerCase();
-                UserId = shared.userId;
-                // Check if user has telegramId for notification
-                if (sharedUser.telegramId) {
-                  shouldSendTelegramNotification = true;
-                }
-              }
-            }
-            // Case 3: Only username provided - find userId and check if it's a registered user
-            else if (shared.username && !shared.userId) {
-              // Search for active user by username (case-insensitive)
-              sharedUser = await this.userModel
-                .findOne({
-                  username: { $regex: new RegExp(`^${shared.username}$`, 'i') },
-                  isActive: true,
-                })
-                .exec();
+            // Use the enhanced user lookup function to find complete user information
+            const userInfo = await this.findUserByAnyInfo({
+              username: shared.username,
+              userId: shared.userId,
+              publicAddress: shared.publicAddress,
+            });
 
-              if (sharedUser) {
-                // User found - populate all details
-                finalUsername = sharedUser.username.toLowerCase();
-                UserId = sharedUser._id ? String(sharedUser._id) : '';
-
-                // Check if user has telegramId for notification
-                if (sharedUser.telegramId) {
-                  shouldSendTelegramNotification = true;
-                }
-
-                // Find the public address for this user
-                const publicAddressRecord = await this.publicAddressModel
-                  .findOne({
-                    userId: sharedUser._id,
-                  })
-                  .exec();
-
-                if (publicAddressRecord) {
-                  finalPublicAddress = publicAddressRecord.publicKey;
-                }
-              } else {
-                // Username not found in registered users, treat as Telegram username
-                finalUsername = shared.username.toLowerCase();
-                UserId = undefined;
+            if (userInfo) {
+              // If user found, use complete information
+              shouldSendTelegramNotification = !!userInfo.telegramId;
+              
+              return {
+                ...shared,
+                username: userInfo.username.toLowerCase(),
+                userId: userInfo.userId,
+                publicAddress: shared.publicAddress || userInfo.latestPublicAddress,
+                shouldSendTelegramNotification,
+              };
+            } else {
+              // If no user found but username provided, treat as Telegram username
+              if (shared.username) {
                 shouldSendTelegramNotification = true;
+                return {
+                  ...shared,
+                  username: shared.username.toLowerCase(),
+                  userId: undefined,
+                  publicAddress: shared.publicAddress,
+                  shouldSendTelegramNotification,
+                };
               }
+              
+              // If only publicAddress provided and no user found, keep only the public address
+              return {
+                ...shared,
+                username: undefined,
+                userId: undefined,
+                publicAddress: shared.publicAddress,
+                shouldSendTelegramNotification: false,
+              };
             }
-            // Case 4: Only publicAddress provided - find user by public address
-            else if (
-              shared.publicAddress &&
-              !shared.userId &&
-              !shared.username
-            ) {
-              // First, find the public address record
-              const publicAddressRecord = await this.publicAddressModel
-                .findOne({
-                  publicKey: shared.publicAddress,
-                })
-                .populate('userId')
-                .exec();
-
-              if (publicAddressRecord && publicAddressRecord.userId) {
-                const user = publicAddressRecord.userId as any;
-                if (user.isActive) {
-                  sharedUser = user;
-                  finalUsername = user.username.toLowerCase();
-                  UserId = user._id ? String(user._id) : '';
-                  finalPublicAddress = shared.publicAddress;
-                  // Always add user to sharedWith if found, regardless of Telegram account
-                  // Check if user has telegramId for notification
-                  if (user.telegramId) {
-                    shouldSendTelegramNotification = true;
-                  }
-                }
-              } else {
-                // If no user found for this public address, keep only the public address
-                finalPublicAddress = shared.publicAddress;
-                finalUsername = undefined;
-                UserId = undefined;
-                shouldSendTelegramNotification = false;
-              }
-            }
-
-            return {
-              ...shared,
-              username: finalUsername,
-              userId: UserId,
-              publicAddress: finalPublicAddress,
-              shouldSendTelegramNotification,
-            };
           }),
         );
 

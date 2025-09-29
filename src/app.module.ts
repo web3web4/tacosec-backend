@@ -11,6 +11,7 @@ import { PublicAddressesModule } from './public-addresses/public-addresses.modul
 import { CryptoModule } from './utils/crypto.module';
 import { ReportsModule } from './reports/reports.module';
 import { AuthModule } from './auth/auth.module';
+import { LoggerModule } from './logger/logger.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AuthModule } from './auth/auth.module';
     CryptoModule,
     ReportsModule,
     AuthModule,
+    LoggerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

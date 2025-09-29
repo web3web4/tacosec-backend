@@ -2942,6 +2942,20 @@ You can view the reply in your shared secrets list 📋.`;
         ]),
       );
 
+      // Get latest public addresses for all secret owners
+      const ownerPublicAddresses = await this.publicAddressModel
+        .find({ userId: { $in: secretOwnerIds } })
+        .sort({ createdAt: -1 })
+        .exec();
+      
+      const ownerLatestPublicAddressMap = new Map();
+      ownerPublicAddresses.forEach((address) => {
+        const userId = String(address.userId);
+        if (!ownerLatestPublicAddressMap.has(userId)) {
+          ownerLatestPublicAddressMap.set(userId, address.publicKey);
+        }
+      });
+
       // Transform the data similar to getSharedWithMe method
       const transformedData = await Promise.all(
         sharedPasswords
@@ -2954,6 +2968,7 @@ You can view the reply in your shared secrets list 📋.`;
             const ownerTelegramId = ownerTelegramIdMap.get(passwordUserId);
             const ownerPrivacyMode =
               ownerPrivacyMap.get(passwordUserId) || false;
+            const ownerLatestPublicAddress = ownerLatestPublicAddressMap.get(passwordUserId);
             const isOwner = currentUserTelegramId === ownerTelegramId;
 
             const baseData = {
@@ -2961,8 +2976,12 @@ You can view the reply in your shared secrets list 📋.`;
               key: password.key,
               value: password.value,
               description: password.description,
-              sharedBy:
-                ownerUsername || password.initData?.username || 'Unknown',
+              sharedBy: {
+                id: passwordUserId,
+                username: ownerUsername || password.initData?.username || 'Unknown',
+                telegramId: ownerTelegramId || null,
+                latestPublicAddress: ownerLatestPublicAddress || null,
+              },
               sharedWith: password.sharedWith || [], // Include sharedWith field in response
               updatedAt: password.updatedAt,
             };

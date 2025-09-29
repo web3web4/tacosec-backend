@@ -110,11 +110,21 @@ export class PasswordService {
     // Get the latest wallet address for the user
     let latestWalletAddress: string | undefined;
     try {
+      // First try to get address by telegramId if available
       if (telegramId) {
         const addressResponse =
           await this.publicAddressesService.getLatestAddressByTelegramId(
             telegramId,
           );
+        if (addressResponse.success && addressResponse.data) {
+          latestWalletAddress = addressResponse.data.publicKey;
+        }
+      }
+      
+      // If no address found by telegramId or telegramId is empty, try by userId
+      if (!latestWalletAddress && userId) {
+        const addressResponse =
+          await this.publicAddressesService.getLatestAddressByUserId(userId);
         if (addressResponse.success && addressResponse.data) {
           latestWalletAddress = addressResponse.data.publicKey;
         }
@@ -3893,11 +3903,36 @@ You can view the reply in your shared secrets list 📋.`;
           telegramId,
           username,
         );
+
+        // Get the latest public address for the viewing user
+        let currentLatestWalletAddress = latestWalletAddress;
+        
+        try {
+          // First try to get address by telegramId if available
+          if (telegramId) {
+            const addressByTelegramId = await this.publicAddressesService.getLatestAddressByTelegramId(telegramId);
+            if (addressByTelegramId.success && addressByTelegramId.data) {
+              currentLatestWalletAddress = addressByTelegramId.data.publicKey;
+            }
+          }
+          
+          // If no address found by telegramId or telegramId is empty, try by userId
+          if (!currentLatestWalletAddress && userId) {
+            const addressByUserId = await this.publicAddressesService.getLatestAddressByUserId(userId);
+            if (addressByUserId.success && addressByUserId.data) {
+              currentLatestWalletAddress = addressByUserId.data.publicKey;
+            }
+          }
+        } catch (error) {
+          console.log('⚠️ Could not retrieve latest wallet address:', error.message);
+          // Continue with the provided latestWalletAddress or undefined
+        }
+
         const newView = {
           telegramId,
           username,
           userId,
-          latestWalletAddress,
+          latestWalletAddress: currentLatestWalletAddress,
           firstName: viewingUser.firstName,
           lastName: viewingUser.lastName,
           viewedAt: new Date(),

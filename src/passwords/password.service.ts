@@ -669,6 +669,7 @@ export class PasswordService {
           }),
       );
 
+      // Group passwords by userId instead of username
       const groupedByOwner = resolvedPasswords.reduce(
         (
           acc: Record<
@@ -698,10 +699,12 @@ export class PasswordService {
             secretViews?: any[];
           },
         ) => {
-          const ownerUsername = password.username;
+          // Get the actual userId from the original password data
+          const originalPassword = sharedPasswords.find(sp => sp._id.toString() === password.id);
+          const ownerUserId = originalPassword ? String(originalPassword.userId) : '';
 
-          if (!acc[ownerUsername]) {
-            acc[ownerUsername] = [];
+          if (!acc[ownerUserId]) {
+            acc[ownerUserId] = [];
           }
 
           if (password.key && password.value) {
@@ -724,7 +727,7 @@ export class PasswordService {
             }
             passwordData.viewsCount = password.secretViews?.length || 0;
 
-            acc[ownerUsername].push(passwordData);
+            acc[ownerUserId].push(passwordData);
           }
 
           return acc;
@@ -732,75 +735,140 @@ export class PasswordService {
         {},
       );
 
-      // Get owner information maps using enhanced user lookup
+      // Get owner information using the new search approach
+      const ownerInfoMapByUserId = new Map<string, any>();
+      
+      // Extract unique owner userIds from passwords
       const ownerUserIds = [
-        ...new Set(resolvedPasswords.map((p) => p.username)),
+        ...new Set(
+          resolvedPasswords
+            .map((p) => {
+              const passwordUserId = String(sharedPasswords.find(sp => sp._id.toString() === p.id)?.userId || '');
+              return passwordUserId;
+            })
+            .filter((id) => id && id !== '')
+        ),
       ];
-      const ownerUsernameMapByUsername = new Map<string, string>();
-      const ownerTelegramIdMapByUsername = new Map<string, string>();
-      const ownerLatestPublicAddressMapByUsername = new Map<string, string>();
-      const ownerUserIdMapByUsername = new Map<string, string>();
 
-      // Fetch owner information for all unique usernames using enhanced lookup
-      for (const username of ownerUserIds) {
-        if (username && username !== 'unknown') {
-          console.log(`Looking up owner info for username: ${username}`);
-          // Use the enhanced user lookup function
-          const ownerInfo = await UserFinderUtil.findUserByAnyInfo(
-            { username }, 
+      // Fetch owner information for each unique userId
+      for (const ownerId of ownerUserIds) {
+        if (ownerId) {
+          console.log(`Looking up owner info for userId: ${ownerId}`);
+          
+          // First, try to find user by userId
+          let ownerInfo = await UserFinderUtil.findUserByAnyInfo(
+            { userId: ownerId }, 
             this.userModel, 
             this.publicAddressModel
           );
 
-          console.log(`Owner info result for ${username}:`, ownerInfo);
+          // If not found by userId, search through sharedWith information of relevant passwords
+          if (!ownerInfo) {
+            console.log(`User not found by userId ${ownerId}, searching in sharedWith...`);
+            
+            // Find passwords owned by this userId
+            const ownerPasswords = sharedPasswords.filter(p => String(p.userId) === ownerId);
+            
+            for (const password of ownerPasswords) {
+              if (password.sharedWith && password.sharedWith.length > 0) {
+                // Search in sharedWith array for owner information
+                for (const sharedUser of password.sharedWith) {
+                  // Try userId first
+                  if (sharedUser.userId) {
+                    ownerInfo = await UserFinderUtil.findUserByAnyInfo(
+                      { userId: sharedUser.userId }, 
+                      this.userModel, 
+                      this.publicAddressModel
+                    );
+                    if (ownerInfo) break;
+                  }
+                  
+                  // Then try publicAddress
+                  if (!ownerInfo && sharedUser.publicAddress) {
+                    ownerInfo = await UserFinderUtil.findUserByAnyInfo(
+                      { publicAddress: sharedUser.publicAddress }, 
+                      this.userModel, 
+                      this.publicAddressModel
+                    );
+                    if (ownerInfo) break;
+                  }
+                  
+                  // Finally try username
+                  if (!ownerInfo && sharedUser.username) {
+                    ownerInfo = await UserFinderUtil.findUserByAnyInfo(
+                      { username: sharedUser.username }, 
+                      this.userModel, 
+                      this.publicAddressModel
+                    );
+                    if (ownerInfo) break;
+                  }
+                }
+                if (ownerInfo) break;
+              }
+            }
+          }
+
+          console.log(`Owner info result for userId ${ownerId}:`, ownerInfo);
 
           if (ownerInfo) {
-            ownerUsernameMapByUsername.set(username, ownerInfo.username || username);
-            ownerTelegramIdMapByUsername.set(username, ownerInfo.telegramId || '');
-            ownerUserIdMapByUsername.set(username, ownerInfo.userId);
-            ownerLatestPublicAddressMapByUsername.set(username, ownerInfo.publicAddress || '');
+            ownerInfoMapByUserId.set(ownerId, {
+              userId: ownerInfo.userId,
+              username: ownerInfo.username || '',
+              telegramId: ownerInfo.telegramId || '',
+              publicAddress: ownerInfo.publicAddress || ''
+            });
           } else {
-            console.log(`No owner info found for username: ${username}`);
+            console.log(`No owner info found for userId: ${ownerId}`);
+            // Store minimal info if no user found
+            ownerInfoMapByUserId.set(ownerId, {
+              userId: ownerId,
+              username: '',
+              telegramId: '',
+              publicAddress: ''
+            });
           }
         }
       }
 
       const result = Object.entries(groupedByOwner)
-        .filter(([username]) => username !== 'unknown')
-        .map(([username, passwords]) => ({
-          sharedBy: {
-            userId: ownerUserIdMapByUsername.get(username) || '',
-            username: ownerUsernameMapByUsername.get(username) || username,
-            telegramId: ownerTelegramIdMapByUsername.get(username) || null,
-            publicAddress:
-              ownerLatestPublicAddressMapByUsername.get(username) || null,
-          },
-          passwords: (passwords as any[]).map((p) => {
-            const passwordData: any = {
-              id: p.id,
-              key: p.key,
-              value: p.value,
-              description: p.description,
-              updatedAt: p.updatedAt,
-              sharedWith: p.sharedWith,
-              reports: p.reports,
-            };
+        .filter(([userId]) => userId && userId !== '')
+        .map(([userId, passwords]) => {
+          const ownerInfo = ownerInfoMapByUserId.get(userId);
+          
+          return {
+            sharedBy: {
+              userId: ownerInfo?.userId || userId,
+              username: ownerInfo?.username || '',
+              telegramId: ownerInfo?.telegramId || null,
+              publicAddress: ownerInfo?.publicAddress || null,
+            },
+            passwords: (passwords as any[]).map((p) => {
+              const passwordData: any = {
+                id: p.id,
+                key: p.key,
+                value: p.value,
+                description: p.description,
+                updatedAt: p.updatedAt,
+                sharedWith: p.sharedWith,
+                reports: p.reports,
+              };
 
-            // Add optional fields if they exist (they were already filtered based on privacy settings)
-            if (p.createdAt) {
-              passwordData.createdAt = p.createdAt;
-            }
-            if (p.secretViews) {
-              passwordData.secretViews = p.secretViews;
-              passwordData.viewsCount = p.secretViews.length;
-            } else {
-              passwordData.viewsCount = 0;
-            }
+              // Add optional fields if they exist (they were already filtered based on privacy settings)
+              if (p.createdAt) {
+                passwordData.createdAt = p.createdAt;
+              }
+              if (p.secretViews) {
+                passwordData.secretViews = p.secretViews;
+                passwordData.viewsCount = p.secretViews.length;
+              } else {
+                passwordData.viewsCount = 0;
+              }
 
-            return passwordData;
-          }),
-          count: (passwords as any[]).length,
-        }));
+              return passwordData;
+            }),
+            count: (passwords as any[]).length,
+          };
+        });
 
       result.sort((a, b) => b.count - a.count);
 

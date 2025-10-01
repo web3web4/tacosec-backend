@@ -755,54 +755,39 @@ export class PasswordService {
         if (ownerId) {
           console.log(`Looking up owner info for userId: ${ownerId}`);
           
-          // First, try to find user by userId
+          // Search for the actual owner user by userId first
           let ownerInfo = await UserFinderUtil.findUserByAnyInfo(
             { userId: ownerId }, 
             this.userModel, 
             this.publicAddressModel
           );
 
-          // If not found by userId, search through sharedWith information of relevant passwords
+          // If not found by userId, try to find the owner using other available information
           if (!ownerInfo) {
-            console.log(`User not found by userId ${ownerId}, searching in sharedWith...`);
+            console.log(`User not found by userId ${ownerId}, trying alternative search methods...`);
             
-            // Find passwords owned by this userId
+            // Find passwords owned by this userId to get additional owner information
             const ownerPasswords = sharedPasswords.filter(p => String(p.userId) === ownerId);
             
+            // Try to find owner information from the password's user data
             for (const password of ownerPasswords) {
-              if (password.sharedWith && password.sharedWith.length > 0) {
-                // Search in sharedWith array for owner information
-                for (const sharedUser of password.sharedWith) {
-                  // Try userId first
-                  if (sharedUser.userId) {
-                    ownerInfo = await UserFinderUtil.findUserByAnyInfo(
-                      { userId: sharedUser.userId }, 
-                      this.userModel, 
-                      this.publicAddressModel
-                    );
-                    if (ownerInfo) break;
-                  }
-                  
-                  // Then try publicAddress
-                  if (!ownerInfo && sharedUser.publicAddress) {
-                    ownerInfo = await UserFinderUtil.findUserByAnyInfo(
-                      { publicAddress: sharedUser.publicAddress }, 
-                      this.userModel, 
-                      this.publicAddressModel
-                    );
-                    if (ownerInfo) break;
-                  }
-                  
-                  // Finally try username
-                  if (!ownerInfo && sharedUser.username) {
-                    ownerInfo = await UserFinderUtil.findUserByAnyInfo(
-                      { username: sharedUser.username }, 
-                      this.userModel, 
-                      this.publicAddressModel
-                    );
-                    if (ownerInfo) break;
-                  }
-                }
+              // If password has username, try searching by username
+              if (password.username) {
+                ownerInfo = await UserFinderUtil.findUserByAnyInfo(
+                  { username: password.username }, 
+                  this.userModel, 
+                  this.publicAddressModel
+                );
+                if (ownerInfo) break;
+              }
+              
+              // If password has telegramId, try searching by telegramId
+              if (password.telegramId) {
+                ownerInfo = await UserFinderUtil.findUserByAnyInfo(
+                  { telegramId: password.telegramId }, 
+                  this.userModel, 
+                  this.publicAddressModel
+                );
                 if (ownerInfo) break;
               }
             }

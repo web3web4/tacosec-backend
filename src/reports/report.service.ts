@@ -273,8 +273,8 @@ export class ReportService {
       // Create the report with comprehensive information
       const report = new this.reportModel({
         // Legacy fields for backward compatibility
-        reporterTelegramId: reporter.telegramId,
-        reportedTelegramId: reportedUser.telegramId,
+        // reporterTelegramId: reporter.telegramId,
+        // reportedTelegramId: reportedUser.telegramId,
         // New comprehensive information fields
         reporterInfo: {
           username: reporter.username,

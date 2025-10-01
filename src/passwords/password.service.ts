@@ -4223,6 +4223,35 @@ You can view the reply in your shared secrets list 📋.`;
               viewedUserIdentifiers.has(String(userDetails._id)) ||
               viewedUserIdentifiers.has(userDetails.username);
 
+            // Get latest public address for the user
+            let latestPublicAddress: string | undefined;
+            try {
+              // First try to get address by telegramId if available
+              if (userDetails.telegramId) {
+                const addressResponse =
+                  await this.publicAddressesService.getLatestAddressByTelegramId(
+                    userDetails.telegramId,
+                  );
+                if (addressResponse.success && addressResponse.data) {
+                  latestPublicAddress = addressResponse.data.publicKey;
+                }
+              }
+
+              // If no address found by telegramId, try by userId
+              if (!latestPublicAddress && userDetails._id) {
+                const addressResponse =
+                  await this.publicAddressesService.getLatestAddressByUserId(
+                    userDetails._id.toString(),
+                  );
+                if (addressResponse.success && addressResponse.data) {
+                  latestPublicAddress = addressResponse.data.publicKey;
+                }
+              }
+            } catch (error) {
+              // If address retrieval fails, latestPublicAddress remains undefined
+              latestPublicAddress = undefined;
+            }
+
             // Check if user has privacy mode enabled AND hasn't viewed the secret
             if (userDetails.privacyMode && !hasViewed) {
               unknownUsers.push({
@@ -4230,6 +4259,7 @@ You can view the reply in your shared secrets list 📋.`;
                 firstName: userDetails.firstName,
                 lastName: userDetails.lastName,
                 telegramId: userDetails.telegramId,
+                publicAddress: latestPublicAddress,
               });
               unknownCount++;
             } else if (!userDetails.privacyMode && !hasViewed) {
@@ -4239,6 +4269,7 @@ You can view the reply in your shared secrets list 📋.`;
                 firstName: userDetails.firstName,
                 lastName: userDetails.lastName,
                 telegramId: userDetails.telegramId,
+                publicAddress: latestPublicAddress,
               });
             }
             // Note: Users with privacyMode=true who have viewed the secret

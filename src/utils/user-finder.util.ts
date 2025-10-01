@@ -52,8 +52,16 @@ export class UserFinderUtil {
 
       // If not found, try by telegramId
       if (!user && userInfo.telegramId) {
+        // Try both string and number formats for telegramId
         user = await userModel
-          .findOne({ telegramId: userInfo.telegramId, isActive: true })
+          .findOne({ 
+            $or: [
+              { telegramId: userInfo.telegramId },
+              { telegramId: String(userInfo.telegramId) },
+              { telegramId: Number(userInfo.telegramId) }
+            ],
+            isActive: true 
+          })
           .exec();
       }
 
@@ -73,15 +81,8 @@ export class UserFinderUtil {
       }
 
       if (!user) {
-        console.log(`User not found with provided info:`, userInfo);
         return null;
       }
-
-      console.log(`Found user:`, {
-        userId: user._id,
-        username: user.username,
-        telegramId: user.telegramId
-      });
 
       // Get latest public address
       const publicAddress = await publicAddressModel
@@ -96,7 +97,6 @@ export class UserFinderUtil {
         publicAddress: publicAddress?.publicKey || '',
       };
 
-      console.log(`Returning user info:`, result);
       return result;
     } catch (error) {
       console.error('Error in findUserByAnyInfo:', error);

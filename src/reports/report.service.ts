@@ -477,7 +477,9 @@ export class ReportService {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
 
-      return user.sharingRestricted || false;
+      const isRestricted = user.sharingRestricted || false;
+
+      return isRestricted;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;

@@ -46,7 +46,6 @@ export class ReportController {
       const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
         req.headers['x-telegram-init-data'] as string,
       );
-      
       // For Telegram authentication, find the user by telegramId to get their userId
       const user = await this.usersService.findByTelegramId(teleDtoData.telegramId);
       if (!user) {
@@ -55,10 +54,7 @@ export class ReportController {
       reporterUserId = (user as any)._id.toString();
     }
 
-    return this.reportService.reportUser(
-      reporterUserId,
-      reportData,
-    );
+    return this.reportService.reportUser(reporterUserId, reportData);
   }
 
   @Get('user/:telegramId')

@@ -51,14 +51,11 @@ export class PublicAddressesController {
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
     // Handle authentication data based on the auth method used
     if ((req as any).authMethod === 'jwt') {
-      // For JWT authentication, use user data from token
+      // For JWT authentication, use user ID from token to get addresses
       const user = (req as any).user;
-      // Use the telegramId from the JWT user data if available
-      return this.publicAddressesService.getAddressesByTelegramId(
-        user.telegramId,
-      );
+      return this.publicAddressesService.getAddressesByUserId(user.id);
     } else if ((req as any).authMethod === 'telegram') {
-      // For Telegram authentication, parse telegram init data from headers
+      // For Telegram authentication, use telegram ID to get addresses
       const telegramData = (req as any).telegramData;
       return this.publicAddressesService.getAddressesByTelegramId(
         telegramData.telegramId,

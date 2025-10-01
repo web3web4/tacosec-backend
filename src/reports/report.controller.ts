@@ -57,16 +57,16 @@ export class ReportController {
     return this.reportService.reportUser(reporterUserId, reportData);
   }
 
-  @Get('user/:telegramId')
+  @Get('user/:userIdentifier')
   @FlexibleAuth()
   @Roles(Role.ADMIN)
   @UsePipes(new ValidationPipe({ transform: true }))
   async getReportsByUser(
-    @Param('telegramId', TelegramUserExistsPipe) telegramId: string,
+    @Param('userIdentifier') userIdentifier: string,
   ) {
-    // This method doesn't need to extract user data from request
-    // since it's an admin endpoint that takes telegramId as parameter
-    return this.reportService.getReportsByUser(telegramId);
+    // This method accepts userId, telegramId, or publicAddress as parameter
+    // It will find the user first and then search for all reports using both userId and telegramId
+    return this.reportService.getReportsByUser(userIdentifier);
   }
 
   @Get('is-restricted/:telegramId')

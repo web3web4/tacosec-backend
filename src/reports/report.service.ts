@@ -333,20 +333,48 @@ export class ReportService {
 
   /**
    * Get all reports for a specific user
-   * @param userIdentifier The user identifier (can be telegramId or userId)
-   * @param identifierType The type of identifier ('telegram' or 'user')
+   * @param userIdentifier The user identifier (can be userId, telegramId, or publicAddress)
    * @returns List of reports
    */
-  async getReportsByUser(
-    userIdentifier: string,
-    identifierType: 'telegram' | 'user' = 'user',
-  ): Promise<Report[]> {
-    const query =
-      identifierType === 'telegram'
-        ? { reportedTelegramId: userIdentifier }
-        : { 'reportedUserInfo.userId': userIdentifier };
+  async getReportsByUser(userIdentifier: string): Promise<Report[]> {
+    try {
+      // First, find the user using any available identifier
+      const userInfo = await UserFinderUtil.findUserByAnyInfo(
+        {
+          userId: userIdentifier,
+          telegramId: userIdentifier,
+          publicAddress: userIdentifier,
+        },
+        this.userModel,
+        this.publicAddressModel,
+      );
 
-    return this.reportModel.find(query).sort({ createdAt: -1 }).exec();
+      if (!userInfo) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Search for reports using both userId and telegramId to find all reports
+      // This ensures we find both new reports (with userId) and legacy reports (with telegramId only)
+      const reports = await this.reportModel
+        .find({
+          $or: [
+            { 'reportedUserInfo.userId': userInfo.userId },
+            { reportedTelegramId: userInfo.telegramId },
+          ],
+        })
+        .sort({ createdAt: -1 })
+        .exec();
+
+      return reports;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Error retrieving reports',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**

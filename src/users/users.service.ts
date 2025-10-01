@@ -356,6 +356,93 @@ As a result:
     return this.findUserIdByTelegramId(telegramId);
   }
 
+  /**
+   * Get complete information about the current user including latest public address
+   * Supports both JWT token authentication and Telegram init data authentication
+   * @param req - The request object containing authentication information
+   * @returns Complete user information with latest public address
+   */
+  async getCurrentUserCompleteInfo(req: any): Promise<{
+     success: boolean;
+     data: {
+       _id: string;
+       telegramId?: string;
+       firstName?: string;
+       lastName?: string;
+       username?: string;
+       isActive: boolean;
+       role?: string;
+       privacyMode?: boolean;
+       reportCount?: number;
+       publicAddress?: string;
+     };
+   }> {
+    try {
+      // Get current user ID using existing method
+      const currentUserId = await this.getCurrentUserId(req);
+      
+      // Find the complete user information
+      const user = await this.userModel.findById(currentUserId).exec();
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Get the latest public address for this user
+      let latestPublicAddress: string | undefined;
+      
+      try {
+        // First try to get address by telegramId if available
+        if (user.telegramId) {
+          const addressResponse = await this.publicAddressesService.getLatestAddressByTelegramId(
+            user.telegramId,
+          );
+          if (addressResponse.success && addressResponse.data) {
+            latestPublicAddress = addressResponse.data.publicKey;
+          }
+        }
+
+        // If no address found by telegramId, try by userId
+        if (!latestPublicAddress) {
+          const addressResponse = await this.publicAddressesService.getLatestAddressByUserId(
+            currentUserId,
+          );
+          if (addressResponse.success && addressResponse.data) {
+            latestPublicAddress = addressResponse.data.publicKey;
+          }
+        }
+      } catch (error) {
+        // If address retrieval fails, latestPublicAddress remains undefined
+        console.log('Could not retrieve latest public address:', error.message);
+        latestPublicAddress = undefined;
+      }
+
+      // Return complete user information
+       return {
+         success: true,
+         data: {
+           _id: user._id.toString(),
+           telegramId: user.telegramId,
+           firstName: user.firstName,
+           lastName: user.lastName,
+           username: user.username,
+           isActive: user.isActive,
+           role: user.role,
+           privacyMode: user.privacyMode,
+           reportCount: user.reportCount,
+           publicAddress: latestPublicAddress,
+         },
+       };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to get user information',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   private async findUserIdByTelegramId(telegramId: string): Promise<string> {
     const user = await this.userModel.findOne({ telegramId }).exec();
     if (!user) {

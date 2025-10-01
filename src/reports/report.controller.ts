@@ -69,15 +69,15 @@ export class ReportController {
     return this.reportService.getReportsByUser(userIdentifier);
   }
 
-  @Get('is-restricted/:telegramId')
+  @Get('is-restricted/:userIdentifier')
   @FlexibleAuth()
   @UsePipes(new ValidationPipe({ transform: true }))
   async isUserRestricted(
-    @Param('telegramId', TelegramUserExistsPipe) telegramId: string,
+    @Param('userIdentifier') userIdentifier: string,
   ) {
-    // This method doesn't need to extract user data from request
-    // since it takes telegramId as parameter
-    return this.reportService.isUserRestricted(telegramId);
+    // This method accepts userId, telegramId, or publicAddress as parameter
+    // It will find the user first and then check if they are restricted
+    return this.reportService.isUserRestricted(userIdentifier);
   }
 
   @Patch('resolve/:id')

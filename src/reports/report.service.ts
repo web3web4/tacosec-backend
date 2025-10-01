@@ -447,24 +447,46 @@ export class ReportService {
 
   /**
    * Check if a user is restricted from sharing passwords
-   * @param userIdentifier The user identifier (telegramId or userId)
-   * @param identifierType The type of identifier ('telegram' or 'user')
+   * @param userIdentifier The user identifier (can be userId, telegramId, or publicAddress)
    * @returns Boolean indicating if the user is restricted
    */
-  async isUserRestricted(
-    userIdentifier: string,
-    identifierType: 'telegram' | 'user' = 'user',
-  ): Promise<boolean> {
-    const query =
-      identifierType === 'telegram'
-        ? { telegramId: userIdentifier, isActive: true }
-        : { _id: userIdentifier, isActive: true };
+  async isUserRestricted(userIdentifier: string): Promise<boolean> {
+    try {
+      // First, find the user using any available identifier
+      const userInfo = await UserFinderUtil.findUserByAnyInfo(
+        {
+          userId: userIdentifier,
+          telegramId: userIdentifier,
+          publicAddress: userIdentifier,
+        },
+        this.userModel,
+        this.publicAddressModel,
+      );
 
-    const user = await this.userModel.findOne(query);
-    if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      if (!userInfo) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Find the user in the database to check restriction status
+      const user = await this.userModel.findOne({
+        _id: userInfo.userId,
+        isActive: true,
+      });
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      return user.sharingRestricted || false;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Error checking user restriction status',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-    return user.sharingRestricted || false;
   }
 
   /**

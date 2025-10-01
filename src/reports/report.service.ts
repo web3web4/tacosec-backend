@@ -53,32 +53,20 @@ export class ReportService {
   /**
    * Report a user for inappropriate behavior
    * Only allows reporting users who have shared their passwords with the reporter
-   * @param reporterIdentifier The identifier of the user making the report (userId for JWT, telegramId for Telegram auth)
+   * @param reporterUserId The userId of the user making the report
    * @param reportData The report data containing reported username, secret_id, report_type and optional reason
-   * @param authMethod The authentication method used ('jwt' or 'telegram')
    * @returns The created report
    */
   async reportUser(
-    reporterIdentifier: string,
+    reporterUserId: string,
     reportData: ReportUserDto,
-    authMethod: 'jwt' | 'telegram' = 'telegram',
   ): Promise<Report> {
     try {
-      // Find reporter based on authentication method
-      let reporter;
-      if (authMethod === 'jwt') {
-        // For JWT authentication, use userId
-        reporter = await this.userModel.findOne({
-          _id: reporterIdentifier,
-          isActive: true,
-        });
-      } else {
-        // For Telegram authentication, use telegramId
-        reporter = await this.userModel.findOne({
-          telegramId: reporterIdentifier,
-          isActive: true,
-        });
-      }
+      // Find reporter by userId
+      const reporter = await this.userModel.findOne({
+        _id: reporterUserId,
+        isActive: true,
+      });
 
       if (!reporter) {
         throw new HttpException('Reporter not found', HttpStatus.NOT_FOUND);
@@ -195,15 +183,7 @@ export class ReportService {
 
       // Check if this user has already reported the same password
       const existingReport = await this.reportModel.findOne({
-        $or: [
-          {
-            reporterTelegramId:
-              authMethod === 'telegram'
-                ? reporterIdentifier
-                : reporter.telegramId,
-          },
-          { 'reporterInfo.userId': reporter._id.toString() },
-        ],
+        'reporterInfo.userId': reporter._id.toString(),
         secret_id: reportData.secret_id,
         resolved: false,
       });
@@ -315,12 +295,9 @@ export class ReportService {
 
       const savedReport = await report.save();
 
-      // Count total unresolved reports for this user using both legacy and new fields
+      // Count total unresolved reports for this user using userId only
       const reportCount = await this.reportModel.countDocuments({
-        $or: [
-          { reportedTelegramId: reportedUser.telegramId },
-          { 'reportedUserInfo.userId': reportedUser._id.toString() },
-        ],
+        'reportedUserInfo.userId': reportedUser._id,
         resolved: false,
       });
 
@@ -362,17 +339,12 @@ export class ReportService {
    */
   async getReportsByUser(
     userIdentifier: string,
-    identifierType: 'telegram' | 'user' = 'telegram',
+    identifierType: 'telegram' | 'user' = 'user',
   ): Promise<Report[]> {
     const query =
       identifierType === 'telegram'
         ? { reportedTelegramId: userIdentifier }
-        : {
-            $or: [
-              { 'reportedUserInfo.userId': userIdentifier },
-              { reportedTelegramId: userIdentifier },
-            ],
-          };
+        : { 'reportedUserInfo.userId': userIdentifier };
 
     return this.reportModel.find(query).sort({ createdAt: -1 }).exec();
   }
@@ -453,7 +425,7 @@ export class ReportService {
    */
   async isUserRestricted(
     userIdentifier: string,
-    identifierType: 'telegram' | 'user' = 'telegram',
+    identifierType: 'telegram' | 'user' = 'user',
   ): Promise<boolean> {
     const query =
       identifierType === 'telegram'

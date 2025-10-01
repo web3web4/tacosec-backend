@@ -8,9 +8,12 @@ import {
   Request,
   UsePipes,
   ValidationPipe,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { ReportService } from './report.service';
 import { ReportUserDto } from './dto/report-user.dto';
+import { UsersService } from '../users/users.service';
 
 import { TelegramUserExistsPipe } from './pipes/telegram-user-exists.pipe';
 import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
@@ -23,6 +26,7 @@ export class ReportController {
   constructor(
     private readonly reportService: ReportService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
+    private readonly usersService: UsersService,
   ) {}
 
   @Post()
@@ -31,24 +35,29 @@ export class ReportController {
     @Body() reportData: ReportUserDto,
     @Request() req: AuthenticatedRequest,
   ) {
-    let reporterIdentifier: string;
+    let reporterUserId: string;
 
-    // Extract reporter identifier based on authentication method
+    // Extract reporter user ID based on authentication method
     if ((req as any).authMethod === 'jwt') {
-      // JWT authentication - use userId as identifier
-      reporterIdentifier = (req as any).user.id;
+      // JWT authentication - use userId directly
+      reporterUserId = (req as any).user.id;
     } else {
-      // Telegram authentication - use telegramId as identifier
+      // Telegram authentication - find userId from telegramId
       const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
         req.headers['x-telegram-init-data'] as string,
       );
-      reporterIdentifier = teleDtoData.telegramId;
+      
+      // For Telegram authentication, find the user by telegramId to get their userId
+      const user = await this.usersService.findByTelegramId(teleDtoData.telegramId);
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+      reporterUserId = (user as any)._id.toString();
     }
 
     return this.reportService.reportUser(
-      reporterIdentifier,
+      reporterUserId,
       reportData,
-      (req as any).authMethod,
     );
   }
 

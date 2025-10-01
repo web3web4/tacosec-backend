@@ -172,7 +172,7 @@ export class UsersController {
   }
 
   @Patch('me/privacy-mode')
-  @TelegramDtoAuth()
+  @FlexibleAuth()
   async updateMyPrivacyMode(
     @Req() req: any,
     @Body() body: { privacyMode: boolean },

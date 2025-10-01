@@ -18,7 +18,7 @@ export enum ReportType {
 export class ReportUserDto {
   @IsString()
   @IsNotEmpty()
-  reportedUsername: string;
+  user: string; // Can be username, publicAddress, or userId
 
   @IsMongoId()
   @IsNotEmpty()

@@ -10,6 +10,13 @@ import {
   PasswordDocument,
 } from '../passwords/schemas/password.schema';
 import { PublicAddressesService } from '../public-addresses/public-addresses.service';
+import { 
+  PublicAddress, 
+  PublicAddressDocument 
+} from '../public-addresses/schemas/public-address.schema';
+import { UserFinderUtil } from '../utils/user-finder.util';
+import { AddressDetectorUtil } from '../utils/address-detector.util';
+import { Types } from 'mongoose';
 
 @Injectable()
 export class ReportService {
@@ -21,6 +28,8 @@ export class ReportService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Password.name)
     private passwordModel: Model<PasswordDocument>,
+    @InjectModel(PublicAddress.name)
+    private publicAddressModel: Model<PublicAddressDocument>,
     private configService: ConfigService,
     private publicAddressesService: PublicAddressesService,
   ) {
@@ -99,13 +108,53 @@ export class ReportService {
         );
       }
 
-      // Check if reported user exists by username and matches the password owner
-      const reportedUser = await this.userModel.findOne({
-        username: {
-          $regex: new RegExp(`^${reportData.reportedUsername}$`, 'i'),
-        }, // case insensitive
-        isActive: true,
-      });
+      // Find reported user using the new flexible user field
+      // First, determine what type of identifier was provided
+      const userIdentifier = reportData.user.trim();
+      let reportedUser: UserDocument | null = null;
+
+      // Detect identifier type and search accordingly
+      if (Types.ObjectId.isValid(userIdentifier)) {
+        // It's a valid ObjectId (userId)
+        const userInfo = await UserFinderUtil.findUserByAnyInfo(
+          { userId: userIdentifier },
+          this.userModel,
+          this.publicAddressModel,
+        );
+        if (userInfo) {
+          reportedUser = await this.userModel.findOne({
+            _id: userInfo.userId,
+            isActive: true,
+          });
+        }
+      } else if (AddressDetectorUtil.isPublicAddress(userIdentifier)) {
+        // It's a public address
+        const userInfo = await UserFinderUtil.findUserByAnyInfo(
+          { publicAddress: userIdentifier },
+          this.userModel,
+          this.publicAddressModel,
+        );
+        if (userInfo) {
+          reportedUser = await this.userModel.findOne({
+            _id: userInfo.userId,
+            isActive: true,
+          });
+        }
+      } else {
+        // It's a username
+        const userInfo = await UserFinderUtil.findUserByAnyInfo(
+          { username: userIdentifier },
+          this.userModel,
+          this.publicAddressModel,
+        );
+        if (userInfo) {
+          reportedUser = await this.userModel.findOne({
+            _id: userInfo.userId,
+            isActive: true,
+          });
+        }
+      }
+
       if (!reportedUser) {
         throw new HttpException(
           'Reported user not found',

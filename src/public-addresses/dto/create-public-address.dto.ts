@@ -45,10 +45,22 @@ export class CreatePublicAddressDto {
   secret?: string;
 
   /**
-   * Telegram init data string (populated from headers)
+   * Telegram init data string (populated from headers for Telegram auth)
    * @internal
    */
   telegramInitData?: string;
+
+  /**
+   * User data from JWT token (populated for JWT auth)
+   * @internal
+   */
+  jwtUser?: {
+    id: string;
+    telegramId: string;
+    username: string;
+    firstName: string;
+    lastName: string;
+  };
 }
 
 /**

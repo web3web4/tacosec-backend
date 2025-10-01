@@ -53,19 +53,35 @@ export class PublicAddressesService {
 
   /**
    * Adds a single public address with optional encrypted secret for a user
-   * identified by telegram init data
+   * Supports both JWT token authentication and Telegram init data authentication
    * Ensures the address is unique across the entire system
    */
   async addPublicAddress(
     createDto: CreatePublicAddressDto,
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
     try {
-      // Extract user from telegram init data
-      const user = await this.usersService.getUserFromTelegramInitData(
-        createDto.telegramInitData,
-      );
-      if (!user) {
-        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      let user: any;
+
+      // Handle different authentication methods
+      if (createDto.jwtUser) {
+        // JWT authentication - get user by ID
+        user = await this.usersService.findOne(createDto.jwtUser.id);
+        if (!user) {
+          throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+        }
+      } else if (createDto.telegramInitData) {
+        // Telegram authentication - extract user from telegram init data
+        user = await this.usersService.getUserFromTelegramInitData(
+          createDto.telegramInitData,
+        );
+        if (!user) {
+          throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+        }
+      } else {
+        throw new HttpException(
+          'Authentication data required',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       // Validate that publicKey is not null or empty

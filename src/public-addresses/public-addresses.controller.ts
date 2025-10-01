@@ -5,28 +5,36 @@ import {
   PublicAddressResponse,
 } from './public-addresses.service';
 import { CreatePublicAddressDto } from './dto/create-public-address.dto';
-import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
-import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
+import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
 
 @Controller('public-addresses')
 export class PublicAddressesController {
   constructor(
     private readonly publicAddressesService: PublicAddressesService,
-    private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
   ) {}
 
   /**
    * Adds a new public address for a user
    * Accepts a single publicKey with an optional secret
+   * Supports both JWT token authentication and Telegram init data authentication
    */
   @Post()
-  @TelegramDtoAuth()
+  @FlexibleAuth()
   async addPublicAddresses(
     @Request() req: Request,
     @Body() createDto: CreatePublicAddressDto,
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
-    // Update the dto with the telegramId from headers
-    createDto.telegramInitData = req.headers['x-telegram-init-data'];
+    // Handle authentication data based on the auth method used
+    if ((req as any).authMethod === 'jwt') {
+      // For JWT authentication, use user data from token
+      const user = (req as any).user;
+      createDto.telegramInitData = null; // Clear any telegram data
+      createDto.jwtUser = user; // Pass JWT user data to service
+    } else if ((req as any).authMethod === 'telegram') {
+      // For Telegram authentication, use telegram init data from headers
+      createDto.telegramInitData = req.headers['x-telegram-init-data'];
+      createDto.jwtUser = null; // Clear any JWT data
+    }
 
     // The service now handles all error scenarios and response formatting
     return this.publicAddressesService.addPublicAddress(createDto);
@@ -34,28 +42,39 @@ export class PublicAddressesController {
 
   /**
    * Gets all public addresses for the authenticated user
+   * Supports both JWT token authentication and Telegram init data authentication
    */
   @Get()
-  @TelegramDtoAuth()
+  @FlexibleAuth()
   async getMyAddresses(
     @Request() req: Request,
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
-    // Extract user data from telegram init data in headers
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
+    // Handle authentication data based on the auth method used
+    if ((req as any).authMethod === 'jwt') {
+      // For JWT authentication, use user data from token
+      const user = (req as any).user;
+      // Use the telegramId from the JWT user data if available
+      return this.publicAddressesService.getAddressesByTelegramId(
+        user.telegramId,
+      );
+    } else if ((req as any).authMethod === 'telegram') {
+      // For Telegram authentication, parse telegram init data from headers
+      const telegramData = (req as any).telegramData;
+      return this.publicAddressesService.getAddressesByTelegramId(
+        telegramData.telegramId,
+      );
+    }
 
-    // The service now handles all error scenarios and response formatting
-    return this.publicAddressesService.getAddressesByTelegramId(
-      teleDtoData.telegramId,
-    );
+    // This should not happen due to FlexibleAuth guard, but added for safety
+    throw new Error('Authentication method not recognized');
   }
 
   /**
    * Gets all public addresses for a specific user
+   * Supports both JWT token authentication and Telegram init data authentication
    */
   @Get(':userId')
-  @TelegramDtoAuth()
+  @FlexibleAuth()
   async getAddressesByUserId(
     @Param('userId') userId: string,
   ): Promise<ApiResponse<PublicAddressResponse[]>> {

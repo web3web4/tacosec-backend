@@ -34,6 +34,7 @@ import { TelegramService } from '../telegram/telegram.service';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { ConfigService } from '@nestjs/config';
 import { PublicAddressesService } from '../public-addresses/public-addresses.service';
+import { UserFinderUtil } from '../utils/user-finder.util';
 @Injectable()
 export class PasswordService {
   constructor(
@@ -431,90 +432,7 @@ export class PasswordService {
    * @param userInfo Object containing any combination of username, userId, telegramId, or publicAddress
    * @returns Complete user information or null if not found
    */
-  private async findUserByAnyInfo(userInfo: {
-    username?: string;
-    userId?: string;
-    telegramId?: string;
-    publicAddress?: string;
-  }): Promise<{
-    userId: string;
-    username: string;
-    telegramId: string;
-    latestPublicAddress: string;
-  } | null> {
-    try {
-      let user = null;
 
-      // Try to find user by userId first (most reliable)
-      if (userInfo.userId) {
-        user = await this.userModel
-          .findOne({ _id: userInfo.userId, isActive: true })
-          .exec();
-      }
-
-      // If not found, try by username (case-insensitive)
-      if (!user && userInfo.username) {
-        user = await this.userModel
-          .findOne({ 
-            username: { $regex: new RegExp(`^${userInfo.username}$`, 'i') }, 
-            isActive: true 
-          })
-          .exec();
-      }
-
-      // If not found, try by telegramId
-      if (!user && userInfo.telegramId) {
-        user = await this.userModel
-          .findOne({ telegramId: userInfo.telegramId, isActive: true })
-          .exec();
-      }
-
-      // If not found, try by publicAddress
-      if (!user && userInfo.publicAddress) {
-        const publicAddressRecord = await this.publicAddressModel
-          .findOne({ publicKey: userInfo.publicAddress })
-          .populate('userId')
-          .exec();
-
-        if (publicAddressRecord && publicAddressRecord.userId) {
-          const populatedUser = publicAddressRecord.userId as any;
-          if (populatedUser.isActive) {
-            user = populatedUser;
-          }
-        }
-      }
-
-      if (!user) {
-        console.log(`User not found with provided info:`, userInfo);
-        return null;
-      }
-
-      console.log(`Found user:`, {
-        userId: user._id,
-        username: user.username,
-        telegramId: user.telegramId
-      });
-
-      // Get latest public address
-      const latestPublicAddress = await this.publicAddressModel
-        .findOne({ userId: user._id })
-        .sort({ createdAt: -1 })
-        .exec();
-
-      const result = {
-        userId: user._id ? String(user._id) : '',
-        username: user.username || '',
-        telegramId: user.telegramId || '',
-        latestPublicAddress: latestPublicAddress?.publicKey || '',
-      };
-
-      console.log(`Returning user info:`, result);
-      return result;
-    } catch (error) {
-      console.error('Error in findUserByAnyInfo:', error);
-      return null;
-    }
-  }
 
   async getSharedWithMe(
     username: string,
@@ -828,7 +746,11 @@ export class PasswordService {
         if (username && username !== 'unknown') {
           console.log(`Looking up owner info for username: ${username}`);
           // Use the enhanced user lookup function
-          const ownerInfo = await this.findUserByAnyInfo({ username });
+          const ownerInfo = await UserFinderUtil.findUserByAnyInfo(
+            { username }, 
+            this.userModel, 
+            this.publicAddressModel
+          );
 
           console.log(`Owner info result for ${username}:`, ownerInfo);
 
@@ -984,11 +906,11 @@ export class PasswordService {
       processedUpdate.sharedWith = await Promise.all(
         update.sharedWith.map(async (shared) => {
           // Use the enhanced user lookup function to find complete user information
-          const userInfo = await this.findUserByAnyInfo({
+          const userInfo = await UserFinderUtil.findUserByAnyInfo({
             username: shared.username,
             userId: shared.userId,
             publicAddress: shared.publicAddress,
-          });
+          }, this.userModel, this.publicAddressModel);
 
           if (userInfo) {
             // If user found, use complete information
@@ -1324,11 +1246,11 @@ export class PasswordService {
             let shouldSendTelegramNotification = false;
 
             // Use the enhanced user lookup function to find complete user information
-            const userInfo = await this.findUserByAnyInfo({
+            const userInfo = await UserFinderUtil.findUserByAnyInfo({
               username: shared.username,
               userId: shared.userId,
               publicAddress: shared.publicAddress,
-            });
+            }, this.userModel, this.publicAddressModel);
 
             if (userInfo) {
               // If user found, use complete information

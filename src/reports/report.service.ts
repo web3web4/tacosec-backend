@@ -620,34 +620,48 @@ export class ReportService {
    * Get all reported users with their reports (Admin only)
    * Returns a list of all users who have been reported, along with their report counts,
    * sharing restriction status, and the reports associated with them
+   * Searches using both legacy telegramId and modern userId fields
    * @returns Object containing count of reported users and their details
    */
   async getAllReportedUsers() {
     try {
-      // Find all unique reportedTelegramIds from reports
+      // Find all unique reportedTelegramIds from legacy reports
       const reportedTelegramIds =
         await this.reportModel.distinct('reportedTelegramId');
 
+      // Find all unique userIds from modern reports
+      const reportedUserIds = await this.reportModel.distinct(
+        'reportedUserInfo.userId',
+      );
+
       // If no reports exist, return empty result
-      if (!reportedTelegramIds.length) {
+      if (!reportedTelegramIds.length && !reportedUserIds.length) {
         return {
           count: 0,
           users: [],
         };
       }
 
-      // Get all reported users
+      // Get all reported users using both legacy telegramId and modern userId
       const reportedUsers = await this.userModel.find({
-        telegramId: { $in: reportedTelegramIds },
+        $or: [
+          { telegramId: { $in: reportedTelegramIds } },
+          { _id: { $in: reportedUserIds } },
+        ],
         isActive: true,
       });
 
       // Prepare the result with detailed information for each user
       const usersWithReports = await Promise.all(
         reportedUsers.map(async (user) => {
-          // Get all reports for this user
+          // Get all reports for this user using both legacy and modern fields
           const reports = await this.reportModel
-            .find({ reportedTelegramId: user.telegramId })
+            .find({
+              $or: [
+                { reportedTelegramId: user.telegramId },
+                { 'reportedUserInfo.userId': user._id },
+              ],
+            })
             .sort({ createdAt: -1 })
             .exec();
 
@@ -657,12 +671,16 @@ export class ReportService {
           return {
             username: user.username,
             telegramId: user.telegramId,
+            userId: user._id,
             reportCount: unresolvedReports,
             sharingRestricted: user.sharingRestricted || false,
             reports: reports.map((report) => ({
               id: report._id,
               reason: report.reason,
               reporterTelegramId: report.reporterTelegramId,
+              reporterInfo: report.reporterInfo,
+              reportedTelegramId: report.reportedTelegramId,
+              reportedUserInfo: report.reportedUserInfo,
               createdAt: report.createdAt,
               resolved: report.resolved,
               resolvedAt: report.resolvedAt,

@@ -7,7 +7,7 @@ export type ReportDocument = Report & Document;
 // Reporter information schema
 @Schema({ _id: false })
 export class ReporterInfo {
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, required: false })
   username: string;
 
   @Prop({ type: Types.ObjectId, required: true, ref: 'User' })
@@ -23,7 +23,7 @@ export class ReporterInfo {
 // Reported user (secret owner) information schema
 @Schema({ _id: false })
 export class ReportedUserInfo {
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, required: false })
   username: string;
 
   @Prop({ type: Types.ObjectId, required: true, ref: 'User' })
@@ -41,10 +41,10 @@ export class Report {
   _id: Types.ObjectId;
 
   // Legacy fields for backward compatibility
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, required: false })
   reporterTelegramId: string;
 
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, required: false })
   reportedTelegramId: string;
 
   // New comprehensive information fields

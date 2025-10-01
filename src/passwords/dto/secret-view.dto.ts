@@ -4,6 +4,6 @@ export class SecretViewDto {
   firstName?: string;
   lastName?: string;
   userId?: string;
-  latestWalletAddress?: string;
+  publicAddress?: string;
   viewedAt: Date;
 }

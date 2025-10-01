@@ -183,7 +183,7 @@ export class PasswordController {
     @Request() req: AuthenticatedRequest,
   ) {
     // Extract user authentication data using the service method
-    const { userId, telegramId, username, latestWalletAddress } =
+    const { userId, telegramId, username, publicAddress } =
       await this.passwordService.extractUserAuthData(req);
 
     return this.passwordService.recordSecretView(
@@ -191,7 +191,7 @@ export class PasswordController {
       telegramId,
       username,
       userId,
-      latestWalletAddress,
+      publicAddress,
     );
   }
 
@@ -202,7 +202,7 @@ export class PasswordController {
     @Request() req: AuthenticatedRequest,
   ) {
     // Extract user authentication data using the service method
-    const { userId, telegramId, username, latestWalletAddress } =
+    const { userId, telegramId, username, publicAddress } =
       await this.passwordService.extractUserAuthData(req);
 
     return this.passwordService.getSecretViewStats(
@@ -210,7 +210,7 @@ export class PasswordController {
       userId,
       telegramId,
       username,
-      latestWalletAddress,
+      publicAddress,
     );
   }
 }

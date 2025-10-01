@@ -58,7 +58,7 @@ export class PasswordService {
     userId: string;
     telegramId: string;
     username: string;
-    latestWalletAddress?: string;
+    publicAddress?: string;
   }> {
     let telegramId: string;
     let username: string;
@@ -109,7 +109,7 @@ export class PasswordService {
     }
 
     // Get the latest wallet address for the user
-    let latestWalletAddress: string | undefined;
+    let publicAddress: string | undefined;
     try {
       // First try to get address by telegramId if available
       if (telegramId) {
@@ -118,28 +118,28 @@ export class PasswordService {
             telegramId,
           );
         if (addressResponse.success && addressResponse.data) {
-          latestWalletAddress = addressResponse.data.publicKey;
+          publicAddress = addressResponse.data.publicKey;
         }
       }
 
       // If no address found by telegramId or telegramId is empty, try by userId
-      if (!latestWalletAddress && userId) {
+      if (!publicAddress && userId) {
         const addressResponse =
           await this.publicAddressesService.getLatestAddressByUserId(userId);
         if (addressResponse.success && addressResponse.data) {
-          latestWalletAddress = addressResponse.data.publicKey;
+          publicAddress = addressResponse.data.publicKey;
         }
       }
     } catch (error) {
-      // If no address found, latestWalletAddress remains undefined
-      latestWalletAddress = undefined;
+      // If no address found, publicAddress remains undefined
+      publicAddress = undefined;
     }
 
     return {
       userId,
       telegramId,
       username,
-      latestWalletAddress,
+      publicAddress,
     };
   }
 
@@ -3772,7 +3772,7 @@ You can view the reply in your shared secrets list 📋.`;
    * @param telegramId - The telegram ID of the viewer
    * @param username - The username of the viewer (optional)
    * @param userId - The user ID of the viewer (optional)
-   * @param latestWalletAddress - The latest wallet address of the viewer (optional)
+   * @param publicAddress - The latest wallet address of the viewer (optional)
    * @returns Updated password document
    */
   async recordSecretView(
@@ -3780,7 +3780,7 @@ You can view the reply in your shared secrets list 📋.`;
     telegramId: string,
     username?: string,
     userId?: string,
-    latestWalletAddress?: string,
+    publicAddress?: string,
   ): Promise<Password> {
     try {
       // Check if secret exists
@@ -3884,7 +3884,7 @@ You can view the reply in your shared secrets list 📋.`;
         );
 
         // Get the latest public address for the viewing user
-        let currentLatestWalletAddress = latestWalletAddress;
+        let currentpublicAddress = publicAddress;
 
         try {
           // First try to get address by telegramId if available
@@ -3894,18 +3894,18 @@ You can view the reply in your shared secrets list 📋.`;
                 telegramId,
               );
             if (addressByTelegramId.success && addressByTelegramId.data) {
-              currentLatestWalletAddress = addressByTelegramId.data.publicKey;
+              currentpublicAddress = addressByTelegramId.data.publicKey;
             }
           }
 
           // If no address found by telegramId or telegramId is empty, try by userId
-          if (!currentLatestWalletAddress && userId) {
+          if (!currentpublicAddress && userId) {
             const addressByUserId =
               await this.publicAddressesService.getLatestAddressByUserId(
                 userId,
               );
             if (addressByUserId.success && addressByUserId.data) {
-              currentLatestWalletAddress = addressByUserId.data.publicKey;
+              currentpublicAddress = addressByUserId.data.publicKey;
             }
           }
         } catch (error) {
@@ -3913,14 +3913,14 @@ You can view the reply in your shared secrets list 📋.`;
             '⚠️ Could not retrieve latest wallet address:',
             error.message,
           );
-          // Continue with the provided latestWalletAddress or undefined
+          // Continue with the provided publicAddress or undefined
         }
 
         const newView = {
           telegramId,
           username,
           userId,
-          latestWalletAddress: currentLatestWalletAddress,
+          publicAddress: currentpublicAddress,
           firstName: viewingUser.firstName,
           lastName: viewingUser.lastName,
           viewedAt: new Date(),
@@ -3960,7 +3960,7 @@ You can view the reply in your shared secrets list 📋.`;
    * @param userId - The user ID of the requesting user
    * @param telegramId - The telegram ID of the requesting user
    * @param username - The username of the requesting user
-   * @param latestWalletAddress - The latest wallet address of the requesting user
+   * @param publicAddress - The latest wallet address of the requesting user
    * @returns View statistics including count and viewer details with deduplication
    */
   async getSecretViewStats(
@@ -3968,7 +3968,7 @@ You can view the reply in your shared secrets list 📋.`;
     userId: string,
     telegramId: string,
     username: string,
-    latestWalletAddress?: string,
+    publicAddress?: string,
   ): Promise<{
     totalViews: number;
     uniqueViewers: number;
@@ -3979,7 +3979,7 @@ You can view the reply in your shared secrets list 📋.`;
       firstName?: string;
       lastName?: string;
       userId?: string;
-      latestWalletAddress?: string;
+      publicAddress?: string;
       viewedAt: Date;
     }>;
     notViewedUsers: Array<{
@@ -3997,7 +3997,7 @@ You can view the reply in your shared secrets list 📋.`;
       userId: string;
       telegramId: string;
       username: string;
-      latestWalletAddress?: string;
+      publicAddress?: string;
       hasViewedSecret: boolean;
       isOwner: boolean;
     };
@@ -4044,9 +4044,9 @@ You can view the reply in your shared secrets list 📋.`;
             view.telegramId === telegramId ||
             view.userId === userId ||
             (view.username && view.username === username) ||
-            (view.latestWalletAddress &&
-              latestWalletAddress &&
-              view.latestWalletAddress === latestWalletAddress),
+            (view.publicAddress &&
+              publicAddress &&
+              view.publicAddress === publicAddress),
         ) || false;
 
       const secretViews = secret.secretViews || [];
@@ -4060,7 +4060,7 @@ You can view the reply in your shared secrets list 📋.`;
           view.userId,
           view.telegramId,
           view.username,
-          view.latestWalletAddress,
+          view.publicAddress,
         ].filter(Boolean); // Remove null/undefined values
 
         // Use the most reliable identifier as the primary key (userId > telegramId > username > walletAddress)
@@ -4068,7 +4068,7 @@ You can view the reply in your shared secrets list 📋.`;
           view.userId ||
           view.telegramId ||
           view.username ||
-          view.latestWalletAddress;
+          view.publicAddress;
 
         // If this user hasn't been seen before, or if this is a more complete record
         if (
@@ -4088,7 +4088,7 @@ You can view the reply in your shared secrets list 📋.`;
       const viewDetailsWithUserInfo = await Promise.all(
         deduplicatedViews.map(async (view) => {
           let userInfo = null;
-          let currentLatestWalletAddress = view.latestWalletAddress;
+          let currentpublicAddress = view.publicAddress;
 
           // Try to get user info from database if firstName/lastName not in view
           if (!view.firstName || !view.lastName) {
@@ -4098,10 +4098,10 @@ You can view the reply in your shared secrets list 📋.`;
               .exec();
           }
 
-          // If latestWalletAddress is missing, null, or empty, try to fetch the latest one
+          // If publicAddress is missing, null, or empty, try to fetch the latest one
           if (
-            !currentLatestWalletAddress ||
-            currentLatestWalletAddress.trim() === ''
+            !currentpublicAddress ||
+            currentpublicAddress.trim() === ''
           ) {
             try {
               // First try to get address by telegramId if available
@@ -4111,23 +4111,23 @@ You can view the reply in your shared secrets list 📋.`;
                     view.telegramId,
                   );
                 if (addressResponse.success && addressResponse.data) {
-                  currentLatestWalletAddress = addressResponse.data.publicKey;
+                  currentpublicAddress = addressResponse.data.publicKey;
                 }
               }
 
               // If no address found by telegramId, try by userId
-              if (!currentLatestWalletAddress && view.userId) {
+              if (!currentpublicAddress && view.userId) {
                 const addressResponse =
                   await this.publicAddressesService.getLatestAddressByUserId(
                     view.userId,
                   );
                 if (addressResponse.success && addressResponse.data) {
-                  currentLatestWalletAddress = addressResponse.data.publicKey;
+                  currentpublicAddress = addressResponse.data.publicKey;
                 }
               }
 
               // If still no address found, try to find user by username and get their address
-              if (!currentLatestWalletAddress && view.username) {
+              if (!currentpublicAddress && view.username) {
                 const user = await this.userModel
                   .findOne({ username: view.username })
                   .select('_id telegramId')
@@ -4141,19 +4141,19 @@ You can view the reply in your shared secrets list 📋.`;
                         user.telegramId,
                       );
                     if (addressResponse.success && addressResponse.data) {
-                      currentLatestWalletAddress =
+                      currentpublicAddress =
                         addressResponse.data.publicKey;
                     }
                   }
 
                   // If still no address, try by userId
-                  if (!currentLatestWalletAddress) {
+                  if (!currentpublicAddress) {
                     const addressResponse =
                       await this.publicAddressesService.getLatestAddressByUserId(
                         user._id.toString(),
                       );
                     if (addressResponse.success && addressResponse.data) {
-                      currentLatestWalletAddress =
+                      currentpublicAddress =
                         addressResponse.data.publicKey;
                     }
                   }
@@ -4172,7 +4172,7 @@ You can view the reply in your shared secrets list 📋.`;
             telegramId: view.telegramId,
             username: view.username,
             userId: view.userId,
-            latestWalletAddress: currentLatestWalletAddress,
+            publicAddress: currentpublicAddress,
             firstName: userInfo?.firstName || view.firstName || '',
             lastName: userInfo?.lastName || view.lastName || '',
             viewedAt: view.viewedAt,
@@ -4191,8 +4191,8 @@ You can view the reply in your shared secrets list 📋.`;
         if (view.telegramId) viewedUserIdentifiers.add(view.telegramId);
         if (view.userId) viewedUserIdentifiers.add(view.userId);
         if (view.username) viewedUserIdentifiers.add(view.username);
-        if (view.latestWalletAddress)
-          viewedUserIdentifiers.add(view.latestWalletAddress);
+        if (view.publicAddress)
+          viewedUserIdentifiers.add(view.publicAddress);
       });
 
       // Process shared users to categorize them using enhanced matching
@@ -4265,7 +4265,7 @@ You can view the reply in your shared secrets list 📋.`;
           userId,
           telegramId,
           username,
-          latestWalletAddress,
+          publicAddress,
           hasViewedSecret,
           isOwner,
         },

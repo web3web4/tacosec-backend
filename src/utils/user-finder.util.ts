@@ -13,7 +13,7 @@ export interface UserFoundInfo {
   userId: string;
   username: string;
   telegramId: string;
-  latestPublicAddress: string;
+  publicAddress: string;
 }
 
 export class UserFinderUtil {
@@ -84,7 +84,7 @@ export class UserFinderUtil {
       });
 
       // Get latest public address
-      const latestPublicAddress = await publicAddressModel
+      const publicAddress = await publicAddressModel
         .findOne({ userId: user._id })
         .sort({ createdAt: -1 })
         .exec();
@@ -93,7 +93,7 @@ export class UserFinderUtil {
         userId: user._id ? String(user._id) : '',
         username: user.username || '',
         telegramId: user.telegramId || '',
-        latestPublicAddress: latestPublicAddress?.publicKey || '',
+        publicAddress: publicAddress?.publicKey || '',
       };
 
       console.log(`Returning user info:`, result);

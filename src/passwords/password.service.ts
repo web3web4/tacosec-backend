@@ -758,7 +758,7 @@ export class PasswordService {
             ownerUsernameMapByUsername.set(username, ownerInfo.username || username);
             ownerTelegramIdMapByUsername.set(username, ownerInfo.telegramId || '');
             ownerUserIdMapByUsername.set(username, ownerInfo.userId);
-            ownerLatestPublicAddressMapByUsername.set(username, ownerInfo.latestPublicAddress || '');
+            ownerLatestPublicAddressMapByUsername.set(username, ownerInfo.publicAddress || '');
           } else {
             console.log(`No owner info found for username: ${username}`);
           }
@@ -772,7 +772,7 @@ export class PasswordService {
             userId: ownerUserIdMapByUsername.get(username) || '',
             username: ownerUsernameMapByUsername.get(username) || username,
             telegramId: ownerTelegramIdMapByUsername.get(username) || null,
-            latestPublicAddress:
+            publicAddress:
               ownerLatestPublicAddressMapByUsername.get(username) || null,
           },
           passwords: (passwords as any[]).map((p) => {
@@ -918,7 +918,7 @@ export class PasswordService {
               ...shared,
               username: userInfo.username.toLowerCase(),
               userId: userInfo.userId,
-              publicAddress: shared.publicAddress || userInfo.latestPublicAddress,
+              publicAddress: shared.publicAddress || userInfo.publicAddress,
             };
           } else {
             // If no user found, keep only the available information
@@ -1260,7 +1260,7 @@ export class PasswordService {
                 ...shared,
                 username: userInfo.username.toLowerCase(),
                 userId: userInfo.userId,
-                publicAddress: shared.publicAddress || userInfo.latestPublicAddress,
+                publicAddress: shared.publicAddress || userInfo.publicAddress,
                 shouldSendTelegramNotification,
               };
             } else {
@@ -2070,7 +2070,7 @@ You can view the reply in your shared secrets list 📋.`;
           telegramId?: string;
           firstName?: string;
           lastName?: string;
-          latestPublicAddress?: string;
+          publicAddress?: string;
         }
       >();
       const owners = await this.userModel
@@ -2083,7 +2083,7 @@ You can view the reply in your shared secrets list 📋.`;
         const ownerId = owner._id ? String(owner._id) : '';
         ownerPrivacyMap.set(ownerId, owner.privacyMode || false);
 
-        let latestPublicAddress: string | undefined;
+        let publicAddress: string | undefined;
 
         // Try to get latest public address by telegramId first
         if (owner.telegramId) {
@@ -2093,7 +2093,7 @@ You can view the reply in your shared secrets list 📋.`;
                 owner.telegramId,
               );
             if (addressResponse.success && addressResponse.data) {
-              latestPublicAddress = addressResponse.data.publicKey;
+              publicAddress = addressResponse.data.publicKey;
             }
           } catch (error) {
             // If no address found by telegramId, try by userId
@@ -2101,14 +2101,14 @@ You can view the reply in your shared secrets list 📋.`;
         }
 
         // If no address found by telegramId or user has no telegramId, try by userId
-        if (!latestPublicAddress) {
+        if (!publicAddress) {
           try {
             const addressResponse =
               await this.publicAddressesService.getLatestAddressByUserId(
                 ownerId,
               );
             if (addressResponse.success && addressResponse.data) {
-              latestPublicAddress = addressResponse.data.publicKey;
+              publicAddress = addressResponse.data.publicKey;
             }
           } catch (error) {
             // If no address found, latestPublicAddress remains undefined
@@ -2120,7 +2120,7 @@ You can view the reply in your shared secrets list 📋.`;
           telegramId: owner.telegramId,
           firstName: owner.firstName,
           lastName: owner.lastName,
-          latestPublicAddress,
+          publicAddress,
         });
       }
 
@@ -2174,7 +2174,7 @@ You can view the reply in your shared secrets list 📋.`;
             telegramId: undefined,
             firstName: undefined,
             lastName: undefined,
-            latestPublicAddress: undefined,
+            publicAddress: undefined,
           };
 
           // Base password data
@@ -2190,7 +2190,7 @@ You can view the reply in your shared secrets list 📋.`;
             ownerTelegramId: ownerInfo.telegramId, // Add owner Telegram ID
             firstName: ownerInfo.firstName,
             lastName: ownerInfo.lastName,
-            latestPublicAddress: ownerInfo.latestPublicAddress, // Add latest public address
+            publicAddress: ownerInfo.publicAddress, // Add latest public address
             updatedAt: password.updatedAt,
             hidden: password.hidden || false,
             reports: reportInfo,
@@ -2825,7 +2825,7 @@ You can view the reply in your shared secrets list 📋.`;
         };
       }
 
-      // Get all secret owners to check their privacy mode
+      // Get all secret owners using UserFinderUtil for complete information
       const secretOwnerIds = [
         ...new Set(
           sharedPasswords
@@ -2833,41 +2833,30 @@ You can view the reply in your shared secrets list 📋.`;
             .filter((id) => id),
         ),
       ];
-      const secretOwners = await this.userModel
-        .find({ _id: { $in: secretOwnerIds } })
-        .exec();
-      const ownerPrivacyMap = new Map(
-        secretOwners.map((owner) => [
-          owner._id ? String(owner._id) : '',
-          owner.privacyMode,
-        ]),
+      
+      // Use UserFinderUtil to get complete owner information
+      const ownerInfoMap = new Map();
+      await Promise.all(
+        secretOwnerIds.map(async (ownerId) => {
+          try {
+            const ownerInfo = await UserFinderUtil.findUserByAnyInfo(
+              { userId: ownerId },
+              this.userModel,
+              this.publicAddressModel,
+            );
+            if (ownerInfo) {
+              ownerInfoMap.set(ownerId, ownerInfo);
+            }
+          } catch (error) {
+            console.log(`Error finding owner info for userId ${ownerId}:`, error);
+            // Set default values if user not found
+            ownerInfoMap.set(ownerId, {
+              user: null,
+              publicAddress: null,
+            });
+          }
+        }),
       );
-      const ownerUsernameMap = new Map(
-        secretOwners.map((owner) => [
-          owner._id ? String(owner._id) : '',
-          owner.username,
-        ]),
-      );
-      const ownerTelegramIdMap = new Map(
-        secretOwners.map((owner) => [
-          owner._id ? String(owner._id) : '',
-          owner.telegramId,
-        ]),
-      );
-
-      // Get latest public addresses for all secret owners
-      const ownerPublicAddresses = await this.publicAddressModel
-        .find({ userId: { $in: secretOwnerIds } })
-        .sort({ createdAt: -1 })
-        .exec();
-
-      const ownerLatestPublicAddressMap = new Map();
-      ownerPublicAddresses.forEach((address) => {
-        const userId = String(address.userId);
-        if (!ownerLatestPublicAddressMap.has(userId)) {
-          ownerLatestPublicAddressMap.set(userId, address.publicKey);
-        }
-      });
 
       // Transform the data similar to getSharedWithMe method
       const transformedData = await Promise.all(
@@ -2877,12 +2866,16 @@ You can view the reply in your shared secrets list 📋.`;
             const passwordUserId = password.userId
               ? String(password.userId)
               : '';
-            const ownerUsername = ownerUsernameMap.get(passwordUserId);
-            const ownerTelegramId = ownerTelegramIdMap.get(passwordUserId);
-            const ownerPrivacyMode =
-              ownerPrivacyMap.get(passwordUserId) || false;
-            const ownerLatestPublicAddress =
-              ownerLatestPublicAddressMap.get(passwordUserId);
+            
+            // Get owner information from the map
+            const ownerInfo = ownerInfoMap.get(passwordUserId);
+            const owner = ownerInfo?.user;
+            const ownerLatestPublicAddress = ownerInfo?.publicAddress;
+            
+            // Use owner information or fallback to password initData
+            const ownerUsername = owner?.username || password.initData?.username || 'Unknown';
+            const ownerTelegramId = owner?.telegramId || null;
+            const ownerPrivacyMode = owner?.privacyMode || false;
             const isOwner = currentUserTelegramId === ownerTelegramId;
 
             const baseData = {
@@ -2892,10 +2885,9 @@ You can view the reply in your shared secrets list 📋.`;
               description: password.description,
               sharedBy: {
                 userId: passwordUserId,
-                username:
-                  ownerUsername || password.initData?.username || 'Unknown',
-                telegramId: ownerTelegramId || null,
-                latestPublicAddress: ownerLatestPublicAddress || null,
+                username: ownerUsername,
+                telegramId: ownerTelegramId,
+                PublicAddress: ownerLatestPublicAddress || null,
               },
               sharedWith: password.sharedWith || [], // Include sharedWith field in response
               updatedAt: password.updatedAt,
@@ -3274,7 +3266,7 @@ You can view the reply in your shared secrets list 📋.`;
           telegramId?: string;
           firstName?: string;
           lastName?: string;
-          latestPublicAddress?: string;
+          publicAddress?: string;
         }
       >();
       const owners = await this.userModel
@@ -3287,7 +3279,7 @@ You can view the reply in your shared secrets list 📋.`;
         const ownerId = owner._id ? String(owner._id) : '';
         ownerPrivacyMap.set(ownerId, owner.privacyMode || false);
 
-        let latestPublicAddress: string | undefined;
+        let publicAddress: string | undefined;
 
         // Try to get latest public address by telegramId first
         if (owner.telegramId) {
@@ -3297,7 +3289,7 @@ You can view the reply in your shared secrets list 📋.`;
                 owner.telegramId,
               );
             if (addressResponse.success && addressResponse.data) {
-              latestPublicAddress = addressResponse.data.publicKey;
+              publicAddress = addressResponse.data.publicKey;
             }
           } catch (error) {
             // If no address found by telegramId, try by userId
@@ -3305,14 +3297,14 @@ You can view the reply in your shared secrets list 📋.`;
         }
 
         // If no address found by telegramId or user has no telegramId, try by userId
-        if (!latestPublicAddress) {
+        if (!publicAddress) {
           try {
             const addressResponse =
               await this.publicAddressesService.getLatestAddressByUserId(
                 ownerId,
               );
             if (addressResponse.success && addressResponse.data) {
-              latestPublicAddress = addressResponse.data.publicKey;
+              publicAddress = addressResponse.data.publicKey;
             }
           } catch (error) {
             // If no address found, latestPublicAddress remains undefined
@@ -3324,7 +3316,7 @@ You can view the reply in your shared secrets list 📋.`;
           telegramId: owner.telegramId,
           firstName: owner.firstName,
           lastName: owner.lastName,
-          latestPublicAddress,
+          publicAddress,
         });
       }
 
@@ -3370,7 +3362,7 @@ You can view the reply in your shared secrets list 📋.`;
             telegramId: undefined,
             firstName: undefined,
             lastName: undefined,
-            latestPublicAddress: undefined,
+            publicAddress: undefined,
           };
 
           // Base password data
@@ -3386,7 +3378,7 @@ You can view the reply in your shared secrets list 📋.`;
             ownerTelegramId: ownerInfo.telegramId, // Add owner Telegram ID
             firstName: ownerInfo.firstName,
             lastName: ownerInfo.lastName,
-            latestPublicAddress: ownerInfo.latestPublicAddress, // Add latest public address
+            publicAddress: ownerInfo.publicAddress, // Add latest public address
             updatedAt: password.updatedAt,
             hidden: password.hidden || false,
             reports: reportInfo,

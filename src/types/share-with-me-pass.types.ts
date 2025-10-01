@@ -13,7 +13,7 @@ export type SharedByUser = {
   userId: string;
   username: string;
   telegramId: string | null;
-  latestPublicAddress: string | null;
+  publicAddress: string | null;
 };
 
 export type OwnerPasswords = {

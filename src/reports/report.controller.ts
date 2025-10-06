@@ -47,7 +47,9 @@ export class ReportController {
         req.headers['x-telegram-init-data'] as string,
       );
       // For Telegram authentication, find the user by telegramId to get their userId
-      const user = await this.usersService.findByTelegramId(teleDtoData.telegramId);
+      const user = await this.usersService.findByTelegramId(
+        teleDtoData.telegramId,
+      );
       if (!user) {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
@@ -61,9 +63,7 @@ export class ReportController {
   @FlexibleAuth()
   @Roles(Role.ADMIN)
   @UsePipes(new ValidationPipe({ transform: true }))
-  async getReportsByUser(
-    @Param('userIdentifier') userIdentifier: string,
-  ) {
+  async getReportsByUser(@Param('userIdentifier') userIdentifier: string) {
     // This method accepts userId, telegramId, or publicAddress as parameter
     // It will find the user first and then search for all reports using both userId and telegramId
     return this.reportService.getReportsByUser(userIdentifier);
@@ -72,9 +72,7 @@ export class ReportController {
   @Get('is-restricted/:userIdentifier')
   @FlexibleAuth()
   @UsePipes(new ValidationPipe({ transform: true }))
-  async isUserRestricted(
-    @Param('userIdentifier') userIdentifier: string,
-  ) {
+  async isUserRestricted(@Param('userIdentifier') userIdentifier: string) {
     // This method accepts userId, telegramId, or publicAddress as parameter
     // It will find the user first and then check if they are restricted
     return this.reportService.isUserRestricted(userIdentifier);

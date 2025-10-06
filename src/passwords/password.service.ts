@@ -433,7 +433,6 @@ export class PasswordService {
    * @returns Complete user information or null if not found
    */
 
-
   async getSharedWithMe(
     username: string,
     userId?: string,
@@ -700,8 +699,12 @@ export class PasswordService {
           },
         ) => {
           // Get the actual userId from the original password data
-          const originalPassword = sharedPasswords.find(sp => sp._id.toString() === password.id);
-          const ownerUserId = originalPassword ? String(originalPassword.userId) : '';
+          const originalPassword = sharedPasswords.find(
+            (sp) => sp._id.toString() === password.id,
+          );
+          const ownerUserId = originalPassword
+            ? String(originalPassword.userId)
+            : '';
 
           if (!acc[ownerUserId]) {
             acc[ownerUserId] = [];
@@ -737,16 +740,19 @@ export class PasswordService {
 
       // Get owner information using the new search approach
       const ownerInfoMapByUserId = new Map<string, any>();
-      
+
       // Extract unique owner userIds from passwords
       const ownerUserIds = [
         ...new Set(
           resolvedPasswords
             .map((p) => {
-              const passwordUserId = String(sharedPasswords.find(sp => sp._id.toString() === p.id)?.userId || '');
+              const passwordUserId = String(
+                sharedPasswords.find((sp) => sp._id.toString() === p.id)
+                  ?.userId || '',
+              );
               return passwordUserId;
             })
-            .filter((id) => id && id !== '')
+            .filter((id) => id && id !== ''),
         ),
       ];
 
@@ -754,39 +760,43 @@ export class PasswordService {
       for (const ownerId of ownerUserIds) {
         if (ownerId) {
           console.log(`Looking up owner info for userId: ${ownerId}`);
-          
+
           // Search for the actual owner user by userId first
           let ownerInfo = await UserFinderUtil.findUserByAnyInfo(
-            { userId: ownerId }, 
-            this.userModel, 
-            this.publicAddressModel
+            { userId: ownerId },
+            this.userModel,
+            this.publicAddressModel,
           );
 
           // If not found by userId, try to find the owner using other available information
           if (!ownerInfo) {
-            console.log(`User not found by userId ${ownerId}, trying alternative search methods...`);
-            
+            console.log(
+              `User not found by userId ${ownerId}, trying alternative search methods...`,
+            );
+
             // Find passwords owned by this userId to get additional owner information
-            const ownerPasswords = sharedPasswords.filter(p => String(p.userId) === ownerId);
-            
+            const ownerPasswords = sharedPasswords.filter(
+              (p) => String(p.userId) === ownerId,
+            );
+
             // Try to find owner information from the password's user data
             for (const password of ownerPasswords) {
               // If password has username, try searching by username
               if (password.username) {
                 ownerInfo = await UserFinderUtil.findUserByAnyInfo(
-                  { username: password.username }, 
-                  this.userModel, 
-                  this.publicAddressModel
+                  { username: password.username },
+                  this.userModel,
+                  this.publicAddressModel,
                 );
                 if (ownerInfo) break;
               }
-              
+
               // If password has telegramId, try searching by telegramId
               if (password.telegramId) {
                 ownerInfo = await UserFinderUtil.findUserByAnyInfo(
-                  { telegramId: password.telegramId }, 
-                  this.userModel, 
-                  this.publicAddressModel
+                  { telegramId: password.telegramId },
+                  this.userModel,
+                  this.publicAddressModel,
                 );
                 if (ownerInfo) break;
               }
@@ -800,7 +810,7 @@ export class PasswordService {
               userId: ownerInfo.userId,
               username: ownerInfo.username || '',
               telegramId: ownerInfo.telegramId || '',
-              publicAddress: ownerInfo.publicAddress || ''
+              publicAddress: ownerInfo.publicAddress || '',
             });
           } else {
             console.log(`No owner info found for userId: ${ownerId}`);
@@ -809,7 +819,7 @@ export class PasswordService {
               userId: ownerId,
               username: '',
               telegramId: '',
-              publicAddress: ''
+              publicAddress: '',
             });
           }
         }
@@ -819,7 +829,7 @@ export class PasswordService {
         .filter(([userId]) => userId && userId !== '')
         .map(([userId, passwords]) => {
           const ownerInfo = ownerInfoMapByUserId.get(userId);
-          
+
           return {
             sharedBy: {
               userId: ownerInfo?.userId || userId,
@@ -959,11 +969,15 @@ export class PasswordService {
       processedUpdate.sharedWith = await Promise.all(
         update.sharedWith.map(async (shared) => {
           // Use the enhanced user lookup function to find complete user information
-          const userInfo = await UserFinderUtil.findUserByAnyInfo({
-            username: shared.username,
-            userId: shared.userId,
-            publicAddress: shared.publicAddress,
-          }, this.userModel, this.publicAddressModel);
+          const userInfo = await UserFinderUtil.findUserByAnyInfo(
+            {
+              username: shared.username,
+              userId: shared.userId,
+              publicAddress: shared.publicAddress,
+            },
+            this.userModel,
+            this.publicAddressModel,
+          );
 
           if (userInfo) {
             // If user found, use complete information
@@ -977,7 +991,9 @@ export class PasswordService {
             // If no user found, keep only the available information
             return {
               ...shared,
-              username: shared.username ? shared.username.toLowerCase() : undefined,
+              username: shared.username
+                ? shared.username.toLowerCase()
+                : undefined,
               userId: shared.userId || undefined,
               publicAddress: shared.publicAddress || undefined,
             };
@@ -1299,16 +1315,20 @@ export class PasswordService {
             let shouldSendTelegramNotification = false;
 
             // Use the enhanced user lookup function to find complete user information
-            const userInfo = await UserFinderUtil.findUserByAnyInfo({
-              username: shared.username,
-              userId: shared.userId,
-              publicAddress: shared.publicAddress,
-            }, this.userModel, this.publicAddressModel);
+            const userInfo = await UserFinderUtil.findUserByAnyInfo(
+              {
+                username: shared.username,
+                userId: shared.userId,
+                publicAddress: shared.publicAddress,
+              },
+              this.userModel,
+              this.publicAddressModel,
+            );
 
             if (userInfo) {
               // If user found, use complete information
               shouldSendTelegramNotification = !!userInfo.telegramId;
-              
+
               return {
                 ...shared,
                 username: userInfo.username.toLowerCase(),
@@ -1328,7 +1348,7 @@ export class PasswordService {
                   shouldSendTelegramNotification,
                 };
               }
-              
+
               // If only publicAddress provided and no user found, keep only the public address
               return {
                 ...shared,
@@ -2886,7 +2906,7 @@ You can view the reply in your shared secrets list 📋.`;
             .filter((id) => id),
         ),
       ];
-      
+
       // Use UserFinderUtil to get complete owner information
       const ownerInfoMap = new Map();
       await Promise.all(
@@ -2901,7 +2921,10 @@ You can view the reply in your shared secrets list 📋.`;
               ownerInfoMap.set(ownerId, ownerInfo);
             }
           } catch (error) {
-            console.log(`Error finding owner info for userId ${ownerId}:`, error);
+            console.log(
+              `Error finding owner info for userId ${ownerId}:`,
+              error,
+            );
             // Set default values if user not found
             ownerInfoMap.set(ownerId, {
               user: null,
@@ -2919,14 +2942,15 @@ You can view the reply in your shared secrets list 📋.`;
             const passwordUserId = password.userId
               ? String(password.userId)
               : '';
-            
+
             // Get owner information from the map
             const ownerInfo = ownerInfoMap.get(passwordUserId);
             const owner = ownerInfo?.user;
             const ownerLatestPublicAddress = ownerInfo?.publicAddress;
-            
+
             // Use owner information or fallback to password initData
-            const ownerUsername = owner?.username || password.initData?.username || 'Unknown';
+            const ownerUsername =
+              owner?.username || password.initData?.username || 'Unknown';
             const ownerTelegramId = owner?.telegramId || null;
             const ownerPrivacyMode = owner?.privacyMode || false;
             const isOwner = currentUserTelegramId === ownerTelegramId;
@@ -4065,10 +4089,7 @@ You can view the reply in your shared secrets list 📋.`;
 
         // Use the most reliable identifier as the primary key (userId > telegramId > username > walletAddress)
         const primaryKey =
-          view.userId ||
-          view.telegramId ||
-          view.username ||
-          view.publicAddress;
+          view.userId || view.telegramId || view.username || view.publicAddress;
 
         // If this user hasn't been seen before, or if this is a more complete record
         if (
@@ -4099,10 +4120,7 @@ You can view the reply in your shared secrets list 📋.`;
           }
 
           // If publicAddress is missing, null, or empty, try to fetch the latest one
-          if (
-            !currentpublicAddress ||
-            currentpublicAddress.trim() === ''
-          ) {
+          if (!currentpublicAddress || currentpublicAddress.trim() === '') {
             try {
               // First try to get address by telegramId if available
               if (view.telegramId) {
@@ -4141,8 +4159,7 @@ You can view the reply in your shared secrets list 📋.`;
                         user.telegramId,
                       );
                     if (addressResponse.success && addressResponse.data) {
-                      currentpublicAddress =
-                        addressResponse.data.publicKey;
+                      currentpublicAddress = addressResponse.data.publicKey;
                     }
                   }
 
@@ -4153,8 +4170,7 @@ You can view the reply in your shared secrets list 📋.`;
                         user._id.toString(),
                       );
                     if (addressResponse.success && addressResponse.data) {
-                      currentpublicAddress =
-                        addressResponse.data.publicKey;
+                      currentpublicAddress = addressResponse.data.publicKey;
                     }
                   }
                 }
@@ -4191,8 +4207,7 @@ You can view the reply in your shared secrets list 📋.`;
         if (view.telegramId) viewedUserIdentifiers.add(view.telegramId);
         if (view.userId) viewedUserIdentifiers.add(view.userId);
         if (view.username) viewedUserIdentifiers.add(view.username);
-        if (view.publicAddress)
-          viewedUserIdentifiers.add(view.publicAddress);
+        if (view.publicAddress) viewedUserIdentifiers.add(view.publicAddress);
       });
 
       // Process shared users to categorize them using enhanced matching

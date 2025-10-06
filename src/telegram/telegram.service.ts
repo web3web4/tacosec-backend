@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 // import { firstValueFrom } from 'rxjs';
 // import { TelegramValidatorService } from './telegram-validator.service';
 import { UsersService } from '../users/users.service';
+import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 import axios from 'axios';
 
 @Injectable()
@@ -21,6 +22,7 @@ export class TelegramService {
     // private readonly telegramValidatorService: TelegramValidatorService,
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
+    private readonly publicAddressesService: PublicAddressesService,
   ) {
     this.botToken =
       this.configService.get<string>('TELEGRAM_BOT_TOKEN') ||
@@ -207,13 +209,13 @@ export class TelegramService {
   /**
    * Send a message to all admin users
    * @param message The message to send
-   * @param senderTelegramId The telegram ID of the sender
+   * @param senderInfo Object containing sender's telegramId, username, and publicAddress
    * @param subject Optional subject for the message
    * @returns Object with success status and number of admins contacted
    */
   async sendMessageToAdmins(
     message: string,
-    senderTelegramId: string,
+    senderInfo: { telegramId: string; username: string; publicAddress: string },
     subject?: string,
   ): Promise<{ success: boolean; adminCount: number }> {
     try {
@@ -225,17 +227,32 @@ export class TelegramService {
         return { success: false, adminCount: 0 };
       }
 
-      // Get sender information
-      const sender = await this.usersService.findByTelegramId(senderTelegramId);
+      // Get additional sender information if telegramId is available
+      let senderDisplayName = 'Unknown User';
+      let senderFirstName = '';
+      let senderLastName = '';
 
-      // Format the message with sender information
+      if (senderInfo.telegramId) {
+        try {
+          const sender = await this.usersService.findByTelegramId(senderInfo.telegramId);
+          if (sender) {
+            senderFirstName = sender.firstName || '';
+            senderLastName = sender.lastName || '';
+            senderDisplayName = `${senderFirstName} ${senderLastName}`.trim() || sender.username || 'Unknown User';
+          }
+        } catch (error) {
+          console.log('Could not fetch sender details:', error.message);
+        }
+      }
+
+      // Format the message with comprehensive sender information
       const formattedMessage = `🆘 <b>Support Request</b>
 
-👤 <b>User:</b> ${sender?.firstName || ''} ${sender?.lastName || ''}
-🪪 <b>Telegram Username:</b> ${sender?.username || 'N/A'}
-🆔 <b>Telegram ID:</b> ${senderTelegramId}
-${subject ? `📋 <b>Subject:</b> ${subject}\n` : ''}
-💬 <b>Message:</b>
+👤 <b>User:</b> ${senderDisplayName}
+🪪 <b>Telegram Username:</b> ${senderInfo.username || 'N/A'}
+🆔 <b>Telegram ID:</b> ${senderInfo.telegramId || 'N/A'}
+🏦 <b>Public Address:</b> ${senderInfo.publicAddress || 'N/A'}
+${subject ? `📋 <b>Subject:</b> ${subject}\n` : ''}💬 <b>Message:</b>
 ${message}
 
 ⏰ <b>Date:</b> ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}`;
@@ -285,13 +302,13 @@ ${message}
   /**
    * Send a message to a specific admin user defined in environment variables
    * @param message The message to send
-   * @param senderTelegramId The telegram ID of the sender
+   * @param senderInfo Object containing sender's telegramId, username, and publicAddress
    * @param subject Optional subject for the message
    * @returns Object with success status
    */
   async sendMessageToSpecificAdmin(
     message: string,
-    senderTelegramId: string,
+    senderInfo: { telegramId: string; username: string; publicAddress: string },
     subject?: string,
   ): Promise<{ success: boolean; adminTelegramId?: string }> {
     try {
@@ -306,15 +323,36 @@ ${message}
         return { success: false };
       }
 
-      // Get sender information
-      const sender = await this.usersService.findByTelegramId(senderTelegramId);
+      // Get additional sender information if telegramId is available
+      let senderDisplayName = 'Unknown User';
+      let senderFirstName = '';
+      let senderLastName = '';
 
-      // Format the message with sender information
+      if (senderInfo.telegramId) {
+        try {
+          const sender = await this.usersService.findByTelegramId(
+            senderInfo.telegramId,
+          );
+          if (sender) {
+            senderFirstName = sender.firstName || '';
+            senderLastName = sender.lastName || '';
+            senderDisplayName =
+              `${senderFirstName} ${senderLastName}`.trim() ||
+              sender.username ||
+              'Unknown User';
+          }
+        } catch (error) {
+          console.log('Could not fetch sender details:', error.message);
+        }
+      }
+
+      // Format the message with comprehensive sender information
       const formattedMessage = `🆘 <b>Support Request</b>
 
-👤 <b>User:</b> ${sender?.firstName || ''} ${sender?.lastName || ''}
-🪪 <b>Telegram Username:</b> ${sender?.username || 'N/A'}
-🆔 <b>Telegram ID:</b> ${senderTelegramId}
+👤 <b>User:</b> ${senderDisplayName}
+🪪 <b>Telegram Username:</b> ${senderInfo.username || 'N/A'}
+🆔 <b>Telegram ID:</b> ${senderInfo.telegramId || 'N/A'}
+🏦 <b>Public Address:</b> ${senderInfo.publicAddress || 'N/A'}
 ${subject ? `📋 <b>Subject:</b> ${subject}\n` : ''}💬 <b>Message:</b>
 ${message}
 
@@ -396,12 +434,66 @@ ${message}
     subject: string | undefined,
     telegramDtoAuthGuard: any,
   ): Promise<{ success: boolean; adminCount: number }> {
-    const telegramId = this.extractTelegramIdFromRequest(
-      req,
-      telegramDtoAuthGuard,
-    );
+    // Extract sender information from request (supports both JWT and Telegram auth)
+    let senderInfo = {
+      telegramId: '',
+      username: '',
+      publicAddress: '',
+    };
 
-    return await this.sendMessageToAdmins(message, telegramId, subject);
+    try {
+      // Priority 1: JWT authentication - extract user info from req.user
+      if (req?.user?.id) {
+        const user = await this.usersService.findOne(req.user.id);
+        if (user) {
+          senderInfo.telegramId = user.telegramId || '';
+          senderInfo.username = user.username || '';
+
+          // Get latest public address for the user
+          try {
+            const addressResponse = await this.publicAddressesService.getLatestAddressByUserId(req.user.id);
+            if (addressResponse.success && addressResponse.data) {
+              senderInfo.publicAddress = addressResponse.data.publicKey;
+            }
+          } catch (error) {
+            console.log('No public address found for user:', req.user.id);
+            senderInfo.publicAddress = '';
+          }
+        }
+      } else {
+        // Priority 2: Telegram authentication - extract from telegram init data
+        const telegramId = this.extractTelegramIdFromRequest(req, telegramDtoAuthGuard);
+        senderInfo.telegramId = telegramId;
+
+        // Get user info and username from database
+        if (senderInfo.telegramId) {
+          try {
+            const addressResponse = await this.publicAddressesService.getLatestAddressByTelegramId(senderInfo.telegramId);
+            if (addressResponse.success && addressResponse.data) {
+              senderInfo.publicAddress = addressResponse.data.publicKey;
+            }
+          } catch (error) {
+            console.log('No public address found for telegramId:', senderInfo.telegramId);
+            senderInfo.publicAddress = '';
+          }
+
+          // Get username from user record
+          try {
+            const user = await this.usersService.findByTelegramId(senderInfo.telegramId);
+            if (user) {
+              senderInfo.username = user.username || '';
+            }
+          } catch (error) {
+            console.log('Could not find user by telegramId:', senderInfo.telegramId);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error extracting sender information:', error);
+      // Continue with empty sender info if extraction fails
+    }
+
+    return await this.sendMessageToAdmins(message, senderInfo, subject);
   }
 
   /**
@@ -418,11 +510,68 @@ ${message}
     subject: string | undefined,
     telegramDtoAuthGuard: any,
   ): Promise<{ success: boolean; adminTelegramId?: string }> {
-    const telegramId = this.extractTelegramIdFromRequest(
-      req,
-      telegramDtoAuthGuard,
-    );
+    // Extract sender information from request (supports both JWT and Telegram auth)
+    let senderInfo = {
+      telegramId: '',
+      username: '',
+      publicAddress: '',
+    };
 
-    return await this.sendMessageToSpecificAdmin(message, telegramId, subject);
+    try {
+      // Priority 1: JWT authentication - extract user info from req.user
+      if (req?.user?.id) {
+        const user = await this.usersService.findOne(req.user.id);
+        if (user) {
+          senderInfo.telegramId = user.telegramId || '';
+          senderInfo.username = user.username || '';
+
+          // Get latest public address for the user
+          try {
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByUserId(
+                req.user.id,
+              );
+            if (addressResponse.success && addressResponse.data) {
+              senderInfo.publicAddress = addressResponse.data.publicKey;
+            }
+          } catch (error) {
+            console.log('No public address found for user:', req.user.id);
+            senderInfo.publicAddress = '';
+          }
+        }
+      }
+      // Priority 2: Telegram authentication - extract from telegram data
+      else if (req?.headers?.['x-telegram-init-data']) {
+        const parsedData = telegramDtoAuthGuard.parseTelegramInitData(
+          req.headers['x-telegram-init-data'],
+        );
+        senderInfo.telegramId = parsedData.telegramId || '';
+        senderInfo.username = parsedData.username || '';
+
+        // Try to find user by telegramId to get public address
+        if (senderInfo.telegramId) {
+          try {
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByTelegramId(
+                senderInfo.telegramId,
+              );
+            if (addressResponse.success && addressResponse.data) {
+              senderInfo.publicAddress = addressResponse.data.publicKey;
+            }
+          } catch (error) {
+            console.log(
+              'No user or public address found for telegramId:',
+              senderInfo.telegramId,
+            );
+            senderInfo.publicAddress = '';
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error extracting sender information:', error);
+      // Continue with empty sender info if extraction fails
+    }
+
+    return await this.sendMessageToSpecificAdmin(message, senderInfo, subject);
   }
 }

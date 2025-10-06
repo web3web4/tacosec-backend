@@ -11,7 +11,10 @@ import { UsersModule } from '../users/users.module';
 import { RolesGuard } from '../guards/roles.guard';
 import { ConfigModule } from '@nestjs/config';
 import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
-import { PublicAddress, PublicAddressSchema } from '../public-addresses/schemas/public-address.schema';
+import {
+  PublicAddress,
+  PublicAddressSchema,
+} from '../public-addresses/schemas/public-address.schema';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 
 @Module({

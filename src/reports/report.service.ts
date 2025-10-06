@@ -10,9 +10,9 @@ import {
   PasswordDocument,
 } from '../passwords/schemas/password.schema';
 import { PublicAddressesService } from '../public-addresses/public-addresses.service';
-import { 
-  PublicAddress, 
-  PublicAddressDocument 
+import {
+  PublicAddress,
+  PublicAddressDocument,
 } from '../public-addresses/schemas/public-address.schema';
 import { UserFinderUtil } from '../utils/user-finder.util';
 import { AddressDetectorUtil } from '../utils/address-detector.util';
@@ -340,10 +340,15 @@ If you believe this report was made in error, please contact our support team.`;
             Number(reportedUser.telegramId),
             notificationMessage,
           );
-          
-          console.log(`Report notification sent to user ${reportedUser.telegramId}`);
+
+          console.log(
+            `Report notification sent to user ${reportedUser.telegramId}`,
+          );
         } catch (telegramError) {
-          console.error(`Failed to send Telegram notification to user ${reportedUser.telegramId}:`, telegramError);
+          console.error(
+            `Failed to send Telegram notification to user ${reportedUser.telegramId}:`,
+            telegramError,
+          );
           // Don't throw error here as the report was still created successfully
         }
       }

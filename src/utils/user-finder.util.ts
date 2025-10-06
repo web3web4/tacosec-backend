@@ -28,7 +28,7 @@ export class UserFinderUtil {
   static async findUserByAnyInfo(
     userInfo: UserSearchInfo,
     userModel: Model<UserDocument>,
-    publicAddressModel: Model<PublicAddressDocument>
+    publicAddressModel: Model<PublicAddressDocument>,
   ): Promise<UserFoundInfo | null> {
     try {
       let user = null;
@@ -43,9 +43,9 @@ export class UserFinderUtil {
       // If not found, try by username (case-insensitive)
       if (!user && userInfo.username) {
         user = await userModel
-          .findOne({ 
-            username: { $regex: new RegExp(`^${userInfo.username}$`, 'i') }, 
-            isActive: true 
+          .findOne({
+            username: { $regex: new RegExp(`^${userInfo.username}$`, 'i') },
+            isActive: true,
           })
           .exec();
       }
@@ -54,13 +54,13 @@ export class UserFinderUtil {
       if (!user && userInfo.telegramId) {
         // Try both string and number formats for telegramId
         user = await userModel
-          .findOne({ 
+          .findOne({
             $or: [
               { telegramId: userInfo.telegramId },
               { telegramId: String(userInfo.telegramId) },
-              { telegramId: Number(userInfo.telegramId) }
+              { telegramId: Number(userInfo.telegramId) },
             ],
-            isActive: true 
+            isActive: true,
           })
           .exec();
       }

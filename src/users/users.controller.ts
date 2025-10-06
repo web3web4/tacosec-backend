@@ -115,7 +115,7 @@ export class UsersController {
   /**
    * Get current user information
    * Supports both JWT token and Telegram init data authentication
-   * 
+   *
    * Example usage with JWT:
    * GET /users/me
    * Authorization: Bearer <jwt_token>
@@ -189,22 +189,22 @@ export class UsersController {
     );
   }
 
-/**
- * Get complete information about the current user
- * Supports both JWT token authentication and Telegram init data authentication
- * Returns all user fields plus the latest public address
- * 
- * Authentication methods:
- * 1. JWT token in Authorization header: Bearer <token>
- * 2. Telegram init data in X-Telegram-Init-Data header
- * 
- * Example usage:
- * GET /users/me
- * Authorization: Bearer <jwt_token>
- * OR
- * GET /users/me
- * X-Telegram-Init-Data: query_id=AAHdF6IQAAAAAN0XohDhrOrc&user=%7B%22id%22%3A123456789...
- */
+  /**
+   * Get complete information about the current user
+   * Supports both JWT token authentication and Telegram init data authentication
+   * Returns all user fields plus the latest public address
+   *
+   * Authentication methods:
+   * 1. JWT token in Authorization header: Bearer <token>
+   * 2. Telegram init data in X-Telegram-Init-Data header
+   *
+   * Example usage:
+   * GET /users/me
+   * Authorization: Bearer <jwt_token>
+   * OR
+   * GET /users/me
+   * X-Telegram-Init-Data: query_id=AAHdF6IQAAAAAN0XohDhrOrc&user=%7B%22id%22%3A123456789...
+   */
 
   @Patch('me/privacy-mode')
   @FlexibleAuth()
@@ -282,5 +282,4 @@ export class UsersController {
   //       return { success: false };
   //     }
   //   }
-
-  }
+}

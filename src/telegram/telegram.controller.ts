@@ -11,6 +11,7 @@ import { TelegramService } from './telegram.service';
 import { GetUsersDto } from './dto/get-users.dto';
 import { SendToAdminDto } from './dto/send-to-admin.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
+import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 // import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 
@@ -85,7 +86,7 @@ export class TelegramController {
    * This endpoint allows regular users to send messages to all admin users
    */
   @Post('send-to-admin')
-  @TelegramDtoAuth()
+  @FlexibleAuth()
   async sendMessageToAdmin(
     @Request() req: Request,
     @Body() sendToAdminDto: SendToAdminDto,
@@ -103,7 +104,7 @@ export class TelegramController {
    * This endpoint allows regular users to send messages to the specific admin
    */
   @Post('send-to-specific-admin')
-  @TelegramDtoAuth()
+  @FlexibleAuth()
   async sendMessageToSpecificAdmin(
     @Request() req: Request,
     @Body() sendToAdminDto: SendToAdminDto,

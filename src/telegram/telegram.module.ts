@@ -7,6 +7,7 @@ import { TelegramController } from './telegram.controller';
 import { TelegramService } from './telegram.service';
 import { TelegramValidatorService } from './telegram-validator.service';
 import { UsersModule } from '../users/users.module';
+import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { User, UserSchema } from '../users/schemas/user.schema';
 
@@ -17,6 +18,7 @@ import { User, UserSchema } from '../users/schemas/user.schema';
     SharedJwtModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     forwardRef(() => UsersModule),
+    PublicAddressesModule,
   ],
   controllers: [TelegramController],
   providers: [TelegramService, TelegramValidatorService, TelegramDtoAuthGuard],

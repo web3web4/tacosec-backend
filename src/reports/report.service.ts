@@ -17,6 +17,7 @@ import {
 import { UserFinderUtil } from '../utils/user-finder.util';
 import { AddressDetectorUtil } from '../utils/address-detector.util';
 import { Types } from 'mongoose';
+import { TelegramService } from '../telegram/telegram.service';
 
 @Injectable()
 export class ReportService {
@@ -32,6 +33,7 @@ export class ReportService {
     private publicAddressModel: Model<PublicAddressDocument>,
     private configService: ConfigService,
     private publicAddressesService: PublicAddressesService,
+    private telegramService: TelegramService,
   ) {
     // Get the maximum number of reports before ban from environment variables
     // Default to 10 if not specified
@@ -320,6 +322,30 @@ export class ReportService {
           { _id: reportedUser._id },
           { sharingRestricted: true },
         );
+      }
+
+      // Send Telegram notification to the reported user if they have a Telegram account
+      if (reportedUser.telegramId) {
+        try {
+          const notificationMessage = `⚠️ <b>Report Notification</b>
+
+You have received a report regarding your shared content. Please review your shared information to ensure it complies with our community guidelines.
+
+📋 <b>Report Type:</b> ${reportData.report_type}
+${finalReason ? `💬 <b>Reason:</b> ${finalReason}\n` : ''}⏰ <b>Date:</b> ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}
+
+If you believe this report was made in error, please contact our support team.`;
+
+          await this.telegramService.sendMessage(
+            Number(reportedUser.telegramId),
+            notificationMessage,
+          );
+          
+          console.log(`Report notification sent to user ${reportedUser.telegramId}`);
+        } catch (telegramError) {
+          console.error(`Failed to send Telegram notification to user ${reportedUser.telegramId}:`, telegramError);
+          // Don't throw error here as the report was still created successfully
+        }
       }
 
       return savedReport;

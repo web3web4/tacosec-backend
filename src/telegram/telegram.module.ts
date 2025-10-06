@@ -18,7 +18,7 @@ import { User, UserSchema } from '../users/schemas/user.schema';
     SharedJwtModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     forwardRef(() => UsersModule),
-    PublicAddressesModule,
+    forwardRef(() => PublicAddressesModule),
   ],
   controllers: [TelegramController],
   providers: [TelegramService, TelegramValidatorService, TelegramDtoAuthGuard],

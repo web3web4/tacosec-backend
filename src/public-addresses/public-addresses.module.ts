@@ -21,7 +21,7 @@ import { CryptoModule } from '../utils/crypto.module';
     ]),
     SharedJwtModule,
     forwardRef(() => UsersModule),
-    TelegramModule,
+    forwardRef(() => TelegramModule),
     CryptoModule,
   ],
   controllers: [PublicAddressesController],

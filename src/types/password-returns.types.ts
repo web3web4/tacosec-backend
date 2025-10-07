@@ -4,13 +4,14 @@ import { ReportType } from '../reports/dto/report-user.dto';
 import { Types } from 'mongoose';
 
 // Report information for passwords
-export type PasswordReportInfo = {
-  reporterUsername: string; // Username of the reporter
-  report_type: ReportType; // Type of the report
-  reason: string | null; // Reason if report_type is 'Other', otherwise null
-  createdAt: Date; // Date when the report was created
-};
-
+// export type PasswordReportInfo = {
+//   reporterUsername: string; // Username of the reporter
+//   report_type: ReportType; // Type of the report
+//   reason: string | null; // Reason if report_type is 'Other', otherwise null
+//   createdAt: Date; // Date when the report was created
+// };
+// Report information for passwords - now using any to allow complete MongoDB document structure
+export type PasswordReportInfo = any;
 export type passwordReturns = {
   _id: Types.ObjectId;
   key: string;

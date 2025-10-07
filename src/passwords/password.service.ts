@@ -207,22 +207,22 @@ export class PasswordService {
             .exec();
 
           // Transform reports to include reporter username
-          const reportInfo: PasswordReportInfo[] = await Promise.all(
-            reports.map(async (report) => {
-              // Get reporter user info
-              const reporter = await this.userModel
-                .findOne({ telegramId: report.reporterTelegramId })
-                .select('username')
-                .exec();
+          // const reportInfo: PasswordReportInfo[] = await Promise.all(
+          //   reports.map(async (report) => {
+          //     // Get reporter user info
+          //     const reporter = await this.userModel
+          //       .findOne({ telegramId: report.reporterTelegramId })
+          //       .select('username')
+          //       .exec();
 
-              return {
-                reporterUsername: reporter ? reporter.username : 'Unknown',
-                report_type: report.report_type,
-                reason: report.reason,
-                createdAt: report.createdAt,
-              };
-            }),
-          );
+          //     return {
+          //       reporterUsername: reporter ? reporter.username : 'Unknown',
+          //       report_type: report.report_type,
+          //       reason: report.reason,
+          //       createdAt: report.createdAt,
+          //     };
+          //   }),
+          // );
 
           const secretViews = password.secretViews || [];
           return {
@@ -235,7 +235,7 @@ export class PasswordService {
             updatedAt: password.updatedAt,
             createdAt: password.createdAt,
             hidden: password.hidden || false,
-            reports: reportInfo,
+            reports: reports, // Include complete reports data as stored in MongoDB
             viewsCount: secretViews.length,
             secretViews: secretViews,
           };
@@ -298,22 +298,22 @@ export class PasswordService {
             .exec();
 
           // Transform reports to include reporter username
-          const reportInfo: PasswordReportInfo[] = await Promise.all(
-            reports.map(async (report) => {
-              // Get reporter user info
-              const reporter = await this.userModel
-                .findOne({ telegramId: report.reporterTelegramId })
-                .select('username')
-                .exec();
+          // const reportInfo: PasswordReportInfo[] = await Promise.all(
+          //   reports.map(async (report) => {
+          //     // Get reporter user info
+          //     const reporter = await this.userModel
+          //       .findOne({ telegramId: report.reporterTelegramId })
+          //       .select('username')
+          //       .exec();
 
-              return {
-                reporterUsername: reporter ? reporter.username : 'Unknown',
-                report_type: report.report_type,
-                reason: report.reason,
-                createdAt: report.createdAt,
-              };
-            }),
-          );
+          //     return {
+          //       reporterUsername: reporter ? reporter.username : 'Unknown',
+          //       report_type: report.report_type,
+          //       reason: report.reason,
+          //       createdAt: report.createdAt,
+          //     };
+          //   }),
+          // );
 
           const secretViews = password.secretViews || [];
           return {
@@ -326,7 +326,7 @@ export class PasswordService {
             updatedAt: password.updatedAt,
             createdAt: password.createdAt,
             hidden: password.hidden || false,
-            reports: reportInfo, // Include report information
+            reports: reports, // Include complete reports data as stored in MongoDB
             viewsCount: secretViews.length,
             secretViews: secretViews,
           };
@@ -588,24 +588,6 @@ export class PasswordService {
               })
               .exec();
 
-            const transformedReports = await Promise.all(
-              reports.map(async (report) => {
-                // Find the reporter user by telegramId
-                const reporterUser = await this.userModel
-                  .findOne({ telegramId: report.reporterTelegramId })
-                  .select('username')
-                  .exec();
-
-                return {
-                  id: report._id.toString(),
-                  reporterUsername: reporterUser?.username || 'unknown',
-                  report_type: report.report_type,
-                  reason: report.reason,
-                  createdAt: report.createdAt,
-                };
-              }),
-            );
-
             // Check owner's privacy mode
             const passwordUserId = password.userId
               ? String(password.userId)
@@ -624,7 +606,7 @@ export class PasswordService {
               description: password.description,
               username: ownerUsername || password.initData.username,
               sharedWith: password.sharedWith || [], // Include sharedWith field in response
-              reports: transformedReports,
+              reports: reports, // Include complete reports data as stored in MongoDB
               updatedAt: password.updatedAt,
             };
 
@@ -2955,6 +2937,17 @@ You can view the reply in your shared secrets list 📋.`;
             const ownerPrivacyMode = owner?.privacyMode || false;
             const isOwner = currentUserTelegramId === ownerTelegramId;
 
+            // Fetch unresolved reports for this password
+            const reports = await this.reportModel
+              .find({
+                $or: [
+                  { secret_id: password._id },
+                  { secret_id: password._id.toString() },
+                ],
+                resolved: false,
+              })
+              .exec();
+
             const baseData = {
               _id: password._id,
               key: password.key,
@@ -2967,6 +2960,7 @@ You can view the reply in your shared secrets list 📋.`;
                 PublicAddress: ownerLatestPublicAddress || null,
               },
               sharedWith: password.sharedWith || [], // Include sharedWith field in response
+              reports: reports, // Include complete reports data as stored in MongoDB
               updatedAt: password.updatedAt,
             };
 

@@ -19,6 +19,9 @@ import { UsersService } from '../users/users.service';
 
 export interface LoginResponse {
   access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
 }
 
 @Injectable()
@@ -114,18 +117,15 @@ export class AuthService {
 
         // Create JWT payload for the new user
         const payload = {
+          userId: savedUser._id.toString(),
           sub: savedUser._id.toString(),
           telegramId: savedUser.telegramId,
           username: savedUser.username,
           role: savedUser.role,
         };
 
-        // Generate JWT token
-        const access_token = this.jwtService.sign(payload);
-
-        return {
-          access_token,
-        };
+        // Generate JWT tokens
+        return this.generateTokens(payload);
       }
 
       // Get the user information
@@ -144,18 +144,15 @@ export class AuthService {
 
       // Create JWT payload
       const payload = {
+        userId: user._id.toString(),
         sub: user._id.toString(),
         telegramId: user.telegramId,
         username: user.username,
         role: user.role,
       };
 
-      // Generate JWT token
-      const access_token = this.jwtService.sign(payload);
-
-      return {
-        access_token,
-      };
+      // Generate JWT tokens
+      return this.generateTokens(payload);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -225,18 +222,15 @@ export class AuthService {
 
       // Create JWT payload
       const payload = {
+        userId: user._id.toString(),
         sub: user._id.toString(),
         telegramId: user.telegramId,
         username: user.username,
         role: user.role,
       };
 
-      // Generate JWT token
-      const access_token = this.jwtService.sign(payload);
-
-      return {
-        access_token,
-      };
+      // Generate JWT tokens
+      return this.generateTokens(payload);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -343,18 +337,15 @@ export class AuthService {
 
         // Create JWT payload
         const payload = {
+          userId: savedUser._id.toString(),
           sub: savedUser._id.toString(),
           telegramId: savedUser.telegramId,
           username: savedUser.username,
           role: savedUser.role,
         };
 
-        // Generate JWT token
-        const access_token = this.jwtService.sign(payload);
-
-        return {
-          access_token,
-        };
+        // Generate JWT tokens
+        return this.generateTokens(payload);
       } else {
         // Different user with same telegramId - this is a conflict for linking
         throw new HttpException(
@@ -401,18 +392,15 @@ export class AuthService {
 
     // Create JWT payload
     const payload = {
+      userId: updatedUser._id.toString(),
       sub: updatedUser._id.toString(),
       telegramId: updatedUser.telegramId,
       username: updatedUser.username,
       role: updatedUser.role,
     };
 
-    // Generate JWT token
-    const access_token = this.jwtService.sign(payload);
-
-    return {
-      access_token,
-    };
+    // Generate JWT tokens
+    return this.generateTokens(payload);
   }
 
   /**
@@ -524,18 +512,15 @@ export class AuthService {
 
       // Create JWT payload
       const payload = {
-        sub: savedUser._id.toString(),
-        telegramId: savedUser.telegramId,
-        username: savedUser.username,
-        role: savedUser.role,
-      };
+      userId: savedUser._id.toString(),
+      sub: savedUser._id.toString(),
+      telegramId: savedUser.telegramId,
+      username: savedUser.username,
+      role: savedUser.role,
+    };
 
-      // Generate JWT token
-      const access_token = this.jwtService.sign(payload);
-
-      return {
-        access_token,
-      };
+    // Generate JWT tokens
+    return this.generateTokens(payload);
     }
 
     // Create new user with Telegram data
@@ -584,5 +569,87 @@ export class AuthService {
     return {
       access_token,
     };
+  }
+
+  /**
+   * Generate access and refresh tokens for a user
+   * @param payload - JWT payload containing user information
+   * @returns Object containing access_token, refresh_token, expires_in, and token_type
+   */
+  private generateTokens(payload: any): LoginResponse {
+    // Generate access token with short expiration (15 minutes)
+    const access_token = this.jwtService.sign(payload, { expiresIn: '15m' });
+    
+    // Generate refresh token with longer expiration (7 days)
+    const refresh_token = this.jwtService.sign(
+      { 
+        userId: payload.userId, 
+        type: 'refresh' 
+      }, 
+      { expiresIn: '7d' }
+    );
+
+    return {
+      access_token,
+      refresh_token,
+      expires_in: 900, // 15 minutes in seconds
+      token_type: 'Bearer',
+    };
+  }
+
+  /**
+   * Refresh access token using a valid refresh token
+   * @param refreshToken - The refresh token
+   * @returns New access and refresh tokens
+   */
+  async refreshToken(refreshToken: string): Promise<LoginResponse> {
+    try {
+      // Verify the refresh token
+      const decoded = this.jwtService.verify(refreshToken);
+      
+      // Check if it's a refresh token
+      if (decoded.type !== 'refresh') {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Invalid token type',
+            error: 'Unauthorized',
+          },
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      // Find the user
+      const user = await this.userModel.findById(decoded.userId).exec();
+      if (!user) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'User not found',
+            error: 'Unauthorized',
+          },
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      // Generate new tokens
+      const payload = {
+        userId: user._id.toString(),
+        telegramId: user.telegramId,
+        username: user.username,
+        role: user.role,
+      };
+
+      return this.generateTokens(payload);
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Invalid or expired refresh token',
+          error: 'Unauthorized',
+        },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
   }
 }

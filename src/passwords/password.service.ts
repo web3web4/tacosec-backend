@@ -60,9 +60,9 @@ export class PasswordService {
     username: string;
     publicAddress?: string;
   }> {
-    let telegramId: string;
-    let username: string;
-    let userId: string;
+    let telegramId: string = '';
+    let username: string = '';
+    let userId: string = '';
 
     // Priority 1: JWT authentication - extract user info from req.user
     if (req?.user?.id) {
@@ -81,32 +81,34 @@ export class PasswordService {
         );
       }
 
-      // Parse telegram init data to extract telegramId and username
-      const parsedData =
-        this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
-      telegramId = parsedData.telegramId;
-      username = parsedData.username;
+      try {
+        // Parse telegram init data to extract telegramId and username
+        const parsedData =
+          this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
+        telegramId = parsedData.telegramId || '';
+        username = parsedData.username || '';
 
-      // Get userId from database using telegramId
-      const user = await this.userModel
-        .findOne({ telegramId })
-        .select('_id')
-        .exec();
+        // Get userId from database using telegramId if available
+        if (telegramId) {
+          const user = await this.userModel
+            .findOne({ telegramId })
+            .select('_id')
+            .exec();
 
-      if (!user) {
-        throw new HttpException(
-          'User not found for the provided Telegram data',
-          HttpStatus.NOT_FOUND,
-        );
+          if (user) {
+            userId = user._id.toString();
+          }
+        }
+      } catch (error) {
+        // If parsing fails, continue with empty values
+        telegramId = '';
+        username = '';
+        userId = '';
       }
-
-      userId = user._id.toString();
-    } else {
-      throw new HttpException(
-        'Authentication required: provide either JWT token or Telegram init data',
-        HttpStatus.BAD_REQUEST,
-      );
     }
+
+    // If no authentication method provided or failed, allow with empty values
+    // This ensures views can be recorded even for unauthenticated users
 
     // Get the latest wallet address for the user
     let publicAddress: string | undefined;
@@ -3813,13 +3815,33 @@ You can view the reply in your shared secrets list 📋.`;
         secretUserIdType: typeof secret.userId,
       });
 
-      // Get the viewing user
-      const viewingUser = await this.userModel
-        .findOne({ telegramId })
-        .select('privacyMode firstName lastName')
-        .exec();
+      // Get the viewing user - try multiple methods to find the user
+      let viewingUser = null;
+      
+      // First try to find by telegramId if available
+      if (telegramId) {
+        viewingUser = await this.userModel
+          .findOne({ telegramId })
+          .select('privacyMode firstName lastName')
+          .exec();
+      }
+      
+      // If not found by telegramId and userId is available, try by userId
+      if (!viewingUser && userId) {
+        viewingUser = await this.userModel
+          .findById(userId)
+          .select('privacyMode firstName lastName')
+          .exec();
+      }
+      
+      // If still not found, create a minimal user object for recording the view
       if (!viewingUser) {
-        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+        console.log('⚠️ User not found in database, but recording view anyway');
+        viewingUser = {
+          firstName: '',
+          lastName: '',
+          privacyMode: false
+        };
       }
 
       // Get the secret owner
@@ -3856,17 +3878,15 @@ You can view the reply in your shared secrets list 📋.`;
         typeof telegramId,
       );
       console.log('Viewing user username:', username);
-      console.log(
-        'Are they equal (strict):',
-        secretOwner.telegramId === telegramId,
-      );
-      console.log(
-        'Are they equal (string):',
-        String(secretOwner.telegramId) === String(telegramId),
-      );
+      console.log('Viewing user userId:', userId);
       console.log('========================');
 
-      if (String(secretOwner.telegramId) === String(telegramId)) {
+      // Check if owner is viewing their own secret using multiple identifiers
+      const isOwnerViewing = 
+        (telegramId && String(secretOwner.telegramId) === String(telegramId)) ||
+        (userId && String(secret.userId) === String(userId));
+
+      if (isOwnerViewing) {
         // Owner viewing their own secret - don't record the view
         console.log('🚫 Owner viewing own secret - not recording view');
         return secret;
@@ -3890,15 +3910,19 @@ You can view the reply in your shared secrets list 📋.`;
 
       // Check if this telegram user has already viewed this secret before (ever)
       const existingView = secret.secretViews?.find(
-        (view) => view.telegramId === telegramId,
+        (view) => 
+          (telegramId && view.telegramId === telegramId) ||
+          (userId && view.userId === userId) ||
+          (username && view.username === username)
       );
 
       // If user has never viewed this secret before, add new view
       if (!existingView) {
         console.log(
           '✅ Recording new secret view for user:',
-          telegramId,
-          username,
+          telegramId || 'no-telegram',
+          username || 'no-username',
+          userId || 'no-userId'
         );
 
         // Get the latest public address for the viewing user
@@ -3935,12 +3959,12 @@ You can view the reply in your shared secrets list 📋.`;
         }
 
         const newView = {
-          telegramId,
-          username,
-          userId,
+          telegramId: telegramId || '',
+          username: username || '',
+          userId: userId || '',
           publicAddress: currentpublicAddress,
-          firstName: viewingUser.firstName,
-          lastName: viewingUser.lastName,
+          firstName: viewingUser.firstName || '',
+          lastName: viewingUser.lastName || '',
           viewedAt: new Date(),
         };
 

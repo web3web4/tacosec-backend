@@ -2,6 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { ConfigService } from '@nestjs/config';
 import {
   PublicAddress,
   PublicAddressDocument,
@@ -37,6 +38,7 @@ export class AuthService {
     private telegramValidator: TelegramValidatorService,
     private telegramDtoAuthGuard: TelegramDtoAuthGuard,
     private usersService: UsersService,
+    private configService: ConfigService,
   ) {}
 
   async login(
@@ -577,24 +579,52 @@ export class AuthService {
    * @returns Object containing access_token, refresh_token, expires_in, and token_type
    */
   private generateTokens(payload: any): LoginResponse {
-    // Generate access token with short expiration (15 minutes)
-    const access_token = this.jwtService.sign(payload, { expiresIn: '15m' });
+    // Get token expiration times from environment variables
+    const accessTokenExpiry = this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRES_IN', '15m');
+    const refreshTokenExpiry = this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRES_IN', '7d');
     
-    // Generate refresh token with longer expiration (7 days)
+    // Generate access token with configurable expiration
+    const access_token = this.jwtService.sign(payload, { expiresIn: accessTokenExpiry });
+    
+    // Generate refresh token with configurable expiration
     const refresh_token = this.jwtService.sign(
       { 
         userId: payload.userId, 
         type: 'refresh' 
       }, 
-      { expiresIn: '7d' }
+      { expiresIn: refreshTokenExpiry }
     );
+
+    // Calculate expires_in based on access token expiry (convert to seconds)
+    const expiresInSeconds = this.parseExpirationToSeconds(accessTokenExpiry);
 
     return {
       access_token,
       refresh_token,
-      expires_in: 900, // 15 minutes in seconds
+      expires_in: expiresInSeconds,
       token_type: 'Bearer',
     };
+  }
+
+  /**
+   * Parse expiration string to seconds
+   * @param expiration - Expiration string like '15m', '1h', '7d'
+   * @returns Number of seconds
+   */
+  private parseExpirationToSeconds(expiration: string): number {
+    const match = expiration.match(/^(\d+)([smhd])$/);
+    if (!match) return 900; // Default to 15 minutes if parsing fails
+    
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    
+    switch (unit) {
+      case 's': return value;
+      case 'm': return value * 60;
+      case 'h': return value * 60 * 60;
+      case 'd': return value * 24 * 60 * 60;
+      default: return 900; // Default to 15 minutes
+    }
   }
 
   /**

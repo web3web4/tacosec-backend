@@ -3793,7 +3793,7 @@ You can view the reply in your shared secrets list 📋.`;
    * @param username - The username of the viewer (optional)
    * @param userId - The user ID of the viewer (optional)
    * @param publicAddress - The latest wallet address of the viewer (optional)
-   * @returns Updated password document
+   * @returns Updated password document or empty object if access denied
    */
   async recordSecretView(
     secretId: string,
@@ -3801,12 +3801,32 @@ You can view the reply in your shared secrets list 📋.`;
     username?: string,
     userId?: string,
     publicAddress?: string,
-  ): Promise<Password> {
+  ): Promise<Password | {}> {
     try {
       // Check if secret exists
       const secret = await this.passwordModel.findById(secretId).exec();
       if (!secret) {
-        throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
+        return {}; // Return empty response for non-existent secrets
+      }
+
+      // Check if the secret has been shared with the viewing user
+      const isSharedWithUser = secret.sharedWith?.some((shared) => {
+        return (
+          (userId && shared.userId === userId) ||
+          (username &&
+            shared.username &&
+            shared.username.toLowerCase() === username.toLowerCase()) ||
+          (publicAddress && shared.publicAddress === publicAddress)
+        );
+      });
+
+      // Check if user is the owner of the secret
+      const isOwner = userId && String(secret.userId) === userId;
+
+      // If user is not the owner and secret is not shared with them, return empty response
+      if (!isOwner && !isSharedWithUser) {
+        console.log('🚫 Access denied: Secret not shared with user');
+        return {}; // Return empty response with 200 status
       }
 
       console.log('🔍 SECRET FOUND:', {
@@ -3893,7 +3913,7 @@ You can view the reply in your shared secrets list 📋.`;
       }
 
       // Check if the secret has been shared with the viewing user
-      const isSharedWithUser = secret.sharedWith?.some((shared) => {
+      const isSecretSharedWithUser = secret.sharedWith?.some((shared) => {
         return (
           (userId && shared.userId === userId) ||
           (username &&
@@ -3903,7 +3923,7 @@ You can view the reply in your shared secrets list 📋.`;
         );
       });
 
-      if (!isSharedWithUser) {
+      if (!isSecretSharedWithUser) {
         // Secret has not been shared with this user - don't record the view
         console.log('🚫 Secret not shared with user - not recording view');
         return secret;

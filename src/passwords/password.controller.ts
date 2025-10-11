@@ -186,13 +186,20 @@ export class PasswordController {
     const { userId, telegramId, username, publicAddress } =
       await this.passwordService.extractUserAuthData(req);
 
-    return this.passwordService.recordSecretView(
+    const result = await this.passwordService.recordSecretView(
       secretId,
       telegramId,
       username,
       userId,
       publicAddress,
     );
+
+    // If result is empty object, return empty 200 response
+    if (Object.keys(result).length === 0) {
+      return {};
+    }
+
+    return result;
   }
 
   @Get('secret-view-stats/:id')

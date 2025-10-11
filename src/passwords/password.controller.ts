@@ -7,8 +7,8 @@ import {
   Param,
   Delete,
   Query,
-  HttpException,
-  HttpStatus,
+  // HttpException,
+  // HttpStatus,
   Request,
 } from '@nestjs/common';
 
@@ -17,9 +17,9 @@ import { PasswordService, AuthenticatedRequest } from './password.service';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
 import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
-import { TelegramService } from '../telegram/telegram.service';
-import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
-import { PublicAddressesService } from '../public-addresses/public-addresses.service';
+// import { TelegramService } from '../telegram/telegram.service';
+// import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
+// import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 // import { Types } from 'mongoose';
 // import { VerifyPasswordData } from './interfaces/verify-password.interface';
 import { Password } from './schemas/password.schema';
@@ -185,7 +185,6 @@ export class PasswordController {
     // Extract user authentication data using the service method
     const { userId, telegramId, username, publicAddress } =
       await this.passwordService.extractUserAuthData(req);
-
     const result = await this.passwordService.recordSecretView(
       secretId,
       telegramId,
@@ -193,12 +192,10 @@ export class PasswordController {
       userId,
       publicAddress,
     );
-
     // If result is empty object, return empty 200 response
     if (Object.keys(result).length === 0) {
       return {};
     }
-
     return result;
   }
 

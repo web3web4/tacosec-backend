@@ -4272,83 +4272,112 @@ You can view the reply in your shared secrets list 📋.`;
 
       if (secret.sharedWith && secret.sharedWith.length > 0) {
         for (const sharedUser of secret.sharedWith) {
-          // Find user details from database using multiple lookup methods
-          let userDetails = await this.userModel
-            .findOne({ username: sharedUser.username })
-            .select('telegramId firstName lastName privacyMode _id')
-            .exec();
+          let userDetails = null;
 
-          // Try alternative lookup methods if username lookup failed
-          if (!userDetails && sharedUser.userId) {
+          // Enhanced lookup: try multiple methods to find the exact shared user
+          // First, try to find by userId if available
+          if (sharedUser.userId) {
             userDetails = await this.userModel
               .findById(sharedUser.userId)
               .select('telegramId firstName lastName privacyMode username')
               .exec();
           }
 
+          // If not found by userId and username is available, try username lookup
+          if (!userDetails && sharedUser.username) {
+            userDetails = await this.userModel
+              .findOne({ username: sharedUser.username })
+              .select('telegramId firstName lastName privacyMode _id')
+              .exec();
+          }
+
+          // If user details found in database
           if (userDetails) {
-            // Enhanced check using multiple identifiers
-            const hasViewed =
-              viewedUserIdentifiers.has(userDetails.telegramId) ||
-              viewedUserIdentifiers.has(String(userDetails._id)) ||
-              viewedUserIdentifiers.has(userDetails.username);
+            // Verify this is actually the same user by cross-checking identifiers
+            const isMatchingUser =
+              (sharedUser.userId &&
+                String(userDetails._id) === sharedUser.userId) ||
+              (sharedUser.username &&
+                userDetails.username === sharedUser.username) ||
+              (!sharedUser.userId &&
+                !sharedUser.username &&
+                sharedUser.publicAddress); // User with only publicAddress
 
-            // Get latest public address for the user
-            let latestPublicAddress: string | undefined;
-            try {
-              // First try to get address by telegramId if available
-              if (userDetails.telegramId) {
-                const addressResponse =
-                  await this.publicAddressesService.getLatestAddressByTelegramId(
-                    userDetails.telegramId,
-                  );
-                if (addressResponse.success && addressResponse.data) {
-                  latestPublicAddress = addressResponse.data.publicKey;
+            if (isMatchingUser) {
+              // Enhanced check using multiple identifiers
+              const hasViewed =
+                viewedUserIdentifiers.has(userDetails.telegramId) ||
+                viewedUserIdentifiers.has(String(userDetails._id)) ||
+                viewedUserIdentifiers.has(userDetails.username);
+
+              // Get latest public address for the user
+              let latestPublicAddress: string | undefined;
+              try {
+                // First try to get address by telegramId if available
+                if (userDetails.telegramId) {
+                  const addressResponse =
+                    await this.publicAddressesService.getLatestAddressByTelegramId(
+                      userDetails.telegramId,
+                    );
+                  if (addressResponse.success && addressResponse.data) {
+                    latestPublicAddress = addressResponse.data.publicKey;
+                  }
                 }
+
+                // If no address found by telegramId, try by userId
+                if (!latestPublicAddress && userDetails._id) {
+                  const addressResponse =
+                    await this.publicAddressesService.getLatestAddressByUserId(
+                      userDetails._id.toString(),
+                    );
+                  if (addressResponse.success && addressResponse.data) {
+                    latestPublicAddress = addressResponse.data.publicKey;
+                  }
+                }
+              } catch (error) {
+                // If address retrieval fails, latestPublicAddress remains undefined
+                latestPublicAddress = undefined;
               }
 
-              // If no address found by telegramId, try by userId
-              if (!latestPublicAddress && userDetails._id) {
-                const addressResponse =
-                  await this.publicAddressesService.getLatestAddressByUserId(
-                    userDetails._id.toString(),
-                  );
-                if (addressResponse.success && addressResponse.data) {
-                  latestPublicAddress = addressResponse.data.publicKey;
-                }
+              // Check if user has privacy mode enabled AND hasn't viewed the secret
+              if (userDetails.privacyMode && !hasViewed) {
+                unknownUsers.push({
+                  username: sharedUser.username,
+                  firstName: userDetails.firstName,
+                  lastName: userDetails.lastName,
+                  telegramId: userDetails.telegramId,
+                  publicAddress: latestPublicAddress,
+                });
+                unknownCount++;
+              } else if (!userDetails.privacyMode && !hasViewed) {
+                // User hasn't viewed the secret and doesn't have privacy mode
+                notViewedUsers.push({
+                  username: sharedUser.username,
+                  firstName: userDetails.firstName,
+                  lastName: userDetails.lastName,
+                  telegramId: userDetails.telegramId,
+                  publicAddress: latestPublicAddress,
+                });
               }
-            } catch (error) {
-              // If address retrieval fails, latestPublicAddress remains undefined
-              latestPublicAddress = undefined;
+              // Note: Users with privacyMode=true who have viewed the secret
+              // will only appear in viewDetails without being added to unknownUsers
             }
-
-            // Check if user has privacy mode enabled AND hasn't viewed the secret
-            if (userDetails.privacyMode && !hasViewed) {
-              unknownUsers.push({
-                username: sharedUser.username,
-                firstName: userDetails.firstName,
-                lastName: userDetails.lastName,
-                telegramId: userDetails.telegramId,
-                publicAddress: latestPublicAddress,
-              });
-              unknownCount++;
-            } else if (!userDetails.privacyMode && !hasViewed) {
-              // User hasn't viewed the secret and doesn't have privacy mode
-              notViewedUsers.push({
-                username: sharedUser.username,
-                firstName: userDetails.firstName,
-                lastName: userDetails.lastName,
-                telegramId: userDetails.telegramId,
-                publicAddress: latestPublicAddress,
-              });
-            }
-            // Note: Users with privacyMode=true who have viewed the secret
-            // will only appear in viewDetails without being added to unknownUsers
           } else {
-            // User not found in database, add to not viewed
-            notViewedUsers.push({
-              username: sharedUser.username,
-            });
+            // User not found in database - this could be a user with only publicAddress
+            // Only add to notViewedUsers if they have some identifying information
+            if (sharedUser.username || sharedUser.publicAddress) {
+              // Check if this shared user has viewed the secret using publicAddress
+              const hasViewedByAddress =
+                sharedUser.publicAddress &&
+                viewedUserIdentifiers.has(sharedUser.publicAddress);
+
+              if (!hasViewedByAddress) {
+                notViewedUsers.push({
+                  username: sharedUser.username,
+                  publicAddress: sharedUser.publicAddress,
+                });
+              }
+            }
           }
         }
       }

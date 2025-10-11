@@ -3817,7 +3817,7 @@ You can view the reply in your shared secrets list 📋.`;
 
       // Get the viewing user - try multiple methods to find the user
       let viewingUser = null;
-      
+
       // First try to find by telegramId if available
       if (telegramId) {
         viewingUser = await this.userModel
@@ -3825,7 +3825,7 @@ You can view the reply in your shared secrets list 📋.`;
           .select('privacyMode firstName lastName')
           .exec();
       }
-      
+
       // If not found by telegramId and userId is available, try by userId
       if (!viewingUser && userId) {
         viewingUser = await this.userModel
@@ -3833,14 +3833,14 @@ You can view the reply in your shared secrets list 📋.`;
           .select('privacyMode firstName lastName')
           .exec();
       }
-      
+
       // If still not found, create a minimal user object for recording the view
       if (!viewingUser) {
         console.log('⚠️ User not found in database, but recording view anyway');
         viewingUser = {
           firstName: '',
           lastName: '',
-          privacyMode: false
+          privacyMode: false,
         };
       }
 
@@ -3882,13 +3882,30 @@ You can view the reply in your shared secrets list 📋.`;
       console.log('========================');
 
       // Check if owner is viewing their own secret using multiple identifiers
-      const isOwnerViewing = 
+      const isOwnerViewing =
         (telegramId && String(secretOwner.telegramId) === String(telegramId)) ||
         (userId && String(secret.userId) === String(userId));
 
       if (isOwnerViewing) {
         // Owner viewing their own secret - don't record the view
         console.log('🚫 Owner viewing own secret - not recording view');
+        return secret;
+      }
+
+      // Check if the secret has been shared with the viewing user
+      const isSharedWithUser = secret.sharedWith?.some((shared) => {
+        return (
+          (userId && shared.userId === userId) ||
+          (username &&
+            shared.username &&
+            shared.username.toLowerCase() === username.toLowerCase()) ||
+          (publicAddress && shared.publicAddress === publicAddress)
+        );
+      });
+
+      if (!isSharedWithUser) {
+        // Secret has not been shared with this user - don't record the view
+        console.log('🚫 Secret not shared with user - not recording view');
         return secret;
       }
 
@@ -3910,10 +3927,10 @@ You can view the reply in your shared secrets list 📋.`;
 
       // Check if this telegram user has already viewed this secret before (ever)
       const existingView = secret.secretViews?.find(
-        (view) => 
+        (view) =>
           (telegramId && view.telegramId === telegramId) ||
           (userId && view.userId === userId) ||
-          (username && view.username === username)
+          (username && view.username === username),
       );
 
       // If user has never viewed this secret before, add new view
@@ -3922,7 +3939,7 @@ You can view the reply in your shared secrets list 📋.`;
           '✅ Recording new secret view for user:',
           telegramId || 'no-telegram',
           username || 'no-username',
-          userId || 'no-userId'
+          userId || 'no-userId',
         );
 
         // Get the latest public address for the viewing user

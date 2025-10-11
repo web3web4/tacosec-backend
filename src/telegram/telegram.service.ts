@@ -234,11 +234,16 @@ export class TelegramService {
 
       if (senderInfo.telegramId) {
         try {
-          const sender = await this.usersService.findByTelegramId(senderInfo.telegramId);
+          const sender = await this.usersService.findByTelegramId(
+            senderInfo.telegramId,
+          );
           if (sender) {
             senderFirstName = sender.firstName || '';
             senderLastName = sender.lastName || '';
-            senderDisplayName = `${senderFirstName} ${senderLastName}`.trim() || sender.username || 'Unknown User';
+            senderDisplayName =
+              `${senderFirstName} ${senderLastName}`.trim() ||
+              sender.username ||
+              'Unknown User';
           }
         } catch (error) {
           console.log('Could not fetch sender details:', error.message);
@@ -451,7 +456,10 @@ ${message}
 
           // Get latest public address for the user
           try {
-            const addressResponse = await this.publicAddressesService.getLatestAddressByUserId(req.user.id);
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByUserId(
+                req.user.id,
+              );
             if (addressResponse.success && addressResponse.data) {
               senderInfo.publicAddress = addressResponse.data.publicKey;
             }
@@ -462,29 +470,43 @@ ${message}
         }
       } else {
         // Priority 2: Telegram authentication - extract from telegram init data
-        const telegramId = this.extractTelegramIdFromRequest(req, telegramDtoAuthGuard);
+        const telegramId = this.extractTelegramIdFromRequest(
+          req,
+          telegramDtoAuthGuard,
+        );
         senderInfo.telegramId = telegramId;
 
         // Get user info and username from database
         if (senderInfo.telegramId) {
           try {
-            const addressResponse = await this.publicAddressesService.getLatestAddressByTelegramId(senderInfo.telegramId);
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByTelegramId(
+                senderInfo.telegramId,
+              );
             if (addressResponse.success && addressResponse.data) {
               senderInfo.publicAddress = addressResponse.data.publicKey;
             }
           } catch (error) {
-            console.log('No public address found for telegramId:', senderInfo.telegramId);
+            console.log(
+              'No public address found for telegramId:',
+              senderInfo.telegramId,
+            );
             senderInfo.publicAddress = '';
           }
 
           // Get username from user record
           try {
-            const user = await this.usersService.findByTelegramId(senderInfo.telegramId);
+            const user = await this.usersService.findByTelegramId(
+              senderInfo.telegramId,
+            );
             if (user) {
               senderInfo.username = user.username || '';
             }
           } catch (error) {
-            console.log('Could not find user by telegramId:', senderInfo.telegramId);
+            console.log(
+              'Could not find user by telegramId:',
+              senderInfo.telegramId,
+            );
           }
         }
       }

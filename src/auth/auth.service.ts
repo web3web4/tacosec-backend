@@ -514,15 +514,15 @@ export class AuthService {
 
       // Create JWT payload
       const payload = {
-      userId: savedUser._id.toString(),
-      sub: savedUser._id.toString(),
-      telegramId: savedUser.telegramId,
-      username: savedUser.username,
-      role: savedUser.role,
-    };
+        userId: savedUser._id.toString(),
+        sub: savedUser._id.toString(),
+        telegramId: savedUser.telegramId,
+        username: savedUser.username,
+        role: savedUser.role,
+      };
 
-    // Generate JWT tokens
-    return this.generateTokens(payload);
+      // Generate JWT tokens
+      return this.generateTokens(payload);
     }
 
     // Create new user with Telegram data
@@ -580,19 +580,27 @@ export class AuthService {
    */
   private generateTokens(payload: any): LoginResponse {
     // Get token expiration times from environment variables
-    const accessTokenExpiry = this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRES_IN', '15m');
-    const refreshTokenExpiry = this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRES_IN', '7d');
-    
+    const accessTokenExpiry = this.configService.get<string>(
+      'JWT_ACCESS_TOKEN_EXPIRES_IN',
+      '15m',
+    );
+    const refreshTokenExpiry = this.configService.get<string>(
+      'JWT_REFRESH_TOKEN_EXPIRES_IN',
+      '7d',
+    );
+
     // Generate access token with configurable expiration
-    const access_token = this.jwtService.sign(payload, { expiresIn: accessTokenExpiry });
-    
+    const access_token = this.jwtService.sign(payload, {
+      expiresIn: accessTokenExpiry,
+    });
+
     // Generate refresh token with configurable expiration
     const refresh_token = this.jwtService.sign(
-      { 
-        userId: payload.userId, 
-        type: 'refresh' 
-      }, 
-      { expiresIn: refreshTokenExpiry }
+      {
+        userId: payload.userId,
+        type: 'refresh',
+      },
+      { expiresIn: refreshTokenExpiry },
     );
 
     // Calculate expires_in based on access token expiry (convert to seconds)
@@ -614,16 +622,21 @@ export class AuthService {
   private parseExpirationToSeconds(expiration: string): number {
     const match = expiration.match(/^(\d+)([smhd])$/);
     if (!match) return 900; // Default to 15 minutes if parsing fails
-    
+
     const value = parseInt(match[1]);
     const unit = match[2];
-    
+
     switch (unit) {
-      case 's': return value;
-      case 'm': return value * 60;
-      case 'h': return value * 60 * 60;
-      case 'd': return value * 24 * 60 * 60;
-      default: return 900; // Default to 15 minutes
+      case 's':
+        return value;
+      case 'm':
+        return value * 60;
+      case 'h':
+        return value * 60 * 60;
+      case 'd':
+        return value * 24 * 60 * 60;
+      default:
+        return 900; // Default to 15 minutes
     }
   }
 
@@ -636,7 +649,7 @@ export class AuthService {
     try {
       // Verify the refresh token
       const decoded = this.jwtService.verify(refreshToken);
-      
+
       // Check if it's a refresh token
       if (decoded.type !== 'refresh') {
         throw new HttpException(

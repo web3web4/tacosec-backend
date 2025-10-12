@@ -662,13 +662,13 @@ export class AuthService {
         );
       }
 
-      // Find the user
+      // Find the user and check if active
       const user = await this.userModel.findById(decoded.userId).exec();
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new HttpException(
           {
             success: false,
-            message: 'User not found',
+            message: 'User not found or inactive',
             error: 'Unauthorized',
           },
           HttpStatus.UNAUTHORIZED,
@@ -678,6 +678,7 @@ export class AuthService {
       // Generate new tokens
       const payload = {
         userId: user._id.toString(),
+        sub: user._id.toString(),
         telegramId: user.telegramId,
         username: user.username,
         role: user.role,

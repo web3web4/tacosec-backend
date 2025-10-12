@@ -4134,14 +4134,6 @@ You can view the reply in your shared secrets list 📋.`;
       const uniqueViewsMap = new Map<string, any>();
 
       for (const view of secretViews) {
-        // Create a composite key for deduplication using multiple identifiers
-        const deduplicationKeys = [
-          view.userId,
-          view.telegramId,
-          view.username,
-          view.publicAddress,
-        ].filter(Boolean); // Remove null/undefined values
-
         // Use the most reliable identifier as the primary key (userId > telegramId > username > walletAddress)
         const primaryKey =
           view.userId || view.telegramId || view.username || view.publicAddress;

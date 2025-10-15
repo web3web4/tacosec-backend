@@ -23,6 +23,16 @@ export interface LoginResponse {
   refresh_token: string;
   expires_in: number;
   token_type: string;
+  user: {
+    telegramId: string;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    authDate?: Date;
+    hash?: string;
+    role?: string;
+    isActive?: boolean;
+  };
 }
 
 @Injectable()
@@ -127,7 +137,7 @@ export class AuthService {
         };
 
         // Generate JWT tokens
-        return this.generateTokens(payload);
+        return this.generateTokens(payload, savedUser);
       }
 
       // Get the user information
@@ -154,7 +164,7 @@ export class AuthService {
       };
 
       // Generate JWT tokens
-      return this.generateTokens(payload);
+      return this.generateTokens(payload, user);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -232,7 +242,7 @@ export class AuthService {
       };
 
       // Generate JWT tokens
-      return this.generateTokens(payload);
+      return this.generateTokens(payload, user);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -347,7 +357,7 @@ export class AuthService {
         };
 
         // Generate JWT tokens
-        return this.generateTokens(payload);
+        return this.generateTokens(payload, savedUser);
       } else {
         // Different user with same telegramId - this is a conflict for linking
         throw new HttpException(
@@ -402,7 +412,7 @@ export class AuthService {
     };
 
     // Generate JWT tokens
-    return this.generateTokens(payload);
+    return this.generateTokens(payload, updatedUser);
   }
 
   /**
@@ -522,7 +532,7 @@ export class AuthService {
       };
 
       // Generate JWT tokens
-      return this.generateTokens(payload);
+      return this.generateTokens(payload, savedUser);
     }
 
     // Create new user with Telegram data
@@ -578,7 +588,7 @@ export class AuthService {
    * @param payload - JWT payload containing user information
    * @returns Object containing access_token, refresh_token, expires_in, and token_type
    */
-  private generateTokens(payload: any): LoginResponse {
+  private generateTokens(payload: any, user?: any): LoginResponse {
     // Get token expiration times from environment variables
     const accessTokenExpiry = this.configService.get<string>(
       'JWT_ACCESS_TOKEN_EXPIRES_IN',
@@ -611,6 +621,18 @@ export class AuthService {
       refresh_token,
       expires_in: expiresInSeconds,
       token_type: 'Bearer',
+      user: user
+        ? {
+            telegramId: user.telegramId,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            username: user.username,
+            authDate: user.authDate,
+            hash: user.hash,
+            role: user.role,
+            isActive: user.isActive,
+          }
+        : undefined,
     };
   }
 
@@ -684,12 +706,12 @@ export class AuthService {
         role: user.role,
       };
 
-      return this.generateTokens(payload);
+      return this.generateTokens(payload, user);
     } catch (error) {
       throw new HttpException(
         {
           success: false,
-          message: 'Invalid or expired refresh token',
+          message: 'Invalid or expired refresh token ( ' + error + ' )',
           error: 'Unauthorized',
         },
         HttpStatus.UNAUTHORIZED,

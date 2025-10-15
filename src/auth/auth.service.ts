@@ -28,10 +28,16 @@ export interface LoginResponse {
     firstName?: string;
     lastName?: string;
     username?: string;
+    photoUrl?: string;
     authDate?: Date;
     hash?: string;
     role?: string;
     isActive?: boolean;
+    sharingRestricted?: boolean;
+    reportCount?: number;
+    privacyMode?: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
   };
 }
 
@@ -627,10 +633,16 @@ export class AuthService {
             firstName: user.firstName,
             lastName: user.lastName,
             username: user.username,
+            photoUrl: user.photoUrl,
             authDate: user.authDate,
             hash: user.hash,
             role: user.role,
             isActive: user.isActive,
+            sharingRestricted: user.sharingRestricted,
+            reportCount: user.reportCount,
+            privacyMode: user.privacyMode,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
           }
         : undefined,
     };

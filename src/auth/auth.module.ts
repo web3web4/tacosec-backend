@@ -11,6 +11,7 @@ import { User, UserSchema } from '../users/schemas/user.schema';
 import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
 import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
+import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 
 @Module({
@@ -23,6 +24,7 @@ import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
     SharedJwtModule,
     TelegramModule,
     UsersModule,
+    PublicAddressesModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, TelegramDtoAuthGuard],

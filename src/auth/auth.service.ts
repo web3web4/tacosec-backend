@@ -17,6 +17,7 @@ import { Role } from '../decorators/roles.decorator';
 import { TelegramValidatorService } from '../telegram/telegram-validator.service';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { UsersService } from '../users/users.service';
+import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 
 export interface LoginResponse {
   access_token: string;
@@ -38,6 +39,7 @@ export interface LoginResponse {
     privacyMode?: boolean;
     createdAt?: Date;
     updatedAt?: Date;
+    publicAddress?: string;
   };
 }
 
@@ -55,6 +57,7 @@ export class AuthService {
     private telegramDtoAuthGuard: TelegramDtoAuthGuard,
     private usersService: UsersService,
     private configService: ConfigService,
+    private publicAddressesService: PublicAddressesService,
   ) {}
 
   async login(
@@ -143,7 +146,7 @@ export class AuthService {
         };
 
         // Generate JWT tokens
-        return this.generateTokens(payload, savedUser);
+        return await this.generateTokens(payload, savedUser);
       }
 
       // Get the user information
@@ -170,7 +173,7 @@ export class AuthService {
       };
 
       // Generate JWT tokens
-      return this.generateTokens(payload, user);
+      return await this.generateTokens(payload, user);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -248,7 +251,7 @@ export class AuthService {
       };
 
       // Generate JWT tokens
-      return this.generateTokens(payload, user);
+      return await this.generateTokens(payload, user);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -363,7 +366,7 @@ export class AuthService {
         };
 
         // Generate JWT tokens
-        return this.generateTokens(payload, savedUser);
+        return await this.generateTokens(payload, savedUser);
       } else {
         // Different user with same telegramId - this is a conflict for linking
         throw new HttpException(
@@ -418,7 +421,7 @@ export class AuthService {
     };
 
     // Generate JWT tokens
-    return this.generateTokens(payload, updatedUser);
+    return await this.generateTokens(payload, updatedUser);
   }
 
   /**
@@ -538,7 +541,7 @@ export class AuthService {
       };
 
       // Generate JWT tokens
-      return this.generateTokens(payload, savedUser);
+      return await this.generateTokens(payload, savedUser);
     }
 
     // Create new user with Telegram data
@@ -594,7 +597,7 @@ export class AuthService {
    * @param payload - JWT payload containing user information
    * @returns Object containing access_token, refresh_token, expires_in, and token_type
    */
-  private generateTokens(payload: any, user?: any): LoginResponse {
+  private async generateTokens(payload: any, user?: any): Promise<LoginResponse> {
     // Get token expiration times from environment variables
     const accessTokenExpiry = this.configService.get<string>(
       'JWT_ACCESS_TOKEN_EXPIRES_IN',
@@ -622,6 +625,37 @@ export class AuthService {
     // Calculate expires_in based on access token expiry (convert to seconds)
     const expiresInSeconds = this.parseExpirationToSeconds(accessTokenExpiry);
 
+    // Get latest public address for the user
+    let publicAddress: string | undefined;
+    if (user) {
+      try {
+        // First try to get address by telegramId if available
+        if (user.telegramId) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByTelegramId(
+              user.telegramId,
+            );
+          if (addressResponse.success && addressResponse.data) {
+            publicAddress = addressResponse.data.publicKey;
+          }
+        }
+
+        // If no address found by telegramId, try by userId
+        if (!publicAddress && user._id) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByUserId(
+              user._id.toString(),
+            );
+          if (addressResponse.success && addressResponse.data) {
+            publicAddress = addressResponse.data.publicKey;
+          }
+        }
+      } catch (error) {
+        // If address retrieval fails, publicAddress remains undefined
+        publicAddress = undefined;
+      }
+    }
+
     return {
       access_token,
       refresh_token,
@@ -643,6 +677,7 @@ export class AuthService {
             privacyMode: user.privacyMode,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
+            publicAddress: publicAddress,
           }
         : undefined,
     };
@@ -718,7 +753,7 @@ export class AuthService {
         role: user.role,
       };
 
-      return this.generateTokens(payload, user);
+      return await this.generateTokens(payload, user);
     } catch (error) {
       throw new HttpException(
         {

@@ -244,41 +244,44 @@ export class AuthService {
         user = await newUser.save();
       }
 
-      // Get latest public address for the user
-      let latestPublicAddress: string | undefined;
-      try {
-        if (user.telegramId) {
-          const addressResponse =
-            await this.publicAddressesService.getLatestAddressByTelegramId(
-              user.telegramId,
-            );
-          if (addressResponse.success && addressResponse.data) {
-            latestPublicAddress = addressResponse.data.publicKey;
+      // Get latest public address for the user (same logic as generateTokens)
+        let latestPublicAddress: string | undefined;
+        try {
+          // First try to get address by telegramId if available
+          if (user.telegramId) {
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByTelegramId(
+                user.telegramId,
+              );
+            if (addressResponse.success && addressResponse.data) {
+              latestPublicAddress = addressResponse.data.publicKey;
+            }
           }
+
+          // If no address found by telegramId, try by userId
+          if (!latestPublicAddress && user._id) {
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByUserId(
+                user._id.toString(),
+              );
+            if (addressResponse.success && addressResponse.data) {
+              latestPublicAddress = addressResponse.data.publicKey;
+            }
+          }
+        } catch (error) {
+          // If address retrieval fails, latestPublicAddress remains undefined
+          latestPublicAddress = undefined;
         }
 
-        if (!latestPublicAddress && user._id) {
-          const addressResponse =
-            await this.publicAddressesService.getLatestAddressByUserId(
-              user._id.toString(),
-            );
-          if (addressResponse.success && addressResponse.data) {
-            latestPublicAddress = addressResponse.data.publicKey;
-          }
-        }
-      } catch (error) {
-        latestPublicAddress = undefined;
-      }
-
-      // Create JWT payload
-      const payload = {
-        userId: user._id.toString(),
-        sub: user._id.toString(),
-        telegramId: user.telegramId,
-        username: user.username,
-        role: user.role,
-        publicAddress: latestPublicAddress, // Add latest publicAddress to JWT payload
-      };
+        // Create JWT payload - use same publicAddress logic as response
+        const payload = {
+          userId: user._id.toString(),
+          sub: user._id.toString(),
+          telegramId: user.telegramId,
+          username: user.username,
+          role: user.role,
+          publicAddress: latestPublicAddress, // Use same logic as generateTokens
+        };
 
       // Generate JWT tokens
       return await this.generateTokens(payload, user);
@@ -386,9 +389,10 @@ export class AuthService {
 
         const savedUser = await existingTelegramUser.save();
 
-        // Get latest public address for the user
+        // Get latest public address for the user (same logic as generateTokens)
         let latestPublicAddress: string | undefined;
         try {
+          // First try to get address by telegramId if available
           if (savedUser.telegramId) {
             const addressResponse =
               await this.publicAddressesService.getLatestAddressByTelegramId(
@@ -399,6 +403,7 @@ export class AuthService {
             }
           }
 
+          // If no address found by telegramId, try by userId
           if (!latestPublicAddress && savedUser._id) {
             const addressResponse =
               await this.publicAddressesService.getLatestAddressByUserId(
@@ -409,17 +414,18 @@ export class AuthService {
             }
           }
         } catch (error) {
+          // If address retrieval fails, latestPublicAddress remains undefined
           latestPublicAddress = undefined;
         }
 
-        // Create JWT payload - use latest publicAddress for Telegram login
+        // Create JWT payload - use same publicAddress logic as response
         const payload = {
           userId: savedUser._id.toString(),
           sub: savedUser._id.toString(),
           telegramId: savedUser.telegramId,
           username: savedUser.username,
           role: savedUser.role,
-          publicAddress: latestPublicAddress, // Use latest publicAddress for Telegram login
+          publicAddress: latestPublicAddress, // Use same logic as generateTokens
         };
 
         // Generate JWT tokens
@@ -468,9 +474,10 @@ export class AuthService {
       );
     }
 
-    // Get latest public address for the user
+    // Get latest public address for the user (same logic as generateTokens)
     let latestPublicAddress: string | undefined;
     try {
+      // First try to get address by telegramId if available
       if (updatedUser.telegramId) {
         const addressResponse =
           await this.publicAddressesService.getLatestAddressByTelegramId(
@@ -481,6 +488,7 @@ export class AuthService {
         }
       }
 
+      // If no address found by telegramId, try by userId
       if (!latestPublicAddress && updatedUser._id) {
         const addressResponse =
           await this.publicAddressesService.getLatestAddressByUserId(
@@ -491,17 +499,18 @@ export class AuthService {
         }
       }
     } catch (error) {
+      // If address retrieval fails, latestPublicAddress remains undefined
       latestPublicAddress = undefined;
     }
 
-    // Create JWT payload - use latest publicAddress for Telegram login
+    // Create JWT payload - use same publicAddress logic as response
     const payload = {
       userId: updatedUser._id.toString(),
       sub: updatedUser._id.toString(),
       telegramId: updatedUser.telegramId,
       username: updatedUser.username,
       role: updatedUser.role,
-      publicAddress: latestPublicAddress, // Use latest publicAddress for Telegram login
+      publicAddress: latestPublicAddress, // Use same logic as generateTokens
     };
 
     // Generate JWT tokens
@@ -687,13 +696,13 @@ export class AuthService {
       latestPublicAddress = undefined;
     }
 
-    // Create JWT payload
+    // Create JWT payload - use publicAddress from login request if provided
     const payload = {
       sub: savedUser._id.toString(),
       telegramId: savedUser.telegramId,
       username: savedUser.username,
       role: savedUser.role,
-      publicAddress: latestPublicAddress, // Add latest publicAddress to JWT payload
+      publicAddress: publicAddress || latestPublicAddress, // Use publicAddress from request, fallback to latest
     };
 
     // Generate JWT token
@@ -720,8 +729,38 @@ export class AuthService {
       '7d',
     );
 
-    // Generate access token with configurable expiration
-    const access_token = this.jwtService.sign(payload, {
+    // Get latest public address for the user and update payload
+    let updatedPayload = { ...payload };
+    if (user) {
+      try {
+        // First try to get address by telegramId if available
+        if (user.telegramId) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByTelegramId(
+              user.telegramId,
+            );
+          if (addressResponse.success && addressResponse.data) {
+            updatedPayload.publicAddress = addressResponse.data.publicKey;
+          }
+        }
+
+        // If no address found by telegramId, try by userId
+        if (!updatedPayload.publicAddress && user._id) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByUserId(
+              user._id.toString(),
+            );
+          if (addressResponse.success && addressResponse.data) {
+            updatedPayload.publicAddress = addressResponse.data.publicKey;
+          }
+        }
+      } catch (error) {
+        // If address retrieval fails, keep original publicAddress from payload
+      }
+    }
+
+    // Generate access token with configurable expiration using updated payload
+    const access_token = this.jwtService.sign(updatedPayload, {
       expiresIn: accessTokenExpiry,
     });
 
@@ -736,37 +775,6 @@ export class AuthService {
 
     // Calculate expires_in based on access token expiry (convert to seconds)
     const expiresInSeconds = this.parseExpirationToSeconds(accessTokenExpiry);
-
-    // Get latest public address for the user
-    let publicAddress: string | undefined;
-    if (user) {
-      try {
-        // First try to get address by telegramId if available
-        if (user.telegramId) {
-          const addressResponse =
-            await this.publicAddressesService.getLatestAddressByTelegramId(
-              user.telegramId,
-            );
-          if (addressResponse.success && addressResponse.data) {
-            publicAddress = addressResponse.data.publicKey;
-          }
-        }
-
-        // If no address found by telegramId, try by userId
-        if (!publicAddress && user._id) {
-          const addressResponse =
-            await this.publicAddressesService.getLatestAddressByUserId(
-              user._id.toString(),
-            );
-          if (addressResponse.success && addressResponse.data) {
-            publicAddress = addressResponse.data.publicKey;
-          }
-        }
-      } catch (error) {
-        // If address retrieval fails, publicAddress remains undefined
-        publicAddress = undefined;
-      }
-    }
 
     return {
       access_token,
@@ -789,7 +797,7 @@ export class AuthService {
             privacyMode: user.privacyMode,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
-            publicAddress: publicAddress,
+            publicAddress: updatedPayload.publicAddress,
           }
         : undefined,
     };

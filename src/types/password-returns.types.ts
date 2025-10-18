@@ -22,6 +22,7 @@ export type passwordReturns = {
   createdAt: Date;
   type: Type;
   hidden: boolean;
+  publicAddress?: string; // Public address associated with the password
   reports: PasswordReportInfo[]; // Array of unresolved reports for this password
   firstName?: string; // First name of the password owner
   lastName?: string; // Last name of the password owner

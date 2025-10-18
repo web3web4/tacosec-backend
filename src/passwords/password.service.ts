@@ -191,7 +191,7 @@ export class PasswordService {
           ],
         })
         .select(
-          'key value description updatedAt createdAt sharedWith type hidden secretViews',
+          'key value description updatedAt createdAt sharedWith type hidden publicAddress secretViews',
         )
         .sort({ createdAt: -1 })
         .exec();
@@ -238,6 +238,7 @@ export class PasswordService {
             updatedAt: password.updatedAt,
             createdAt: password.createdAt,
             hidden: password.hidden || false,
+            publicAddress: password.publicAddress,
             reports: reports, // Include complete reports data as stored in MongoDB
             viewsCount: secretViews.length,
             secretViews: secretViews,
@@ -281,7 +282,7 @@ export class PasswordService {
           ],
         })
         .select(
-          'key value description updatedAt createdAt sharedWith type hidden secretViews',
+          'key value description updatedAt createdAt sharedWith type hidden publicAddress secretViews',
         )
         .sort({ createdAt: -1 })
         .exec();
@@ -329,6 +330,7 @@ export class PasswordService {
             updatedAt: password.updatedAt,
             createdAt: password.createdAt,
             hidden: password.hidden || false,
+            publicAddress: password.publicAddress,
             reports: reports, // Include complete reports data as stored in MongoDB
             viewsCount: secretViews.length,
             secretViews: secretViews,
@@ -426,6 +428,213 @@ export class PasswordService {
       return sharedWithMe;
     } catch (error) {
       console.log('error', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Find passwords by publicAddress with optional pagination
+   * @param publicAddress The public address to search for
+   * @param page Optional page number for pagination
+   * @param limit Optional limit for pagination
+   * @returns Either paginated response or simple array based on parameters
+   */
+  async findByPublicAddressWithPagination(
+    publicAddress: string,
+    page?: number,
+    limit?: number,
+  ): Promise<passwordReturns[] | PaginatedResponse<passwordReturns>> {
+    try {
+      if (!publicAddress) {
+        throw new Error('Public address is required');
+      }
+
+      // If pagination parameters are not provided or incomplete, return original response
+      if (
+        page === undefined ||
+        limit === undefined ||
+        isNaN(page) ||
+        isNaN(limit) ||
+        page <= 0 ||
+        limit <= 0
+      ) {
+        // Find passwords by publicAddress without pagination
+        const passwords = await this.passwordModel
+          .find({
+            publicAddress: publicAddress,
+            isActive: true,
+            $and: [
+              { $or: [{ hidden: false }, { hidden: { $exists: false } }] },
+              {
+                $or: [
+                  { parent_secret_id: { $exists: false } },
+                  { parent_secret_id: null },
+                ],
+              },
+            ],
+          })
+          .select(
+            'key value description updatedAt createdAt sharedWith type hidden publicAddress',
+          )
+          .sort({ createdAt: -1 })
+          .exec();
+
+        // Transform passwords with reports
+        const passwordWithSharedWithAsUsernames = await Promise.all(
+          passwords.map(async (password) => {
+            // Fetch unresolved reports for this password
+            const reports = await this.reportModel
+              .find({
+                $or: [
+                  { secret_id: password._id },
+                  { secret_id: password._id.toString() },
+                ],
+                resolved: false,
+              })
+              .exec();
+
+            // Transform reports to include reporter username
+            const reportInfo: PasswordReportInfo[] = await Promise.all(
+              reports.map(async (report) => {
+                // Get reporter user info
+                const reporter = await this.userModel
+                  .findOne({ telegramId: report.reporterTelegramId })
+                  .select('username')
+                  .exec();
+
+                return {
+                  reporterUsername: reporter ? reporter.username : 'Unknown',
+                  report_type: report.report_type,
+                  reason: report.reason,
+                  createdAt: report.createdAt,
+                };
+              }),
+            );
+
+            const secretViews = password.secretViews || [];
+            return {
+              _id: password._id,
+              key: password.key,
+              value: password.value,
+              description: password.description,
+              type: password.type,
+              sharedWith: password.sharedWith,
+              updatedAt: password.updatedAt,
+              createdAt: password.createdAt,
+              hidden: password.hidden || false,
+              publicAddress: password.publicAddress,
+              reports: reportInfo,
+              viewsCount: secretViews.length,
+              secretViews: secretViews,
+            };
+          }),
+        );
+
+        return passwordWithSharedWithAsUsernames;
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Base query for finding passwords by publicAddress
+      const baseQuery = {
+        publicAddress: publicAddress,
+        isActive: true,
+        $and: [
+          { $or: [{ hidden: false }, { hidden: { $exists: false } }] },
+          {
+            $or: [
+              { parent_secret_id: { $exists: false } },
+              { parent_secret_id: null },
+            ],
+          },
+        ],
+      };
+
+      // Get total count for pagination
+      const totalCount = await this.passwordModel
+        .countDocuments(baseQuery)
+        .exec();
+
+      // Find passwords with pagination
+      const passwords = await this.passwordModel
+        .find(baseQuery)
+        .select(
+          'key value description updatedAt createdAt sharedWith type hidden publicAddress',
+        )
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec();
+
+      // Transform passwords with reports
+      const passwordWithSharedWithAsUsernames = await Promise.all(
+        passwords.map(async (password) => {
+          // Fetch unresolved reports for this password
+          const reports = await this.reportModel
+            .find({
+              $or: [
+                { secret_id: password._id },
+                { secret_id: password._id.toString() },
+              ],
+              resolved: false,
+            })
+            .exec();
+
+          // Transform reports to include reporter username
+          const reportInfo: PasswordReportInfo[] = await Promise.all(
+            reports.map(async (report) => {
+              // Get reporter user info
+              const reporter = await this.userModel
+                .findOne({ telegramId: report.reporterTelegramId })
+                .select('username')
+                .exec();
+
+              return {
+                reporterUsername: reporter ? reporter.username : 'Unknown',
+                report_type: report.report_type,
+                reason: report.reason,
+                createdAt: report.createdAt,
+              };
+            }),
+          );
+
+          const secretViews = password.secretViews || [];
+          return {
+            _id: password._id,
+            key: password.key,
+            value: password.value,
+            description: password.description,
+            type: password.type,
+            sharedWith: password.sharedWith,
+            updatedAt: password.updatedAt,
+            createdAt: password.createdAt,
+            hidden: password.hidden || false,
+            publicAddress: password.publicAddress,
+            reports: reportInfo,
+            viewsCount: secretViews.length,
+            secretViews: secretViews,
+          };
+        }),
+      );
+
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
+
+      return {
+        data: passwordWithSharedWithAsUsernames,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage,
+          hasPreviousPage,
+          limit,
+        },
+      };
+    } catch (error) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -2406,6 +2615,7 @@ You can view the reply in your shared secrets list 📋.`;
             updatedAt: password.updatedAt,
             createdAt: password.createdAt,
             hidden: password.hidden || false,
+            publicAddress: password.publicAddress,
             reports: reportInfo,
             viewsCount: secretViews.length,
             secretViews: secretViews,
@@ -2490,7 +2700,7 @@ You can view the reply in your shared secrets list 📋.`;
       const passwords = await this.passwordModel
         .find(baseQuery)
         .select(
-          'key value description updatedAt createdAt sharedWith type hidden',
+          'key value description updatedAt createdAt sharedWith type hidden publicAddress',
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -3511,9 +3721,13 @@ You can view the reply in your shared secrets list 📋.`;
     page?: number,
     limit?: number,
   ): Promise<passwordReturns[] | PaginatedResponse<passwordReturns>> {
-    // If JWT token exists, use userId; otherwise use telegramId
-    if (req?.user && req.user.id) {
-      return this.findByUserIdWithPagination(req.user.id, page, limit);
+        // If JWT token exists, use userId; otherwise use telegramId
+    // if (req?.user && req.user.id) {
+    //   return this.findByUserIdWithPagination(req.user.id, page, limit);
+    
+    // If JWT token exists and has publicAddress, use publicAddress; otherwise use telegramId
+    if (req?.user && req.user.publicAddress) {
+      return this.findByPublicAddressWithPagination(req.user.publicAddress, page, limit);
     } else {
       const telegramId = this.extractTelegramIdFromRequest(req);
       return this.findByUserTelegramIdWithPagination(telegramId, page, limit);

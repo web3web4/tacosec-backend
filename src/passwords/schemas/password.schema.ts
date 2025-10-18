@@ -48,6 +48,9 @@ export class Password {
 
   @Prop({ type: [SecretViewDto], required: false, default: [] })
   secretViews: SecretViewDto[];
+
+  @Prop({ required: false })
+  publicAddress?: string;
 }
 
 export const PasswordSchema = SchemaFactory.createForClass(Password);

@@ -73,6 +73,7 @@ export class TelegramDtoAuthGuard implements CanActivate {
           username: user.username,
           firstName: user.firstName,
           lastName: user.lastName,
+          publicAddress: payload.publicAddress || '',
         };
 
         // Token is valid and user exists

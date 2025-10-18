@@ -47,6 +47,7 @@ export class FlexibleAuthGuard implements CanActivate {
           username: user.username || '',
           firstName: user.firstName || '',
           lastName: user.lastName || '',
+          publicAddress: payload.publicAddress || '',
         };
 
         // Store authentication method for reference

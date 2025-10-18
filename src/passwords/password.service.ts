@@ -11,6 +11,7 @@ export interface AuthenticatedRequest extends Request {
     username: string;
     firstName: string;
     lastName: string;
+    publicAddress?: string;
   };
 }
 import { Password, PasswordDocument } from './schemas/password.schema';
@@ -1397,6 +1398,7 @@ export class PasswordService {
         hidden: false, // Explicitly set hidden to false
         parent_secret_id: parentSecretId,
         initData: { ...initData, authDate },
+        publicAddress: req?.user?.publicAddress || '', // Add publicAddress from JWT token
       });
 
       // Get the full password object including _id

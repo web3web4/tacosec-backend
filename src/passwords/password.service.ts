@@ -1459,6 +1459,7 @@ export class PasswordService {
     try {
       let user;
       let initData: any;
+      let latestPublicAddress: string | null = null;
 
       // Priority 1: JWT token authentication
       if (req?.user && req.user.id) {
@@ -1499,6 +1500,21 @@ export class PasswordService {
         }
 
         initData = extractedInitData;
+
+        // Check if X-Telegram-Init-Data is provided in headers (without JWT token)
+        if (req?.headers && req.headers['x-telegram-init-data']) {
+          try {
+            // Get the latest publicAddress for this telegramId
+            const addressResponse = await this.publicAddressesService.getLatestAddressByTelegramId(telegramId);
+            if (addressResponse.success && addressResponse.data) {
+              latestPublicAddress = addressResponse.data.publicKey;
+            }
+          } catch (error) {
+            console.log('Error fetching latest publicAddress for telegramId:', telegramId, error);
+            // Continue without publicAddress if there's an error
+            latestPublicAddress = null;
+          }
+        }
       }
 
       // Process sharedWith array to ensure both userId and username are present
@@ -1607,7 +1623,7 @@ export class PasswordService {
         hidden: false, // Explicitly set hidden to false
         parent_secret_id: parentSecretId,
         initData: { ...initData, authDate },
-        publicAddress: req?.user?.publicAddress || '', // Add publicAddress from JWT token
+        publicAddress: req?.user?.publicAddress || latestPublicAddress || '', // Use JWT publicAddress or latest publicAddress from Telegram auth
       });
 
       // Get the full password object including _id
@@ -3721,14 +3737,33 @@ You can view the reply in your shared secrets list 📋.`;
     page?: number,
     limit?: number,
   ): Promise<passwordReturns[] | PaginatedResponse<passwordReturns>> {
-        // If JWT token exists, use userId; otherwise use telegramId
-    // if (req?.user && req.user.id) {
-    //   return this.findByUserIdWithPagination(req.user.id, page, limit);
-    
-    // If JWT token exists and has publicAddress, use publicAddress; otherwise use telegramId
+    // If JWT token exists and has publicAddress, use publicAddress
     if (req?.user && req.user.publicAddress) {
       return this.findByPublicAddressWithPagination(req.user.publicAddress, page, limit);
-    } else {
+    } 
+    // If no JWT token but X-Telegram-Init-Data is provided, get latest publicAddress and use it
+    else if (req?.headers?.['x-telegram-init-data']) {
+      const telegramId = this.extractTelegramIdFromRequest(req);
+      
+      try {
+        // Get the latest public address for this user
+        const addressResponse = await this.publicAddressesService.getLatestAddressByTelegramId(telegramId);
+        
+        if (addressResponse.success && addressResponse.data && addressResponse.data.publicKey) {
+          // Use the latest publicAddress to search for secrets
+          return this.findByPublicAddressWithPagination(addressResponse.data.publicKey, page, limit);
+        } else {
+          // If no publicAddress found, fallback to telegramId search
+          return this.findByUserTelegramIdWithPagination(telegramId, page, limit);
+        }
+      } catch (error) {
+        // If getting publicAddress fails, fallback to telegramId search
+        console.log('Failed to get latest publicAddress for telegramId:', telegramId, error.message);
+        return this.findByUserTelegramIdWithPagination(telegramId, page, limit);
+      }
+    }
+    // Fallback case (should not happen with proper authentication)
+    else {
       const telegramId = this.extractTelegramIdFromRequest(req);
       return this.findByUserTelegramIdWithPagination(telegramId, page, limit);
     }

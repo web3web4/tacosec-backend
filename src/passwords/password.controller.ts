@@ -7,16 +7,16 @@ import {
   Param,
   Delete,
   Query,
-  // HttpException,
-  // HttpStatus,
   Request,
 } from '@nestjs/common';
 
 import { PasswordService, AuthenticatedRequest } from './password.service';
 // import { CreatePasswordDto } from './dto/create-password.dto';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
+import { AdminSecretsFilterDto } from './dto/admin-secrets-filter.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
 import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
+import { Roles, Role } from '../decorators/roles.decorator';
 // import { TelegramService } from '../telegram/telegram.service';
 // import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 // import { PublicAddressesService } from '../public-addresses/public-addresses.service';
@@ -216,5 +216,18 @@ export class PasswordController {
       username,
       publicAddress,
     );
+  }
+
+  @Get('admin/all/:userId')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getAllSecretsForAdmin(
+    @Param('userId') userId: string,
+    @Query() filters: AdminSecretsFilterDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    // Add userId from path parameter to filters
+    const filtersWithUserId = { ...filters, userId };
+    return this.passwordService.getAllSecretsForAdmin(filtersWithUserId);
   }
 }

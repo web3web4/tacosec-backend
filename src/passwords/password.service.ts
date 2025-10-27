@@ -31,6 +31,7 @@ import {
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { SharedWithDto } from './dto/shared-with.dto';
 import { PaginatedResponse } from './dto/pagination.dto';
+import { AdminSecretsFilterDto } from './dto/admin-secrets-filter.dto';
 import { TelegramService } from '../telegram/telegram.service';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { ConfigService } from '@nestjs/config';
@@ -4649,6 +4650,102 @@ You can view the reply in your shared secrets list 📋.`;
       }
       throw new HttpException(
         'Failed to get secret view statistics',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Get all secrets for admin with filters and pagination
+   * @param filters Admin filters including userId, isActive, hidden, secretType
+   * @returns Paginated secrets with metadata
+   */
+  async getAllSecretsForAdmin(filters: AdminSecretsFilterDto): Promise<PaginatedResponse<any>> {
+    try {
+      const { userId, isActive, hidden, secretType, search, page = 1, limit = 10 } = filters;
+
+      // Build filter query
+      const andConditions: any[] = [];
+
+      // Filter by userId if provided
+      if (userId) {
+        andConditions.push({ userId });
+      }
+
+      // Filter by isActive if provided
+      if (isActive !== undefined) {
+        andConditions.push({ isActive });
+      }
+
+      // Filter by hidden if provided
+      if (hidden !== undefined) {
+        andConditions.push({ hidden });
+      }
+
+      // Filter by secretType (parent/child secrets)
+      if (secretType) {
+        if (secretType === 'parents') {
+          andConditions.push({
+            $or: [
+              { parent_secret_id: { $exists: false } },
+              { parent_secret_id: null },
+              { parent_secret_id: '' }
+            ]
+          });
+        } else if (secretType === 'children') {
+           andConditions.push({
+             parent_secret_id: { $exists: true, $nin: [null, ''] }
+           });
+        }
+        // For 'all', no additional filter needed
+      }
+
+      // Search filter
+      if (search) {
+        andConditions.push({
+          $or: [
+            { title: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } }
+          ]
+        });
+      }
+
+      // Combine all conditions
+      const filterQuery = andConditions.length > 0 ? { $and: andConditions } : {};
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Get total count
+      const totalCount = await this.passwordModel.countDocuments(filterQuery);
+
+      // Get paginated secrets
+      const secrets = await this.passwordModel
+        .find(filterQuery)
+        .select('-hash') // Exclude sensitive hash field
+        .populate('userId', 'username firstName lastName telegramId')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec();
+
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalCount / limit);
+
+      return {
+         data: secrets,
+         pagination: {
+           currentPage: page,
+           totalPages,
+           totalCount: totalCount,
+           hasNextPage: page < totalPages,
+           hasPreviousPage: page > 1,
+           limit: limit,
+         },
+       };
+    } catch (error) {
+      throw new HttpException(
+        'Failed to get secrets for admin',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

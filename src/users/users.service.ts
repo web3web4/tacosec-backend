@@ -846,4 +846,94 @@ As a result:
       total: sortedUsers.length,
     };
   }
+
+  /**
+   * Get all users with admin filters and pagination
+   * @param filters - Filter criteria for users
+   * @returns Paginated list of users with total count
+   */
+  async getAllUsersForAdmin(filters: {
+    role?: string;
+    sharingRestricted?: boolean;
+    isActive?: boolean;
+    hasTelegramId?: 'true' | 'false';
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    data: User[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const {
+      role,
+      sharingRestricted,
+      isActive,
+      hasTelegramId,
+      search,
+      page = 1,
+      limit = 10,
+    } = filters;
+
+    // Build filter query
+    const filterQuery: any = {};
+
+    if (role) {
+      filterQuery.role = role;
+    }
+
+    if (typeof sharingRestricted === 'boolean') {
+      filterQuery.sharingRestricted = sharingRestricted;
+    }
+
+    if (typeof isActive === 'boolean') {
+      filterQuery.isActive = isActive;
+    }
+
+    if (hasTelegramId === 'true') {
+      filterQuery.telegramId = { $ne: '', $exists: true };
+    } else if (hasTelegramId === 'false') {
+      filterQuery.$or = [
+        { telegramId: '' },
+        { telegramId: { $exists: false } },
+        { telegramId: null },
+      ];
+    }
+
+    if (search && search.trim()) {
+      filterQuery.$or = [
+        { username: { $regex: search.trim(), $options: 'i' } },
+        { firstName: { $regex: search.trim(), $options: 'i' } },
+        { lastName: { $regex: search.trim(), $options: 'i' } },
+        { telegramId: { $regex: search.trim(), $options: 'i' } },
+      ];
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Get total count
+    const total = await this.userModel.countDocuments(filterQuery);
+
+    // Get paginated users
+    const users = await this.userModel
+      .find(filterQuery)
+      .select('-hash') // Exclude sensitive data
+      .sort({ createdAt: -1 }) // Sort by newest first
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: users,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
 }

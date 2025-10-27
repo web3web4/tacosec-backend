@@ -28,6 +28,7 @@ import { TelegramService } from '../telegram/telegram.service';
 import { HttpService } from '@nestjs/axios';
 // import { firstValueFrom } from 'rxjs';
 import { SearchUsersDto } from './dto/search-users.dto';
+import { AdminUsersFilterDto } from './dto/admin-users-filter.dto';
 
 @Controller('users')
 export class UsersController {
@@ -215,6 +216,34 @@ export class UsersController {
     // Get current user from JWT token or Telegram data
     const currentUserId = await this.usersService.getCurrentUserId(req);
     return this.usersService.updatePrivacyMode(currentUserId, body.privacyMode);
+  }
+
+  /**
+   * Get all users with admin filters and pagination
+   * Admin-only endpoint to manage users with comprehensive filtering options
+   * 
+   * Supported filters:
+   * - role: Filter by user role (user, admin)
+   * - sharingRestricted: Filter by sharing restriction status (true/false)
+   * - isActive: Filter by active status (true/false)
+   * - hasTelegramId: Filter users with/without Telegram ID (true/false)
+   * - search: Search in username, firstName, lastName, telegramId
+   * - page: Page number for pagination (default: 1)
+   * - limit: Items per page (default: 10)
+   * 
+   * Authentication: Supports both JWT token and Telegram init data
+   * Authorization: Admin role required
+   * 
+   * Example usage:
+   * GET /users/admin/all?role=user&isActive=true&page=1&limit=20
+   * GET /users/admin/all?sharingRestricted=true&hasTelegramId=false
+   * GET /users/admin/all?search=john&page=2
+   */
+  @Get('admin/all')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getAllUsersForAdmin(@Query() filters: AdminUsersFilterDto) {
+    return this.usersService.getAllUsersForAdmin(filters);
   }
 
   @Delete(':id')

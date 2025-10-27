@@ -879,6 +879,7 @@ As a result:
 
     // Build filter query
     const filterQuery: any = {};
+    const andConditions: any[] = [];
 
     if (role) {
       filterQuery.role = role;
@@ -892,23 +893,36 @@ As a result:
       filterQuery.isActive = isActive;
     }
 
+    // Handle hasTelegramId filter
     if (hasTelegramId === 'true') {
-      filterQuery.telegramId = { $ne: '', $exists: true };
+      andConditions.push({
+        telegramId: { $exists: true, $nin: ['', null] }
+      });
     } else if (hasTelegramId === 'false') {
-      filterQuery.$or = [
-        { telegramId: '' },
-        { telegramId: { $exists: false } },
-        { telegramId: null },
-      ];
+      andConditions.push({
+        $or: [
+          { telegramId: '' },
+          { telegramId: { $exists: false } },
+          { telegramId: null },
+        ]
+      });
     }
 
+    // Handle search filter
     if (search && search.trim()) {
-      filterQuery.$or = [
-        { username: { $regex: search.trim(), $options: 'i' } },
-        { firstName: { $regex: search.trim(), $options: 'i' } },
-        { lastName: { $regex: search.trim(), $options: 'i' } },
-        { telegramId: { $regex: search.trim(), $options: 'i' } },
-      ];
+      andConditions.push({
+        $or: [
+          { username: { $regex: search.trim(), $options: 'i' } },
+          { firstName: { $regex: search.trim(), $options: 'i' } },
+          { lastName: { $regex: search.trim(), $options: 'i' } },
+          { telegramId: { $regex: search.trim(), $options: 'i' } },
+        ]
+      });
+    }
+
+    // Combine all conditions
+    if (andConditions.length > 0) {
+      filterQuery.$and = andConditions;
     }
 
     // Calculate pagination

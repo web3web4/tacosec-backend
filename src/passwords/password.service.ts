@@ -4660,26 +4660,45 @@ You can view the reply in your shared secrets list 📋.`;
    * @param filters Admin filters including userId, isActive, hidden, secretType
    * @returns Paginated secrets with metadata
    */
-  async getAllSecretsForAdmin(filters: AdminSecretsFilterDto): Promise<PaginatedResponse<any>> {
+  async getAllSecretsForAdmin(filters: AdminSecretsFilterDto): Promise<{
+    data: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     try {
       const { userId, isActive, hidden, secretType, search, page = 1, limit = 10 } = filters;
 
       // Build filter query
+      const filterQuery: any = {};
       const andConditions: any[] = [];
 
-      // Filter by userId if provided
+      // Filter by userId if provided (convert string to ObjectId)
       if (userId) {
-        andConditions.push({ userId });
+        try {
+          const userObjectId = new Types.ObjectId(userId);
+          filterQuery.userId = userObjectId;
+        } catch (error) {
+          // If userId is not a valid ObjectId, return empty results
+          return {
+            data: [],
+            total: 0,
+            page,
+            limit,
+            totalPages: 0,
+          };
+        }
       }
 
       // Filter by isActive if provided
-      if (isActive !== undefined) {
-        andConditions.push({ isActive });
+      if (typeof isActive === 'boolean') {
+        filterQuery.isActive = isActive;
       }
 
       // Filter by hidden if provided
-      if (hidden !== undefined) {
-        andConditions.push({ hidden });
+      if (typeof hidden === 'boolean') {
+        filterQuery.hidden = hidden;
       }
 
       // Filter by secretType (parent/child secrets)
@@ -4701,23 +4720,25 @@ You can view the reply in your shared secrets list 📋.`;
       }
 
       // Search filter
-      if (search) {
+      if (search && search.trim()) {
         andConditions.push({
           $or: [
-            { title: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } }
+            { title: { $regex: search.trim(), $options: 'i' } },
+            { description: { $regex: search.trim(), $options: 'i' } }
           ]
         });
       }
 
       // Combine all conditions
-      const filterQuery = andConditions.length > 0 ? { $and: andConditions } : {};
+      if (andConditions.length > 0) {
+        filterQuery.$and = andConditions;
+      }
 
       // Calculate pagination
       const skip = (page - 1) * limit;
 
       // Get total count
-      const totalCount = await this.passwordModel.countDocuments(filterQuery);
+      const total = await this.passwordModel.countDocuments(filterQuery);
 
       // Get paginated secrets
       const secrets = await this.passwordModel
@@ -4730,19 +4751,15 @@ You can view the reply in your shared secrets list 📋.`;
         .exec();
 
       // Calculate pagination info
-      const totalPages = Math.ceil(totalCount / limit);
+      const totalPages = Math.ceil(total / limit);
 
       return {
-         data: secrets,
-         pagination: {
-           currentPage: page,
-           totalPages,
-           totalCount: totalCount,
-           hasNextPage: page < totalPages,
-           hasPreviousPage: page > 1,
-           limit: limit,
-         },
-       };
+        data: secrets,
+        total,
+        page,
+        limit,
+        totalPages,
+      };
     } catch (error) {
       throw new HttpException(
         'Failed to get secrets for admin',

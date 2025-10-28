@@ -1274,7 +1274,7 @@ export class PasswordService {
   ): Promise<void> {
     // Get all passwords shared with this user
     const passwordsSharedWithUser = await this.passwordModel.find({
-      'sharedWith.username': user.username,
+      'sharedWith.username': { $regex: new RegExp(`^${user.username}$`, 'i') },
       isActive: true,
     });
 
@@ -1346,7 +1346,7 @@ export class PasswordService {
             }
 
             const sharedWithUser = await this.userModel.findOne({
-              username: sharedWith.username,
+              username: sharedWith.username.toLowerCase(),
               isActive: true,
             });
 
@@ -1884,7 +1884,7 @@ You can view the reply in your shared secrets list 📋.`;
       const hasAccess =
         parentPassword.sharedWith &&
         parentPassword.sharedWith.some(
-          (shared) => shared.username === user.username,
+          (shared) => shared.username?.toLowerCase() === user.username?.toLowerCase(),
         );
 
       // Check if user owns any child password
@@ -2950,7 +2950,7 @@ You can view the reply in your shared secrets list 📋.`;
       const hasAccess =
         parentPassword.sharedWith &&
         parentPassword.sharedWith.some(
-          (shared) => shared.username === user.username,
+          (shared) => shared.username?.toLowerCase() === user.username?.toLowerCase(),
         );
 
       // Check if user owns any child password

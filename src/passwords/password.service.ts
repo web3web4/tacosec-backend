@@ -364,7 +364,7 @@ export class PasswordService {
       if (sharedPasswords.length === 0 && username) {
         sharedPasswords = await this.passwordModel
           .find({
-            'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') }, //case insensitive
+            'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') }, //case insensitive to union all usersname in telegram
             isActive: true,
             $or: [
               { parent_secret_id: { $exists: false } },

@@ -339,45 +339,62 @@ export class PasswordService {
         throw new Error('Username or userId is required');
       }
 
-      let sharedPasswords: any[] = [];
+      const uniquePasswordsMap = new Map<string, any>();
 
-      // First, try searching by userId if available
+      // Build queries for both userId and username searches
+      const queries: any[] = [];
+
+      // Add userId query if available
       if (userId) {
-        sharedPasswords = await this.passwordModel
-          .find({
-            'sharedWith.userId': userId,
-            isActive: true,
-            $or: [
-              { parent_secret_id: { $exists: false } },
-              { parent_secret_id: null },
-            ],
-          })
-          .select(
-            ' _id key value description initData.username sharedWith createdAt updatedAt userId secretViews ',
-          )
-          .sort({ createdAt: -1 })
-          .lean()
-          .exec();
+        queries.push({
+          'sharedWith.userId': userId,
+          isActive: true,
+          $or: [
+            { parent_secret_id: { $exists: false } },
+            { parent_secret_id: null },
+          ],
+        });
       }
 
-      // If no results found with userId and username exists, try searching by username
-      if (sharedPasswords.length === 0 && username) {
-        sharedPasswords = await this.passwordModel
-          .find({
-            'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') }, //case insensitive
-            isActive: true,
-            $or: [
-              { parent_secret_id: { $exists: false } },
-              { parent_secret_id: null },
-            ],
-          })
+      // Add username query if available
+      if (username) {
+        queries.push({
+          'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') }, //case insensitive
+          isActive: true,
+          $or: [
+            { parent_secret_id: { $exists: false } },
+            { parent_secret_id: null },
+          ],
+        });
+      }
+
+      // Execute all queries and collect results
+      for (const query of queries) {
+        const passwords = await this.passwordModel
+          .find(query)
           .select(
             ' _id key value description initData.username sharedWith createdAt updatedAt userId secretViews ',
           )
           .sort({ createdAt: -1 })
           .lean()
           .exec();
+
+        // Add to unique map to avoid duplicates (using _id as key)
+        passwords.forEach((password) => {
+          const passwordId = String(password._id);
+          if (!uniquePasswordsMap.has(passwordId)) {
+            uniquePasswordsMap.set(passwordId, password);
+          }
+        });
       }
+
+      // Convert map to array and sort by createdAt
+      const sharedPasswords = Array.from(uniquePasswordsMap.values());
+      sharedPasswords.sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.updatedAt);
+        const dateB = new Date(b.createdAt || b.updatedAt);
+        return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+      });
       if (!sharedPasswords?.length) {
         return { sharedWithMe: [], userCount: 0 };
       }
@@ -2506,73 +2523,76 @@ You can view the reply in your shared secrets list 📋.`;
 
       // Calculate pagination
       const skip = (page - 1) * limit;
-      let baseQuery: any;
-      let totalCount = 0;
-      let sharedPasswords: any[] = [];
+      let allSharedPasswords: any[] = [];
+      const uniquePasswordsMap = new Map<string, any>();
 
-      // First, try searching by userId if available
+      // Build queries for both userId and username searches
+      const queries: any[] = [];
+
+      // Add userId query if available
       if (userId) {
-        baseQuery = {
+        queries.push({
           'sharedWith.userId': userId,
           isActive: true,
           $or: [
             { parent_secret_id: { $exists: false } },
             { parent_secret_id: null },
           ],
-        };
-
-        totalCount = await this.passwordModel.countDocuments(baseQuery).exec();
-
-        if (totalCount > 0) {
-          sharedPasswords = await this.passwordModel
-            .find(baseQuery)
-            .select(
-              ' _id key value description initData.username sharedWith updatedAt userId ',
-            )
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean()
-            .exec();
-          console.log(
-            'Database query result (userId):',
-            sharedPasswords.length,
-            'passwords found',
-          );
-        }
+        });
       }
 
-      // If no results found with userId and username exists, try searching by username
-      if (totalCount === 0 && username) {
-        baseQuery = {
+      // Add username query if available
+      if (username) {
+        queries.push({
           'sharedWith.username': { $regex: new RegExp(`^${username}$`, 'i') },
           isActive: true,
           $or: [
             { parent_secret_id: { $exists: false } },
             { parent_secret_id: null },
           ],
-        };
-
-        totalCount = await this.passwordModel.countDocuments(baseQuery).exec();
-
-        if (totalCount > 0) {
-          sharedPasswords = await this.passwordModel
-            .find(baseQuery)
-            .select(
-              ' _id key value description initData.username sharedWith updatedAt userId ',
-            )
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean()
-            .exec();
-          console.log(
-            'Database query result (username):',
-            sharedPasswords.length,
-            'passwords found',
-          );
-        }
+        });
       }
+
+      // Execute all queries and collect results
+      for (const query of queries) {
+        const passwords = await this.passwordModel
+          .find(query)
+          .select(
+            ' _id key value description initData.username sharedWith createdAt updatedAt userId ',
+          )
+          .sort({ createdAt: -1 })
+          .lean()
+          .exec();
+
+        // Add to unique map to avoid duplicates (using _id as key)
+        passwords.forEach((password) => {
+          const passwordId = String(password._id);
+          if (!uniquePasswordsMap.has(passwordId)) {
+            uniquePasswordsMap.set(passwordId, password);
+          }
+        });
+      }
+
+      // Convert map to array and sort by createdAt
+      allSharedPasswords = Array.from(uniquePasswordsMap.values());
+      allSharedPasswords.sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.updatedAt);
+        const dateB = new Date(b.createdAt || b.updatedAt);
+        return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+      });
+
+      const totalCount = allSharedPasswords.length;
+
+      // Apply pagination to the combined results
+      const sharedPasswords = allSharedPasswords.slice(skip, skip + limit);
+
+      console.log(
+        'Combined query results:',
+        totalCount,
+        'total passwords found,',
+        sharedPasswords.length,
+        'passwords returned after pagination',
+      );
 
       // If no username available and no results, stop search and return empty result
       if (totalCount === 0 && !username) {

@@ -53,9 +53,16 @@ export class UsersService {
         username: user.username,
       });
 
-      if (
-        telegramInitDto.username.toLowerCase() !== user.username.toLowerCase()
-      ) {
+      // Always update user data to ensure username is stored in lowercase
+      // and other fields are kept up to date
+      const updateData = { ...telegramInitDto };
+
+      // Check if username actually changed (case-insensitive comparison)
+      const usernameChanged =
+        telegramInitDto.username &&
+        telegramInitDto.username.toLowerCase() !== user.username?.toLowerCase();
+
+      if (usernameChanged) {
         console.log('Username changed detected!', {
           oldUsername: user.username,
           newUsername: telegramInitDto.username,
@@ -84,12 +91,15 @@ As a result:
         } catch (error) {
           console.error('Failed to send notification message:', error);
         }
+      }
 
-        user = await this.userModel
-          .findByIdAndUpdate(user._id, telegramInitDto, { new: true })
-          .exec();
-      } else {
-        console.log('Username has not changed');
+      // Always update the user to ensure data consistency and lowercase username
+      user = await this.userModel
+        .findByIdAndUpdate(user._id, updateData, { new: true })
+        .exec();
+
+      if (!usernameChanged) {
+        console.log('Username normalized to lowercase and user data updated');
       }
     }
 

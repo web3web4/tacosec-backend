@@ -1884,7 +1884,8 @@ You can view the reply in your shared secrets list 📋.`;
       const hasAccess =
         parentPassword.sharedWith &&
         parentPassword.sharedWith.some(
-          (shared) => shared.username?.toLowerCase() === user.username?.toLowerCase(),
+          (shared) =>
+            shared.username?.toLowerCase() === user.username?.toLowerCase(),
         );
 
       // Check if user owns any child password
@@ -2950,7 +2951,8 @@ You can view the reply in your shared secrets list 📋.`;
       const hasAccess =
         parentPassword.sharedWith &&
         parentPassword.sharedWith.some(
-          (shared) => shared.username?.toLowerCase() === user.username?.toLowerCase(),
+          (shared) =>
+            shared.username?.toLowerCase() === user.username?.toLowerCase(),
         );
 
       // Check if user owns any child password

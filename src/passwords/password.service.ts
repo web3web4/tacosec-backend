@@ -1109,7 +1109,7 @@ export class PasswordService {
                 })
                 .exec();
               if (sharedUser) {
-                finalUsername = sharedUser.username;
+                finalUsername = sharedUser.username.toLowerCase();
                 finalUserId = shared.userId;
               }
             }
@@ -1122,7 +1122,7 @@ export class PasswordService {
                 })
                 .exec();
               if (sharedUser) {
-                finalUsername = sharedUser.username;
+                finalUsername = sharedUser.username.toLowerCase();
                 finalUserId = shared.userId;
               }
             }
@@ -1135,7 +1135,7 @@ export class PasswordService {
                 })
                 .exec();
               if (sharedUser) {
-                finalUsername = sharedUser.username;
+                finalUsername = sharedUser.username.toLowerCase();
                 finalUserId = sharedUser._id ? String(sharedUser._id) : '';
               }
             }
@@ -1157,7 +1157,7 @@ export class PasswordService {
                 const user = publicAddressRecord.userId as any;
                 if (user.isActive) {
                   sharedUser = user;
-                  finalUsername = user.username;
+                  finalUsername = user.username.toLowerCase();
                   finalUserId = user._id ? String(user._id) : '';
                   finalPublicAddress = shared.publicAddress;
                 }
@@ -1608,7 +1608,7 @@ You can view the response in your secrets list 📋.`;
         try {
           // Find the shared user by username
           const user = await this.userModel
-            .findOne({ username: sharedUser.username })
+            .findOne({ username: sharedUser.username.toLowerCase() })
             .exec();
 
           if (!user) {
@@ -3705,7 +3705,7 @@ You can view the reply in your shared secrets list 📋.`;
         for (const sharedUser of secret.sharedWith) {
           // Find user details from database
           const userDetails = await this.userModel
-            .findOne({ username: sharedUser.username })
+            .findOne({ username: sharedUser.username.toLowerCase() })
             .select('telegramId firstName lastName privacyMode')
             .exec();
 

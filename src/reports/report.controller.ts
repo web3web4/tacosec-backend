@@ -59,7 +59,7 @@ export class ReportController {
     return this.reportService.reportUser(reporterUserId, reportData);
   }
 
-  @Get('user/:userIdentifier')
+  @Get('admin/user/:userIdentifier')
   @FlexibleAuth()
   @Roles(Role.ADMIN)
   @UsePipes(new ValidationPipe({ transform: true }))
@@ -78,7 +78,7 @@ export class ReportController {
     return this.reportService.isUserRestricted(userIdentifier);
   }
 
-  @Patch('resolve/:id')
+  @Patch('admin/resolve/:id')
   @FlexibleAuth()
   @Roles(Role.ADMIN)
   async resolveReport(@Param('id') id: string) {

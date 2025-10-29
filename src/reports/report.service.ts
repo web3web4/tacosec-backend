@@ -663,7 +663,7 @@ If you believe this report was made in error, please contact our support team.`;
   }) {
     try {
       // Build the base query for finding reports
-      const reportQuery: any = {};
+      let reportQuery: any = {};
 
       // Apply filters if provided
       if (filters?.reporterUserId || filters?.reportedUserId) {
@@ -684,34 +684,64 @@ If you believe this report was made in error, please contact our support team.`;
         reportQuery.$and = andConditions;
       }
 
-      // Find all unique reportedTelegramIds from legacy reports
-      const reportedTelegramIds = await this.reportModel.distinct(
-        'reportedTelegramId',
-        reportQuery,
-      );
-
-      // Find all unique userIds from modern reports
-      const reportedUserIds = await this.reportModel.distinct(
-        'reportedUserInfo.userId',
-        reportQuery,
-      );
-
-      // If no reports exist, return empty result
-      if (!reportedTelegramIds.length && !reportedUserIds.length) {
-        return {
-          count: 0,
-          users: [],
+      // If we're filtering by reportedUserId, we need to check if reports exist for this user
+      let reportedUsers = [];
+      
+      if (filters?.reportedUserId) {
+        // Build query to check if reports exist for this specific user
+        const checkQuery: any = {
+          'reportedUserInfo.userId': filters.reportedUserId, // Check modern field
         };
-      }
 
-      // Get all reported users using both legacy telegramId and modern userId
-      const reportedUsers = await this.userModel.find({
-        $or: [
-          { telegramId: { $in: reportedTelegramIds } },
-          { _id: { $in: reportedUserIds } },
-        ],
-        isActive: true,
-      });
+        // Add reporter filter if provided
+        if (filters.reporterUserId) {
+          checkQuery['reporterInfo.userId'] = filters.reporterUserId;
+        }
+
+        // First check if there are any reports for this user
+        const reportsExist = await this.reportModel.findOne(checkQuery);
+
+        if (reportsExist) {
+          // Find the specific user by ID
+          const specificUser = await this.userModel.findOne({
+            _id: filters.reportedUserId,
+            isActive: true,
+          });
+          
+          if (specificUser) {
+            reportedUsers = [specificUser];
+          }
+        }
+      } else {
+        // Find all unique reportedTelegramIds from legacy reports
+        const reportedTelegramIds = await this.reportModel.distinct(
+          'reportedTelegramId',
+          reportQuery,
+        );
+
+        // Find all unique userIds from modern reports
+        const reportedUserIds = await this.reportModel.distinct(
+          'reportedUserInfo.userId',
+          reportQuery,
+        );
+
+        // If no reports exist, return empty result
+        if (!reportedTelegramIds.length && !reportedUserIds.length) {
+          return {
+            count: 0,
+            users: [],
+          };
+        }
+
+        // Get all reported users using both legacy telegramId and modern userId
+        reportedUsers = await this.userModel.find({
+          $or: [
+            { telegramId: { $in: reportedTelegramIds } },
+            { _id: { $in: reportedUserIds } },
+          ],
+          isActive: true,
+        });
+      }
 
       // Prepare the result with detailed information for each user
       const usersWithReports = await Promise.all(
@@ -731,6 +761,17 @@ If you believe this report was made in error, please contact our support team.`;
             additionalConditions.push({
               'reporterInfo.userId': filters.reporterUserId, // Only search in modern field for userId
             });
+          }
+
+          // If we're filtering by reportedUserId, we need to ensure we only get reports for this specific user
+          if (filters?.reportedUserId) {
+            // Override the userReportQuery to be more specific
+            userReportQuery = {
+              $or: [
+                { reportedTelegramId: user.telegramId },
+                { 'reportedUserInfo.userId': user._id },
+              ],
+            };
           }
 
           // If we have additional conditions, combine them with AND

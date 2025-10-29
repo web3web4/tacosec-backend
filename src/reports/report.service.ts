@@ -667,11 +667,11 @@ If you believe this report was made in error, please contact our support team.`;
 
       // Apply filters if provided - only use modern fields
       if (filters?.reporterUserId) {
-        reportQuery['reporterInfo.userId'] = filters.reporterUserId;
+        reportQuery['reporterInfo.userId'] = new Types.ObjectId(filters.reporterUserId);
       }
 
       if (filters?.reportedUserId) {
-        reportQuery['reportedUserInfo.userId'] = filters.reportedUserId;
+        reportQuery['reportedUserInfo.userId'] = new Types.ObjectId(filters.reportedUserId);
       }
 
       // Find all unique userIds from modern reports only
@@ -704,7 +704,7 @@ If you believe this report was made in error, please contact our support team.`;
 
           // Apply reporter filter if provided
           if (filters?.reporterUserId) {
-            userReportQuery['reporterInfo.userId'] = filters.reporterUserId;
+            userReportQuery['reporterInfo.userId'] = new Types.ObjectId(filters.reporterUserId);
           }
 
           // Get all reports for this user

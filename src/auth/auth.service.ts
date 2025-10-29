@@ -296,7 +296,7 @@ export class AuthService {
           if (shared.publicAddress === publicAddress) {
             return {
               ...shared,
-              username: username,
+              username: username.toLowerCase(),
               userId: userId,
               publicAddress: publicAddress, // Keep the existing public address
             };

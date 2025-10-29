@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Request,
+  Query,
   UsePipes,
   ValidationPipe,
   HttpException,
@@ -13,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { ReportService } from './report.service';
 import { ReportUserDto } from './dto/report-user.dto';
+import { GetReportedUsersQueryDto } from './dto/get-reported-users-query.dto';
 import { UsersService } from '../users/users.service';
 
 import { TelegramUserExistsPipe } from './pipes/telegram-user-exists.pipe';
@@ -90,9 +92,10 @@ export class ReportController {
   @Get('admin/reported-users')
   @FlexibleAuth()
   @Roles(Role.ADMIN)
-  async getAllReportedUsers() {
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async getAllReportedUsers(@Query() query: GetReportedUsersQueryDto) {
     // This method doesn't need to extract user data from request
     // since it's an admin endpoint that returns all reported users
-    return this.reportService.getAllReportedUsers();
+    return this.reportService.getAllReportedUsers(query);
   }
 }

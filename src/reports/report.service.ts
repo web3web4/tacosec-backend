@@ -654,18 +654,40 @@ If you believe this report was made in error, please contact our support team.`;
    * Returns a list of all users who have been reported, along with their report counts,
    * sharing restriction status, and the reports associated with them
    * Searches using both legacy telegramId and modern userId fields
+   * @param filters Optional filters for reporterUserId and reportedUserId
    * @returns Object containing count of reported users and their details
    */
-  async getAllReportedUsers() {
+  async getAllReportedUsers(filters?: { reporterUserId?: string; reportedUserId?: string }) {
     try {
+      // Build the base query for finding reports
+      let reportQuery: any = {};
+      
+      // Apply filters if provided
+      if (filters?.reporterUserId || filters?.reportedUserId) {
+        const orConditions = [];
+        
+        if (filters.reporterUserId) {
+          orConditions.push(
+            { reporterTelegramId: filters.reporterUserId }, // Legacy field
+            { 'reporterInfo.userId': filters.reporterUserId } // Modern field
+          );
+        }
+        
+        if (filters.reportedUserId) {
+          orConditions.push(
+            { reportedTelegramId: filters.reportedUserId }, // Legacy field
+            { 'reportedUserInfo.userId': filters.reportedUserId } // Modern field
+          );
+        }
+        
+        reportQuery.$or = orConditions;
+      }
+
       // Find all unique reportedTelegramIds from legacy reports
-      const reportedTelegramIds =
-        await this.reportModel.distinct('reportedTelegramId');
+      const reportedTelegramIds = await this.reportModel.distinct('reportedTelegramId', reportQuery);
 
       // Find all unique userIds from modern reports
-      const reportedUserIds = await this.reportModel.distinct(
-        'reportedUserInfo.userId',
-      );
+      const reportedUserIds = await this.reportModel.distinct('reportedUserInfo.userId', reportQuery);
 
       // If no reports exist, return empty result
       if (!reportedTelegramIds.length && !reportedUserIds.length) {
@@ -687,14 +709,30 @@ If you believe this report was made in error, please contact our support team.`;
       // Prepare the result with detailed information for each user
       const usersWithReports = await Promise.all(
         reportedUsers.map(async (user) => {
-          // Get all reports for this user using both legacy and modern fields
+          // Build query for this specific user's reports
+          let userReportQuery: any = {
+            $or: [
+              { reportedTelegramId: user.telegramId },
+              { 'reportedUserInfo.userId': user._id },
+            ],
+          };
+
+          // Apply additional filters if provided
+          if (filters?.reporterUserId) {
+            userReportQuery.$and = [
+              userReportQuery,
+              {
+                $or: [
+                  { reporterTelegramId: filters.reporterUserId },
+                  { 'reporterInfo.userId': filters.reporterUserId },
+                ],
+              },
+            ];
+          }
+
+          // Get all reports for this user
           const reports = await this.reportModel
-            .find({
-              $or: [
-                { reportedTelegramId: user.telegramId },
-                { 'reportedUserInfo.userId': user._id },
-              ],
-            })
+            .find(userReportQuery)
             .sort({ createdAt: -1 })
             .exec();
 
@@ -709,6 +747,8 @@ If you believe this report was made in error, please contact our support team.`;
             sharingRestricted: user.sharingRestricted || false,
             reports: reports.map((report) => ({
               id: report._id,
+              secret_id: report.secret_id,
+              report_type: report.report_type,
               reason: report.reason,
               reporterTelegramId: report.reporterTelegramId,
               reporterInfo: report.reporterInfo,

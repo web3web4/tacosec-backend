@@ -245,43 +245,43 @@ export class AuthService {
       }
 
       // Get latest public address for the user (same logic as generateTokens)
-        let latestPublicAddress: string | undefined;
-        try {
-          // First try to get address by telegramId if available
-          if (user.telegramId) {
-            const addressResponse =
-              await this.publicAddressesService.getLatestAddressByTelegramId(
-                user.telegramId,
-              );
-            if (addressResponse.success && addressResponse.data) {
-              latestPublicAddress = addressResponse.data.publicKey;
-            }
+      let latestPublicAddress: string | undefined;
+      try {
+        // First try to get address by telegramId if available
+        if (user.telegramId) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByTelegramId(
+              user.telegramId,
+            );
+          if (addressResponse.success && addressResponse.data) {
+            latestPublicAddress = addressResponse.data.publicKey;
           }
-
-          // If no address found by telegramId, try by userId
-          if (!latestPublicAddress && user._id) {
-            const addressResponse =
-              await this.publicAddressesService.getLatestAddressByUserId(
-                user._id.toString(),
-              );
-            if (addressResponse.success && addressResponse.data) {
-              latestPublicAddress = addressResponse.data.publicKey;
-            }
-          }
-        } catch (error) {
-          // If address retrieval fails, latestPublicAddress remains undefined
-          latestPublicAddress = undefined;
         }
 
-        // Create JWT payload - use same publicAddress logic as response
-        const payload = {
-          userId: user._id.toString(),
-          sub: user._id.toString(),
-          telegramId: user.telegramId,
-          username: user.username,
-          role: user.role,
-          publicAddress: latestPublicAddress, // Use same logic as generateTokens
-        };
+        // If no address found by telegramId, try by userId
+        if (!latestPublicAddress && user._id) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByUserId(
+              user._id.toString(),
+            );
+          if (addressResponse.success && addressResponse.data) {
+            latestPublicAddress = addressResponse.data.publicKey;
+          }
+        }
+      } catch (error) {
+        // If address retrieval fails, latestPublicAddress remains undefined
+        latestPublicAddress = undefined;
+      }
+
+      // Create JWT payload - use same publicAddress logic as response
+      const payload = {
+        userId: user._id.toString(),
+        sub: user._id.toString(),
+        telegramId: user.telegramId,
+        username: user.username,
+        role: user.role,
+        publicAddress: latestPublicAddress, // Use same logic as generateTokens
+      };
 
       // Generate JWT tokens
       return await this.generateTokens(payload, user);
@@ -718,7 +718,10 @@ export class AuthService {
    * @param payload - JWT payload containing user information
    * @returns Object containing access_token, refresh_token, expires_in, and token_type
    */
-  private async generateTokens(payload: JwtPayload, user?: any): Promise<LoginResponse> {
+  private async generateTokens(
+    payload: JwtPayload,
+    user?: any,
+  ): Promise<LoginResponse> {
     // Get token expiration times from environment variables
     const accessTokenExpiry = this.configService.get<string>(
       'JWT_ACCESS_TOKEN_EXPIRES_IN',

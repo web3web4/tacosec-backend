@@ -38,12 +38,14 @@ export class RolesGuard implements CanActivate {
     } else {
       // Telegram authentication - extract from telegram init data
       const telegramId = request.headers['x-telegram-init-data']
-        ? new URLSearchParams(request.headers['x-telegram-init-data']).get('user')
+        ? new URLSearchParams(request.headers['x-telegram-init-data']).get(
+            'user',
+          )
           ? JSON.parse(
               decodeURIComponent(
-                new URLSearchParams(request.headers['x-telegram-init-data']).get(
-                  'user',
-                ),
+                new URLSearchParams(
+                  request.headers['x-telegram-init-data'],
+                ).get('user'),
               ),
             ).id
           : null

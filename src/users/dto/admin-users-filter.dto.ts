@@ -1,4 +1,11 @@
-import { IsOptional, IsEnum, IsBoolean, IsString, IsNumber, Min } from 'class-validator';
+import {
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+  IsString,
+  IsNumber,
+  Min,
+} from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { Role } from '../../decorators/roles.decorator';
 

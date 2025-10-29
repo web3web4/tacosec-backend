@@ -896,7 +896,7 @@ As a result:
     // Handle hasTelegramId filter
     if (hasTelegramId === 'true') {
       andConditions.push({
-        telegramId: { $exists: true, $nin: ['', null] }
+        telegramId: { $exists: true, $nin: ['', null] },
       });
     } else if (hasTelegramId === 'false') {
       andConditions.push({
@@ -904,7 +904,7 @@ As a result:
           { telegramId: '' },
           { telegramId: { $exists: false } },
           { telegramId: null },
-        ]
+        ],
       });
     }
 
@@ -916,7 +916,7 @@ As a result:
           { firstName: { $regex: search.trim(), $options: 'i' } },
           { lastName: { $regex: search.trim(), $options: 'i' } },
           { telegramId: { $regex: search.trim(), $options: 'i' } },
-        ]
+        ],
       });
     }
 

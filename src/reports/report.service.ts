@@ -657,37 +657,44 @@ If you believe this report was made in error, please contact our support team.`;
    * @param filters Optional filters for reporterUserId and reportedUserId
    * @returns Object containing count of reported users and their details
    */
-  async getAllReportedUsers(filters?: { reporterUserId?: string; reportedUserId?: string }) {
+  async getAllReportedUsers(filters?: {
+    reporterUserId?: string;
+    reportedUserId?: string;
+  }) {
     try {
       // Build the base query for finding reports
-      let reportQuery: any = {};
-      
+      const reportQuery: any = {};
+
       // Apply filters if provided
       if (filters?.reporterUserId || filters?.reportedUserId) {
-        const orConditions = [];
-        
+        const andConditions = [];
+
         if (filters.reporterUserId) {
-          orConditions.push(
-            { reporterTelegramId: filters.reporterUserId }, // Legacy field
-            { 'reporterInfo.userId': filters.reporterUserId } // Modern field
-          );
+          andConditions.push({
+            'reporterInfo.userId': filters.reporterUserId, // Only search in modern field for userId
+          });
         }
-        
+
         if (filters.reportedUserId) {
-          orConditions.push(
-            { reportedTelegramId: filters.reportedUserId }, // Legacy field
-            { 'reportedUserInfo.userId': filters.reportedUserId } // Modern field
-          );
+          andConditions.push({
+            'reportedUserInfo.userId': filters.reportedUserId, // Only search in modern field for userId
+          });
         }
-        
-        reportQuery.$or = orConditions;
+
+        reportQuery.$and = andConditions;
       }
 
       // Find all unique reportedTelegramIds from legacy reports
-      const reportedTelegramIds = await this.reportModel.distinct('reportedTelegramId', reportQuery);
+      const reportedTelegramIds = await this.reportModel.distinct(
+        'reportedTelegramId',
+        reportQuery,
+      );
 
       // Find all unique userIds from modern reports
-      const reportedUserIds = await this.reportModel.distinct('reportedUserInfo.userId', reportQuery);
+      const reportedUserIds = await this.reportModel.distinct(
+        'reportedUserInfo.userId',
+        reportQuery,
+      );
 
       // If no reports exist, return empty result
       if (!reportedTelegramIds.length && !reportedUserIds.length) {
@@ -718,16 +725,19 @@ If you believe this report was made in error, please contact our support team.`;
           };
 
           // Apply additional filters if provided
+          const additionalConditions = [];
+
           if (filters?.reporterUserId) {
-            userReportQuery.$and = [
-              userReportQuery,
-              {
-                $or: [
-                  { reporterTelegramId: filters.reporterUserId },
-                  { 'reporterInfo.userId': filters.reporterUserId },
-                ],
-              },
-            ];
+            additionalConditions.push({
+              'reporterInfo.userId': filters.reporterUserId, // Only search in modern field for userId
+            });
+          }
+
+          // If we have additional conditions, combine them with AND
+          if (additionalConditions.length > 0) {
+            userReportQuery = {
+              $and: [userReportQuery, ...additionalConditions],
+            };
           }
 
           // Get all reports for this user

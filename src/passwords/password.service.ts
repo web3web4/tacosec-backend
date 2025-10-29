@@ -1506,12 +1506,19 @@ export class PasswordService {
         if (req?.headers && req.headers['x-telegram-init-data']) {
           try {
             // Get the latest publicAddress for this telegramId
-            const addressResponse = await this.publicAddressesService.getLatestAddressByTelegramId(telegramId);
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByTelegramId(
+                telegramId,
+              );
             if (addressResponse.success && addressResponse.data) {
               latestPublicAddress = addressResponse.data.publicKey;
             }
           } catch (error) {
-            console.log('Error fetching latest publicAddress for telegramId:', telegramId, error);
+            console.log(
+              'Error fetching latest publicAddress for telegramId:',
+              telegramId,
+              error,
+            );
             // Continue without publicAddress if there's an error
             latestPublicAddress = null;
           }
@@ -3740,26 +3747,49 @@ You can view the reply in your shared secrets list 📋.`;
   ): Promise<passwordReturns[] | PaginatedResponse<passwordReturns>> {
     // If JWT token exists and has publicAddress, use publicAddress
     if (req?.user && req.user.publicAddress) {
-      return this.findByPublicAddressWithPagination(req.user.publicAddress, page, limit);
-    } 
+      return this.findByPublicAddressWithPagination(
+        req.user.publicAddress,
+        page,
+        limit,
+      );
+    }
     // If no JWT token but X-Telegram-Init-Data is provided, get latest publicAddress and use it
     else if (req?.headers?.['x-telegram-init-data']) {
       const telegramId = this.extractTelegramIdFromRequest(req);
-      
+
       try {
         // Get the latest public address for this user
-        const addressResponse = await this.publicAddressesService.getLatestAddressByTelegramId(telegramId);
-        
-        if (addressResponse.success && addressResponse.data && addressResponse.data.publicKey) {
+        const addressResponse =
+          await this.publicAddressesService.getLatestAddressByTelegramId(
+            telegramId,
+          );
+
+        if (
+          addressResponse.success &&
+          addressResponse.data &&
+          addressResponse.data.publicKey
+        ) {
           // Use the latest publicAddress to search for secrets
-          return this.findByPublicAddressWithPagination(addressResponse.data.publicKey, page, limit);
+          return this.findByPublicAddressWithPagination(
+            addressResponse.data.publicKey,
+            page,
+            limit,
+          );
         } else {
           // If no publicAddress found, fallback to telegramId search
-          return this.findByUserTelegramIdWithPagination(telegramId, page, limit);
+          return this.findByUserTelegramIdWithPagination(
+            telegramId,
+            page,
+            limit,
+          );
         }
       } catch (error) {
         // If getting publicAddress fails, fallback to telegramId search
-        console.log('Failed to get latest publicAddress for telegramId:', telegramId, error.message);
+        console.log(
+          'Failed to get latest publicAddress for telegramId:',
+          telegramId,
+          error.message,
+        );
         return this.findByUserTelegramIdWithPagination(telegramId, page, limit);
       }
     }
@@ -4668,7 +4698,15 @@ You can view the reply in your shared secrets list 📋.`;
     totalPages: number;
   }> {
     try {
-      const { userId, isActive, hidden, secretType, search, page = 1, limit = 10 } = filters;
+      const {
+        userId,
+        isActive,
+        hidden,
+        secretType,
+        search,
+        page = 1,
+        limit = 10,
+      } = filters;
 
       // Build filter query
       const filterQuery: any = {};
@@ -4708,13 +4746,13 @@ You can view the reply in your shared secrets list 📋.`;
             $or: [
               { parent_secret_id: { $exists: false } },
               { parent_secret_id: null },
-              { parent_secret_id: '' }
-            ]
+              { parent_secret_id: '' },
+            ],
           });
         } else if (secretType === 'children') {
-           andConditions.push({
-             parent_secret_id: { $exists: true, $nin: [null, ''] }
-           });
+          andConditions.push({
+            parent_secret_id: { $exists: true, $nin: [null, ''] },
+          });
         }
         // For 'all', no additional filter needed
       }
@@ -4724,8 +4762,8 @@ You can view the reply in your shared secrets list 📋.`;
         andConditions.push({
           $or: [
             { title: { $regex: search.trim(), $options: 'i' } },
-            { description: { $regex: search.trim(), $options: 'i' } }
-          ]
+            { description: { $regex: search.trim(), $options: 'i' } },
+          ],
         });
       }
 

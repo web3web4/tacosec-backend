@@ -221,7 +221,7 @@ export class UsersController {
   /**
    * Get all users with admin filters and pagination
    * Admin-only endpoint to manage users with comprehensive filtering options
-   * 
+   *
    * Supported filters:
    * - role: Filter by user role (user, admin)
    * - sharingRestricted: Filter by sharing restriction status (true/false)
@@ -230,10 +230,10 @@ export class UsersController {
    * - search: Search in username, firstName, lastName, telegramId
    * - page: Page number for pagination (default: 1)
    * - limit: Items per page (default: 10)
-   * 
+   *
    * Authentication: Supports both JWT token and Telegram init data
    * Authorization: Admin role required
-   * 
+   *
    * Example usage:
    * GET /users/admin/all?role=user&isActive=true&page=1&limit=20
    * GET /users/admin/all?sharingRestricted=true&hasTelegramId=false

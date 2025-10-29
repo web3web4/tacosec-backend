@@ -98,4 +98,11 @@ export class ReportController {
     // since it's an admin endpoint that returns all reported users
     return this.reportService.getAllReportedUsers(query);
   }
+
+  @Get('admin/:id')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getReportById(@Param('id') reportId: string) {
+    return this.reportService.getReportById(reportId);
+  }
 }

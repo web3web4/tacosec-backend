@@ -667,11 +667,15 @@ If you believe this report was made in error, please contact our support team.`;
 
       // Apply filters if provided - only use modern fields
       if (filters?.reporterUserId) {
-        reportQuery['reporterInfo.userId'] = new Types.ObjectId(filters.reporterUserId);
+        reportQuery['reporterInfo.userId'] = new Types.ObjectId(
+          filters.reporterUserId,
+        );
       }
 
       if (filters?.reportedUserId) {
-        reportQuery['reportedUserInfo.userId'] = new Types.ObjectId(filters.reportedUserId);
+        reportQuery['reportedUserInfo.userId'] = new Types.ObjectId(
+          filters.reportedUserId,
+        );
       }
 
       // Find all unique userIds from modern reports only
@@ -704,7 +708,9 @@ If you believe this report was made in error, please contact our support team.`;
 
           // Apply reporter filter if provided
           if (filters?.reporterUserId) {
-            userReportQuery['reporterInfo.userId'] = new Types.ObjectId(filters.reporterUserId);
+            userReportQuery['reporterInfo.userId'] = new Types.ObjectId(
+              filters.reporterUserId,
+            );
           }
 
           // Get all reports for this user
@@ -748,6 +754,40 @@ If you believe this report was made in error, please contact our support team.`;
         throw error;
       }
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  /**
+   * Get a specific report by its ID (Admin only)
+   * @param reportId The ID of the report to retrieve
+   * @returns The report with full details
+   */
+  async getReportById(reportId: string): Promise<Report> {
+    try {
+      // Validate the reportId format
+      if (!Types.ObjectId.isValid(reportId)) {
+        throw new HttpException(
+          'Invalid report ID format',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Find the report by ID
+      const report = await this.reportModel.findById(reportId).exec();
+
+      if (!report) {
+        throw new HttpException('Report not found', HttpStatus.NOT_FOUND);
+      }
+
+      return report;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Error retrieving report',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

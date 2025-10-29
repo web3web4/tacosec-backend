@@ -662,123 +662,49 @@ If you believe this report was made in error, please contact our support team.`;
     reportedUserId?: string;
   }) {
     try {
-      // Build the base query for finding reports
-      let reportQuery: any = {};
+      // Build the base query for finding reports (only modern fields)
+      const reportQuery: any = {};
 
-      // Apply filters if provided
-      if (filters?.reporterUserId || filters?.reportedUserId) {
-        const andConditions = [];
-
-        if (filters.reporterUserId) {
-          andConditions.push({
-            'reporterInfo.userId': filters.reporterUserId, // Only search in modern field for userId
-          });
-        }
-
-        if (filters.reportedUserId) {
-          andConditions.push({
-            'reportedUserInfo.userId': filters.reportedUserId, // Only search in modern field for userId
-          });
-        }
-
-        reportQuery.$and = andConditions;
+      // Apply filters if provided - only use modern fields
+      if (filters?.reporterUserId) {
+        reportQuery['reporterInfo.userId'] = filters.reporterUserId;
       }
 
-      // If we're filtering by reportedUserId, we need to check if reports exist for this user
-      let reportedUsers = [];
-      
       if (filters?.reportedUserId) {
-        // Build query to check if reports exist for this specific user
-        const checkQuery: any = {
-          'reportedUserInfo.userId': filters.reportedUserId, // Check modern field
-        };
-
-        // Add reporter filter if provided
-        if (filters.reporterUserId) {
-          checkQuery['reporterInfo.userId'] = filters.reporterUserId;
-        }
-
-        // First check if there are any reports for this user
-        const reportsExist = await this.reportModel.findOne(checkQuery);
-
-        if (reportsExist) {
-          // Find the specific user by ID
-          const specificUser = await this.userModel.findOne({
-            _id: filters.reportedUserId,
-            isActive: true,
-          });
-          
-          if (specificUser) {
-            reportedUsers = [specificUser];
-          }
-        }
-      } else {
-        // Find all unique reportedTelegramIds from legacy reports
-        const reportedTelegramIds = await this.reportModel.distinct(
-          'reportedTelegramId',
-          reportQuery,
-        );
-
-        // Find all unique userIds from modern reports
-        const reportedUserIds = await this.reportModel.distinct(
-          'reportedUserInfo.userId',
-          reportQuery,
-        );
-
-        // If no reports exist, return empty result
-        if (!reportedTelegramIds.length && !reportedUserIds.length) {
-          return {
-            count: 0,
-            users: [],
-          };
-        }
-
-        // Get all reported users using both legacy telegramId and modern userId
-        reportedUsers = await this.userModel.find({
-          $or: [
-            { telegramId: { $in: reportedTelegramIds } },
-            { _id: { $in: reportedUserIds } },
-          ],
-          isActive: true,
-        });
+        reportQuery['reportedUserInfo.userId'] = filters.reportedUserId;
       }
+
+      // Find all unique userIds from modern reports only
+      const reportedUserIds = await this.reportModel.distinct(
+        'reportedUserInfo.userId',
+        reportQuery,
+      );
+
+      // If no reports exist, return empty result
+      if (!reportedUserIds.length) {
+        return {
+          count: 0,
+          users: [],
+        };
+      }
+
+      // Get all reported users using modern userId only
+      const reportedUsers = await this.userModel.find({
+        _id: { $in: reportedUserIds },
+        isActive: true,
+      });
 
       // Prepare the result with detailed information for each user
       const usersWithReports = await Promise.all(
         reportedUsers.map(async (user) => {
-          // Build query for this specific user's reports
+          // Build query for this specific user's reports (only modern fields)
           let userReportQuery: any = {
-            $or: [
-              { reportedTelegramId: user.telegramId },
-              { 'reportedUserInfo.userId': user._id },
-            ],
+            'reportedUserInfo.userId': user._id, // Only use modern field
           };
 
-          // Apply additional filters if provided
-          const additionalConditions = [];
-
+          // Apply reporter filter if provided
           if (filters?.reporterUserId) {
-            additionalConditions.push({
-              'reporterInfo.userId': filters.reporterUserId, // Only search in modern field for userId
-            });
-          }
-
-          // If we're filtering by reportedUserId, we need to ensure we only get reports for this specific user
-          if (filters?.reportedUserId) {
-            // Override the userReportQuery to be more specific
-            userReportQuery = {
-              $or: [
-                { reportedTelegramId: user.telegramId },
-                { 'reportedUserInfo.userId': user._id },
-              ],
-            };
-          }
-
-          // If we have additional conditions, combine them with AND
-          if (additionalConditions.length > 0) {
-            userReportQuery = {
-              $and: [userReportQuery, ...additionalConditions],
-            };
+            userReportQuery['reporterInfo.userId'] = filters.reporterUserId;
           }
 
           // Get all reports for this user

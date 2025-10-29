@@ -654,12 +654,13 @@ If you believe this report was made in error, please contact our support team.`;
    * Returns a list of all users who have been reported, along with their report counts,
    * sharing restriction status, and the reports associated with them
    * Searches using both legacy telegramId and modern userId fields
-   * @param filters Optional filters for reporterUserId and reportedUserId
+   * @param filters Optional filters for reporterUserId, reportedUserId, and secret_id
    * @returns Object containing count of reported users and their details
    */
   async getAllReportedUsers(filters?: {
     reporterUserId?: string;
     reportedUserId?: string;
+    secret_id?: string;
   }) {
     try {
       // Build the base query for finding reports (only modern fields)
@@ -676,6 +677,10 @@ If you believe this report was made in error, please contact our support team.`;
         reportQuery['reportedUserInfo.userId'] = new Types.ObjectId(
           filters.reportedUserId,
         );
+      }
+
+      if (filters?.secret_id) {
+        reportQuery['secret_id'] = filters.secret_id;
       }
 
       // Find all unique userIds from modern reports only
@@ -711,6 +716,11 @@ If you believe this report was made in error, please contact our support team.`;
             userReportQuery['reporterInfo.userId'] = new Types.ObjectId(
               filters.reporterUserId,
             );
+          }
+
+          // Apply secret_id filter if provided
+          if (filters?.secret_id) {
+            userReportQuery['secret_id'] = filters.secret_id;
           }
 
           // Get all reports for this user

@@ -1,4 +1,4 @@
-import { IsOptional, IsMongoId } from 'class-validator';
+import { IsOptional, IsMongoId, IsString } from 'class-validator';
 
 export class GetReportedUsersQueryDto {
   @IsOptional()
@@ -8,4 +8,8 @@ export class GetReportedUsersQueryDto {
   @IsOptional()
   @IsMongoId()
   reportedUserId?: string;
+
+  @IsOptional()
+  @IsString()
+  secret_id?: string;
 }

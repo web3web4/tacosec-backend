@@ -26,6 +26,7 @@ import {
   PublicAddress,
   PublicAddressDocument,
 } from '../public-addresses/schemas/public-address.schema';
+import { Report, ReportDocument } from '../reports/schemas/report.schema';
 
 @Injectable()
 export class UsersService {
@@ -35,6 +36,7 @@ export class UsersService {
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
     @InjectModel(PublicAddress.name)
     private publicAddressModel: Model<PublicAddressDocument>,
+    @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
     private readonly httpService: HttpService,
     private readonly telegramService: TelegramService,
     @Inject(forwardRef(() => PublicAddressesService))
@@ -861,11 +863,14 @@ As a result:
     page?: number;
     limit?: number;
   }): Promise<{
-    data: User[];
+    data: any[];
     total: number;
     page: number;
     limit: number;
     totalPages: number;
+    totalUsers: number;
+    activeUsers: number;
+    inactiveUsers: number;
   }> {
     const {
       role,
@@ -928,8 +933,13 @@ As a result:
     // Calculate pagination
     const skip = (page - 1) * limit;
 
-    // Get total count
+    // Get total count for filtered results
     const total = await this.userModel.countDocuments(filterQuery);
+
+    // Get pagination statistics for all users
+    const totalUsers = await this.userModel.countDocuments({});
+    const activeUsers = await this.userModel.countDocuments({ isActive: true });
+    const inactiveUsers = await this.userModel.countDocuments({ isActive: false });
 
     // Get paginated users
     const users = await this.userModel
@@ -942,12 +952,86 @@ As a result:
 
     const totalPages = Math.ceil(total / limit);
 
+    // Transform users data to include required fields
+    const transformedUsers = await Promise.all(
+      users.map(async (user) => {
+        // Convert to plain object to access timestamps
+        const userObj = user.toObject() as any;
+        
+        // Combine firstName and lastName into Name
+        const Name = `${userObj.firstName || ''} ${userObj.lastName || ''}`.trim() || 'N/A';
+
+        // Format phone field
+        let phone: string;
+        if (!userObj.phone || userObj.phone.trim() === '') {
+          phone = 'TG';
+        } else {
+          phone = `TG: ${userObj.phone}`;
+        }
+
+        // Format joinedDate from createdAt
+        const joinedDate = userObj.createdAt ? userObj.createdAt.toISOString().split('T')[0] : null;
+
+        // Calculate statistics
+        // Count secrets (passwords) for this user
+        const secrets = await this.passwordModel.countDocuments({
+          userId: userObj._id,
+          isActive: true,
+        });
+
+        // Count total views for all user's secrets
+        const userPasswords = await this.passwordModel.find({
+          userId: userObj._id,
+          isActive: true,
+        }).select('secretViews');
+
+        let views = 0;
+        userPasswords.forEach(password => {
+          if (password.secretViews && Array.isArray(password.secretViews)) {
+            views += password.secretViews.length;
+          }
+        });
+
+        // Count reports for this user (unresolved reports)
+        const reports = await this.reportModel.countDocuments({
+          'reportedUserInfo.userId': userObj._id,
+          resolved: false,
+        });
+
+        return {
+          _id: userObj._id,
+          username: userObj.username,
+          Name,
+          phone,
+          telegramId: userObj.telegramId,
+          photoUrl: userObj.photoUrl,
+          authDate: userObj.authDate,
+          isActive: userObj.isActive,
+          role: userObj.role,
+          sharingRestricted: userObj.sharingRestricted,
+          reportCount: userObj.reportCount,
+          privacyMode: userObj.privacyMode,
+          joinedDate,
+          statistics: {
+            secrets,
+            views,
+            reports,
+          },
+          updatedAt: userObj.updatedAt,
+          createdAt: userObj.createdAt,
+        };
+      })
+    );
+
     return {
-      data: users,
+      data: transformedUsers,
       total,
       page,
       limit,
       totalPages,
+      totalUsers,
+      activeUsers,
+      inactiveUsers,
     };
   }
 

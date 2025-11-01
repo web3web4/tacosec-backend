@@ -9,6 +9,7 @@ import {
   PublicAddress,
   PublicAddressSchema,
 } from '../public-addresses/schemas/public-address.schema';
+import { Report, ReportSchema } from '../reports/schemas/report.schema';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { FlexibleAuthGuard } from '../guards/flexible-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
@@ -26,6 +27,7 @@ import { PublicAddressesModule } from '../public-addresses/public-addresses.modu
       { name: User.name, schema: UserSchema },
       { name: Password.name, schema: PasswordSchema },
       { name: PublicAddress.name, schema: PublicAddressSchema },
+      { name: Report.name, schema: ReportSchema },
     ]),
     SharedJwtModule,
     ConfigModule,

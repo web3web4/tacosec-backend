@@ -80,6 +80,16 @@ export class UsersController {
     return this.usersService.createAndUpdateUser(createUserDto);
   }
 
+  @Patch('update-info')
+  @FlexibleAuth()
+  async updateUserInfo(
+    @Body() updateUserInfoDto: UpdateUserInfoDto,
+    @Req() req: any,
+  ) {
+    const currentUserId = await this.usersService.getCurrentUserId(req);
+    return this.usersService.updateUserInfo(currentUserId, updateUserInfoDto);
+  }
+
   @Patch(':id')
   @TelegramDtoAuth()
   updateUser(
@@ -312,14 +322,4 @@ export class UsersController {
   //       return { success: false };
   //     }
   //   }
-
-  @Patch('update-info')
-  @FlexibleAuth()
-  async updateUserInfo(
-    @Body() updateUserInfoDto: UpdateUserInfoDto,
-    @Req() req: any,
-  ) {
-    const currentUserId = await this.usersService.getCurrentUserId(req);
-    return this.usersService.updateUserInfo(currentUserId, updateUserInfoDto);
-  }
 }

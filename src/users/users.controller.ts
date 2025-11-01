@@ -28,6 +28,7 @@ import { TelegramService } from '../telegram/telegram.service';
 import { HttpService } from '@nestjs/axios';
 // import { firstValueFrom } from 'rxjs';
 import { SearchUsersDto } from './dto/search-users.dto';
+import { UpdateUserInfoDto } from './dto/update-user-info.dto';
 import { AdminUsersFilterDto } from './dto/admin-users-filter.dto';
 
 @Controller('users')
@@ -311,4 +312,14 @@ export class UsersController {
   //       return { success: false };
   //     }
   //   }
+
+  @Patch('update-info')
+  @FlexibleAuth()
+  async updateUserInfo(
+    @Body() updateUserInfoDto: UpdateUserInfoDto,
+    @Req() req: any,
+  ) {
+    const currentUserId = await this.usersService.getCurrentUserId(req);
+    return this.usersService.updateUserInfo(currentUserId, updateUserInfoDto);
+  }
 }

@@ -43,6 +43,9 @@ export class User {
 
   @Prop({ default: false })
   privacyMode: boolean;
+
+  @Prop({ required: false })
+  phone: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

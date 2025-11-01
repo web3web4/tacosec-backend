@@ -950,4 +950,76 @@ As a result:
       totalPages,
     };
   }
+
+  async updateUserInfo(
+    userId: string,
+    updateData: { firstName?: string; lastName?: string; phone?: string },
+  ): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      phone?: string;
+      telegramId?: string;
+    };
+  }> {
+    try {
+      // Get current user to check if linked to Telegram
+      const currentUser = await this.userModel.findById(userId).exec();
+      if (!currentUser) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Prepare update object
+      const updateObject: any = {};
+
+      // If user is linked to Telegram, only allow phone updates
+      if (currentUser.telegramId) {
+        if (updateData.phone !== undefined) {
+          updateObject.phone = updateData.phone;
+        }
+        // firstName and lastName are ignored for Telegram users
+      } else {
+        // For non-Telegram users, allow all fields
+        if (updateData.firstName !== undefined) {
+          updateObject.firstName = updateData.firstName;
+        }
+        if (updateData.lastName !== undefined) {
+          updateObject.lastName = updateData.lastName;
+        }
+        if (updateData.phone !== undefined) {
+          updateObject.phone = updateData.phone;
+        }
+      }
+
+      // Update user
+      const updatedUser = await this.userModel
+        .findByIdAndUpdate(userId, updateObject, { new: true })
+        .exec();
+
+      if (!updatedUser) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      return {
+        success: true,
+        data: {
+          id: updatedUser._id.toString(),
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          phone: updatedUser.phone,
+          telegramId: updatedUser.telegramId,
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Internal server error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

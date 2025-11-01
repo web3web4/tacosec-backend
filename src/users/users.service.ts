@@ -1037,7 +1037,7 @@ As a result:
 
   async updateUserInfo(
     userId: string,
-    updateData: { firstName?: string; lastName?: string; phone?: string },
+    updateData: { firstName?: string; lastName?: string; phone?: string; email?: string },
   ): Promise<{
     success: boolean;
     data: {
@@ -1045,6 +1045,7 @@ As a result:
       firstName: string;
       lastName: string;
       phone?: string;
+      email?: string;
       telegramId?: string;
     };
   }> {
@@ -1058,10 +1059,13 @@ As a result:
       // Prepare update object
       const updateObject: any = {};
 
-      // If user is linked to Telegram, only allow phone updates
+      // If user is linked to Telegram, only allow phone and email updates
       if (currentUser.telegramId) {
         if (updateData.phone !== undefined) {
           updateObject.phone = updateData.phone;
+        }
+        if (updateData.email !== undefined) {
+          updateObject.email = updateData.email;
         }
         // firstName and lastName are ignored for Telegram users
       } else {
@@ -1074,6 +1078,9 @@ As a result:
         }
         if (updateData.phone !== undefined) {
           updateObject.phone = updateData.phone;
+        }
+        if (updateData.email !== undefined) {
+          updateObject.email = updateData.email;
         }
       }
 
@@ -1093,6 +1100,7 @@ As a result:
           firstName: updatedUser.firstName,
           lastName: updatedUser.lastName,
           phone: updatedUser.phone,
+          email: updatedUser.email,
           telegramId: updatedUser.telegramId,
         },
       };

@@ -46,6 +46,9 @@ export class User {
 
   @Prop({ required: false })
   phone: string;
+
+  @Prop({ required: false })
+  email: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

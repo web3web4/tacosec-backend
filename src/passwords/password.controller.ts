@@ -218,16 +218,13 @@ export class PasswordController {
     );
   }
 
-  @Get('admin/all/:userId')
+  @Get('admin/all')
   @FlexibleAuth()
   @Roles(Role.ADMIN)
   async getAllSecretsForAdmin(
-    @Param('userId') userId: string,
     @Query() filters: AdminSecretsFilterDto,
     @Request() req: AuthenticatedRequest,
   ) {
-    // Add userId from path parameter to filters
-    const filtersWithUserId = { ...filters, userId };
-    return this.passwordService.getAllSecretsForAdmin(filtersWithUserId);
+    return this.passwordService.getAllSecretsForAdmin(filters);
   }
 }

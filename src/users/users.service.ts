@@ -1012,13 +1012,12 @@ As a result:
           reportCount: userObj.reportCount,
           privacyMode: userObj.privacyMode,
           joinedDate,
+          lastActive: userObj.updatedAt,
           statistics: {
             secrets,
             views,
             reports,
           },
-          updatedAt: userObj.updatedAt,
-          createdAt: userObj.createdAt,
         };
       })
     );

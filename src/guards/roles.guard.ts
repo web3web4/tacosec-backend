@@ -32,8 +32,15 @@ export class RolesGuard implements CanActivate {
     if ((request as any).authMethod === 'jwt') {
       // JWT authentication - user data is already in request.user
       const userData = (request as any).user;
-      if (userData && userData.telegramId) {
-        user = await this.usersService.findByTelegramId(userData.telegramId);
+      if (userData) {
+        // First try to find by telegramId if available
+        if (userData.telegramId) {
+          user = await this.usersService.findByTelegramId(userData.telegramId);
+        }
+        // If no telegramId or user not found, try to find by userId
+        if (!user && userData.id) {
+          user = await this.usersService.findById(userData.id);
+        }
       }
     } else {
       // Telegram authentication - extract from telegram init data

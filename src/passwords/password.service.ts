@@ -4781,18 +4781,56 @@ You can view the reply in your shared secrets list 📋.`;
       // Get paginated secrets
       const secrets = await this.passwordModel
         .find(filterQuery)
-        .select('-hash') // Exclude sensitive hash field
-        .populate('userId', 'username firstName lastName telegramId')
+        .select('-hash -value -initData') // Exclude sensitive fields but keep key for title
+        .populate('userId', 'username firstName lastName telegramId email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec();
 
+      // Transform data to include required fields
+      const transformedSecrets = await Promise.all(
+        secrets.map(async (secret) => {
+          const secretObj = secret.toObject();
+          const user = secretObj.userId as any;
+
+          // Calculate statistics
+          const views = secretObj.secretViews?.length || 0;
+          const shares = secretObj.sharedWith?.length || 0;
+          
+          // Count reports for this secret
+          const reports = await this.reportModel.countDocuments({
+            secret_id: secret._id,
+          });
+
+          // Get last viewed date
+          const lastViewed = secretObj.secretViews?.length > 0 
+            ? secretObj.secretViews[secretObj.secretViews.length - 1].viewedAt 
+            : null;
+
+          return {
+            ...secretObj,
+            title: secretObj.key, // Use key as title
+            ownerName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '',
+            ownerHandle: user?.username || '',
+            contactEmail: user?.email || '',
+            statistics: {
+              views,
+              shares,
+              reports,
+            },
+            lastViewed,
+            // Remove key from final response
+            key: undefined,
+          };
+        })
+      );
+
       // Calculate pagination info
       const totalPages = Math.ceil(total / limit);
 
       return {
-        data: secrets,
+        data: transformedSecrets,
         total,
         page,
         limit,

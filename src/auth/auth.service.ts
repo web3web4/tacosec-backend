@@ -732,6 +732,22 @@ export class AuthService {
       '7d',
     );
 
+    // Update user's updatedAt field when generating tokens
+    if (user && user._id) {
+      try {
+        await this.userModel.findByIdAndUpdate(
+          user._id,
+          { updatedAt: new Date() },
+          { new: true }
+        );
+        // Update the user object to reflect the new updatedAt value
+        user.updatedAt = new Date();
+      } catch (error) {
+        // If update fails, continue with token generation
+        console.error('Failed to update user updatedAt field:', error);
+      }
+    }
+
     // Get latest public address for the user and update payload
     let updatedPayload = { ...payload };
     if (user) {

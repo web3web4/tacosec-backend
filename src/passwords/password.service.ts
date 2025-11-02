@@ -4797,21 +4797,24 @@ You can view the reply in your shared secrets list 📋.`;
           // Calculate statistics
           const views = secretObj.secretViews?.length || 0;
           const shares = secretObj.sharedWith?.length || 0;
-          
+
           // Count reports for this secret
           const reports = await this.reportModel.countDocuments({
             secret_id: secret._id,
           });
 
           // Get last viewed date
-          const lastViewed = secretObj.secretViews?.length > 0 
-            ? secretObj.secretViews[secretObj.secretViews.length - 1].viewedAt 
-            : null;
+          const lastViewed =
+            secretObj.secretViews?.length > 0
+              ? secretObj.secretViews[secretObj.secretViews.length - 1].viewedAt
+              : null;
 
           return {
             ...secretObj,
             title: secretObj.key, // Use key as title
-            ownerName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '',
+            ownerName: user
+              ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+              : '',
             ownerHandle: user?.username || '',
             contactEmail: user?.email || '',
             statistics: {
@@ -4823,7 +4826,7 @@ You can view the reply in your shared secrets list 📋.`;
             // Remove key from final response
             key: undefined,
           };
-        })
+        }),
       );
 
       // Calculate pagination info

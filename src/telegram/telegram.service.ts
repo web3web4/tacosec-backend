@@ -596,4 +596,105 @@ ${message}
 
     return await this.sendMessageToSpecificAdmin(message, senderInfo, subject);
   }
+
+  /**
+   * Send a message from admin to a specific user by userId
+   * @param adminRequest The admin request object
+   * @param userId The target user's MongoDB ObjectId
+   * @param message The message to send
+   * @param subject Optional subject for the message
+   * @returns Promise with success status and user info
+   */
+  async handleAdminToUserMessage(
+    adminRequest: any,
+    userId: string,
+    message: string,
+    subject?: string,
+  ): Promise<{
+    success: boolean;
+    userFound: boolean;
+    hasTelegram: boolean;
+    userInfo?: any;
+    error?: string;
+  }> {
+    try {
+      // Find the target user by userId
+      const targetUser = await this.usersService.findById(userId);
+
+      if (!targetUser) {
+        return {
+          success: false,
+          userFound: false,
+          hasTelegram: false,
+          error: 'User not found',
+        };
+      }
+
+      // Check if user has telegram account
+      if (!targetUser.telegramId) {
+        return {
+          success: false,
+          userFound: true,
+          hasTelegram: false,
+          userInfo: {
+            username: targetUser.username,
+            firstName: targetUser.firstName,
+            lastName: targetUser.lastName,
+          },
+          error: 'User does not have a Telegram account',
+        };
+      }
+
+      // Get admin info for the message
+      let adminInfo = '';
+      try {
+        if (adminRequest.user && adminRequest.user.userId) {
+          const admin = await this.usersService.findById(
+            adminRequest.user.userId,
+          );
+          if (admin) {
+            adminInfo = `\n\n<i>📤 Sent by Admin: ${admin.firstName || ''} ${admin.lastName || ''} (@${admin.username || 'admin'})</i>`;
+          }
+        }
+      } catch (error) {
+        console.log('Could not get admin info:', error.message);
+        adminInfo = '\n\n<i>📤 Sent by Admin</i>';
+      }
+
+      // Format the message
+      let formattedMessage = '';
+      if (subject) {
+        formattedMessage = `<b>📢 ${subject}</b>\n\n${message}${adminInfo}`;
+      } else {
+        formattedMessage = `<b>📢 Admin Message</b>\n\n${message}${adminInfo}`;
+      }
+
+      // Send the message
+      const messageSent = await this.sendMessage(
+        Number(targetUser.telegramId),
+        formattedMessage,
+      );
+
+      return {
+        success: messageSent,
+        userFound: true,
+        hasTelegram: true,
+        userInfo: {
+          username: targetUser.username,
+          firstName: targetUser.firstName,
+          lastName: targetUser.lastName,
+          telegramId: targetUser.telegramId,
+        },
+        error: messageSent ? undefined : 'Failed to send message to Telegram',
+      };
+    } catch (error) {
+      console.error('Error in handleAdminToUserMessage:', error);
+      return {
+        success: false,
+        userFound: false,
+        hasTelegram: false,
+        error: 'Internal server error',
+      };
+    }
+  }
 }

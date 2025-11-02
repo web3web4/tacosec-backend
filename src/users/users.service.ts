@@ -261,6 +261,10 @@ As a result:
     return user;
   }
 
+  async findById(id: string): Promise<User | null> {
+    return this.userModel.findById(id).exec();
+  }
+
   async findByTelegramId(telegramId: string): Promise<User> {
     return this.userModel.findOne({ telegramId, isActive: true }).exec();
   }

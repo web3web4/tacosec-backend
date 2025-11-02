@@ -871,6 +871,7 @@ As a result:
     totalUsers: number;
     activeUsers: number;
     inactiveUsers: number;
+    sharingRestrictedUsers: number;
   }> {
     const {
       role,
@@ -939,7 +940,12 @@ As a result:
     // Get pagination statistics for all users
     const totalUsers = await this.userModel.countDocuments({});
     const activeUsers = await this.userModel.countDocuments({ isActive: true });
-    const inactiveUsers = await this.userModel.countDocuments({ isActive: false });
+    const inactiveUsers = await this.userModel.countDocuments({
+      isActive: false,
+    });
+    const sharingRestrictedUsers = await this.userModel.countDocuments({
+      sharingRestricted: true,
+    });
 
     // Get paginated users
     const users = await this.userModel
@@ -957,9 +963,11 @@ As a result:
       users.map(async (user) => {
         // Convert to plain object to access timestamps
         const userObj = user.toObject() as any;
-        
+
         // Combine firstName and lastName into Name
-        const Name = `${userObj.firstName || ''} ${userObj.lastName || ''}`.trim() || 'N/A';
+        const Name =
+          `${userObj.firstName || ''} ${userObj.lastName || ''}`.trim() ||
+          'N/A';
 
         // Format phone field
         let phone: string;
@@ -970,7 +978,9 @@ As a result:
         }
 
         // Format joinedDate from createdAt
-        const joinedDate = userObj.createdAt ? userObj.createdAt.toISOString().split('T')[0] : null;
+        const joinedDate = userObj.createdAt
+          ? userObj.createdAt.toISOString().split('T')[0]
+          : null;
 
         // Calculate statistics
         // Count secrets (passwords) for this user
@@ -980,13 +990,15 @@ As a result:
         });
 
         // Count total views for all user's secrets
-        const userPasswords = await this.passwordModel.find({
-          userId: userObj._id,
-          isActive: true,
-        }).select('secretViews');
+        const userPasswords = await this.passwordModel
+          .find({
+            userId: userObj._id,
+            isActive: true,
+          })
+          .select('secretViews');
 
         let views = 0;
-        userPasswords.forEach(password => {
+        userPasswords.forEach((password) => {
           if (password.secretViews && Array.isArray(password.secretViews)) {
             views += password.secretViews.length;
           }
@@ -1019,7 +1031,7 @@ As a result:
             reports,
           },
         };
-      })
+      }),
     );
 
     return {
@@ -1031,12 +1043,18 @@ As a result:
       totalUsers,
       activeUsers,
       inactiveUsers,
+      sharingRestrictedUsers,
     };
   }
 
   async updateUserInfo(
     userId: string,
-    updateData: { firstName?: string; lastName?: string; phone?: string; email?: string },
+    updateData: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      email?: string;
+    },
   ): Promise<{
     success: boolean;
     data: {

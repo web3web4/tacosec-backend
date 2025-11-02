@@ -738,7 +738,7 @@ export class AuthService {
         await this.userModel.findByIdAndUpdate(
           user._id,
           { updatedAt: new Date() },
-          { new: true }
+          { new: true },
         );
         // Update the user object to reflect the new updatedAt value
         user.updatedAt = new Date();

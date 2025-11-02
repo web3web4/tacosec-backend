@@ -30,6 +30,7 @@ import { HttpService } from '@nestjs/axios';
 import { SearchUsersDto } from './dto/search-users.dto';
 import { UpdateUserInfoDto } from './dto/update-user-info.dto';
 import { AdminUsersFilterDto } from './dto/admin-users-filter.dto';
+import { UpdateUserActiveStatusDto } from './dto/update-user-active-status.dto';
 
 @Controller('users')
 export class UsersController {
@@ -255,6 +256,32 @@ export class UsersController {
   @Roles(Role.ADMIN)
   async getAllUsersForAdmin(@Query() filters: AdminUsersFilterDto) {
     return this.usersService.getAllUsersForAdmin(filters);
+  }
+
+  /**
+   * Update user active status (Admin only)
+   * Admin endpoint to activate or deactivate a specific user
+   *
+   * Authentication: Supports both JWT token and Telegram init data
+   * Authorization: Admin role required
+   *
+   * Example usage:
+   * PATCH /users/admin/active-status/64f1a2b3c4d5e6f7g8h9i0j1
+   * {
+   *   "isActive": false
+   * }
+   */
+  @Patch('admin/active-status/:id')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async updateUserActiveStatus(
+    @Param('id') id: string,
+    @Body() updateUserActiveStatusDto: UpdateUserActiveStatusDto,
+  ) {
+    return this.usersService.updateUserActiveStatus(
+      id,
+      updateUserActiveStatusDto.isActive,
+    );
   }
 
   @Delete(':id')

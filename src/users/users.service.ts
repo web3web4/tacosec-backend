@@ -1114,4 +1114,51 @@ As a result:
       );
     }
   }
+
+  /**
+   * Update user active status (Admin only)
+   * @param userId - The ID of the user to update
+   * @param isActive - The new active status
+   * @returns Updated user information
+   */
+  async updateUserActiveStatus(
+    userId: string,
+    isActive: boolean,
+  ): Promise<{ success: boolean; message: string; user?: any }> {
+    try {
+      // Check if user exists
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Update the user's active status
+      const updatedUser = await this.userModel.findByIdAndUpdate(
+        userId,
+        { isActive },
+        { new: true },
+      );
+
+      return {
+        success: true,
+        message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+        user: {
+          _id: updatedUser._id,
+          telegramId: updatedUser.telegramId,
+          username: updatedUser.username,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          isActive: updatedUser.isActive,
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Internal server error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

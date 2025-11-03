@@ -16,6 +16,7 @@ import {
   PublicAddressSchema,
 } from '../public-addresses/schemas/public-address.schema';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PublicAddressesModule } from '../public-addresses/public-addresses.modu
     forwardRef(() => TelegramModule),
     forwardRef(() => UsersModule),
     forwardRef(() => PublicAddressesModule),
+    forwardRef(() => NotificationsModule),
     ConfigModule,
   ],
   controllers: [ReportController],

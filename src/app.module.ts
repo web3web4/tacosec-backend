@@ -12,6 +12,7 @@ import { CryptoModule } from './utils/crypto.module';
 import { ReportsModule } from './reports/reports.module';
 import { AuthModule } from './auth/auth.module';
 import { LoggerModule } from './logger/logger.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { LoggerModule } from './logger/logger.module';
     ReportsModule,
     AuthModule,
     LoggerModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

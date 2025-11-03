@@ -63,7 +63,7 @@ describe.skip('ReportController (e2e)', () => {
   };
 
   const mockReportUserDto: ReportUserDto = {
-    reportedUsername: 'reportedUser',
+    user: 'reportedUser',
     secret_id: '507f1f77bcf86cd799439012', // Mock MongoDB ObjectId
     report_type: ReportType.OTHER,
     reason: 'Inappropriate behavior',

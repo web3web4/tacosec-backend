@@ -27,6 +27,11 @@ import {
   PublicAddressDocument,
 } from '../public-addresses/schemas/public-address.schema';
 import { Report, ReportDocument } from '../reports/schemas/report.schema';
+import {
+  NotificationsService,
+  NotificationLogData,
+} from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/schemas/notification.schema';
 
 @Injectable()
 export class UsersService {
@@ -41,6 +46,7 @@ export class UsersService {
     private readonly telegramService: TelegramService,
     @Inject(forwardRef(() => PublicAddressesService))
     private readonly publicAddressesService: PublicAddressesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async createAndUpdateUser(telegramInitDto: TelegramInitDto): Promise<User> {
@@ -77,6 +83,17 @@ export class UsersService {
 
         console.log('Sending notification message to user');
         try {
+          const notificationData: NotificationLogData = {
+            message: `Username changed from ${user.username} to ${telegramInitDto.username}`,
+            type: NotificationType.USERNAME_CHANGE,
+            recipientUserId: user._id as Types.ObjectId,
+            recipientTelegramId: user.telegramId,
+            metadata: {
+              oldUsername: user.username,
+              newUsername: telegramInitDto.username,
+            },
+          };
+
           await this.telegramService.sendMessage(
             Number(user.telegramId),
             `<b>🔄 Username Changed</b>
@@ -93,6 +110,9 @@ As a result:
 
 <i>😞 We're sorry for the inconvenience.</i>
 🔁 To recover your secrets, please log in again using your old username.`,
+            0,
+            undefined,
+            notificationData,
           );
           console.log('Notification message sent successfully');
         } catch (error) {

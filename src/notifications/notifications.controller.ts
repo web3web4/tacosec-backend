@@ -1,0 +1,195 @@
+import {
+  Controller,
+  Get,
+  Query,
+  UseGuards,
+  HttpException,
+  HttpStatus,
+  Delete,
+  Param,
+} from '@nestjs/common';
+import { NotificationsService } from './notifications.service';
+import { GetNotificationsDto } from './dto';
+import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
+import { Roles } from '../decorators/roles.decorator';
+import { Role } from '../decorators/roles.decorator';
+import { RolesGuard } from '../guards/roles.guard';
+import { FlexibleAuthGuard } from '../guards/flexible-auth.guard';
+
+@Controller('notifications')
+@UseGuards(FlexibleAuthGuard, RolesGuard)
+export class NotificationsController {
+  constructor(private readonly notificationsService: NotificationsService) {}
+
+  /**
+   * Get all notifications with filters and pagination
+   */
+  @Get()
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getNotifications(@Query() query: GetNotificationsDto) {
+    try {
+      return await this.notificationsService.getNotifications(query);
+    } catch (error) {
+      throw new HttpException(
+        'Failed to retrieve notifications',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Get notification statistics
+   */
+  @Get('stats')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getNotificationStats(@Query('userId') userId?: string) {
+    try {
+      return await this.notificationsService.getNotificationStats(userId);
+    } catch (error) {
+      throw new HttpException(
+        'Failed to retrieve notification statistics',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Get failed notifications for retry
+   */
+  @Get('failed')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getFailedNotifications(@Query('maxRetries') maxRetries?: number) {
+    try {
+      const max = maxRetries ? parseInt(maxRetries.toString()) : 3;
+      return await this.notificationsService.getFailedNotificationsForRetry(
+        max,
+      );
+    } catch (error) {
+      throw new HttpException(
+        'Failed to retrieve failed notifications',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Clean up old notifications
+   */
+  @Delete('cleanup/:days')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async cleanupOldNotifications(@Param('days') days: string) {
+    try {
+      const daysOld = parseInt(days);
+      if (isNaN(daysOld) || daysOld < 1) {
+        throw new HttpException(
+          'Invalid days parameter. Must be a positive number.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const deletedCount =
+        await this.notificationsService.cleanupOldNotifications(daysOld);
+      return {
+        success: true,
+        message: `Successfully deleted ${deletedCount} old notifications`,
+        deletedCount,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to cleanup old notifications',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Search notifications by sender
+   */
+  @Get('by-sender/:senderUserId')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getNotificationsBySender(
+    @Param('senderUserId') senderUserId: string,
+    @Query() query: Omit<GetNotificationsDto, 'senderUserId'>,
+  ) {
+    try {
+      const searchQuery = { ...query, senderUserId };
+      return await this.notificationsService.getNotifications(searchQuery);
+    } catch (error) {
+      throw new HttpException(
+        'Failed to retrieve notifications by sender',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Search notifications by recipient
+   */
+  @Get('by-recipient/:recipientUserId')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getNotificationsByRecipient(
+    @Param('recipientUserId') recipientUserId: string,
+    @Query() query: Omit<GetNotificationsDto, 'recipientUserId'>,
+  ) {
+    try {
+      const searchQuery = { ...query, recipientUserId };
+      return await this.notificationsService.getNotifications(searchQuery);
+    } catch (error) {
+      throw new HttpException(
+        'Failed to retrieve notifications by recipient',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Search notifications by type
+   */
+  @Get('by-type/:type')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getNotificationsByType(
+    @Param('type') type: string,
+    @Query() query: Omit<GetNotificationsDto, 'type'>,
+  ) {
+    try {
+      const searchQuery = { ...query, type: type as any };
+      return await this.notificationsService.getNotifications(searchQuery);
+    } catch (error) {
+      throw new HttpException(
+        'Failed to retrieve notifications by type',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Search notifications by status
+   */
+  @Get('by-status/:status')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getNotificationsByStatus(
+    @Param('status') status: string,
+    @Query() query: Omit<GetNotificationsDto, 'status'>,
+  ) {
+    try {
+      const searchQuery = { ...query, status: status as any };
+      return await this.notificationsService.getNotifications(searchQuery);
+    } catch (error) {
+      throw new HttpException(
+        'Failed to retrieve notifications by status',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+}

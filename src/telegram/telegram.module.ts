@@ -10,6 +10,7 @@ import { UsersModule } from '../users/users.module';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { User, UserSchema } from '../users/schemas/user.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -19,9 +20,10 @@ import { User, UserSchema } from '../users/schemas/user.schema';
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     forwardRef(() => UsersModule),
     forwardRef(() => PublicAddressesModule),
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [TelegramController],
   providers: [TelegramService, TelegramValidatorService, TelegramDtoAuthGuard],
-  exports: [TelegramService, TelegramValidatorService],
+  exports: [TelegramService, TelegramValidatorService, TelegramDtoAuthGuard],
 })
 export class TelegramModule {}

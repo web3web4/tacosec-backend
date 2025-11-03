@@ -20,6 +20,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TelegramModule } from '../telegram/telegram.module';
 import { ReportsModule } from '../reports/reports.module';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { PublicAddressesModule } from '../public-addresses/public-addresses.modu
     forwardRef(() => TelegramModule),
     forwardRef(() => ReportsModule),
     forwardRef(() => PublicAddressesModule),
+    NotificationsModule,
   ],
   controllers: [UsersController],
   providers: [

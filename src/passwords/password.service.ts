@@ -37,6 +37,11 @@ import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { ConfigService } from '@nestjs/config';
 import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 import { UserFinderUtil } from '../utils/user-finder.util';
+import {
+  NotificationsService,
+  NotificationLogData,
+} from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/schemas/notification.schema';
 @Injectable()
 export class PasswordService {
   constructor(
@@ -49,6 +54,7 @@ export class PasswordService {
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
     private readonly configService: ConfigService,
     private readonly publicAddressesService: PublicAddressesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -1806,6 +1812,21 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
               message,
               3,
               replyMarkup,
+              {
+                type: NotificationType.PASSWORD_SHARED,
+                recipientId: sharedWithUser._id as Types.ObjectId,
+                recipientUsername: sharedWithUser.username,
+                senderUserId: user._id as Types.ObjectId,
+                senderUsername: user.username,
+                reason: 'Password shared notification',
+                subject: 'Secret Shared With You',
+                relatedEntityType: 'password',
+                relatedEntityId: passwordUser._id as Types.ObjectId,
+                metadata: {
+                  passwordKey: passwordUser.key,
+                  sharedAt: new Date(),
+                },
+              },
             );
 
             console.log(
@@ -1938,6 +1959,22 @@ You can view the response in your secrets list 📋.`;
         message,
         3,
         replyMarkup,
+        {
+          type: NotificationType.PASSWORD_CHILD_RESPONSE,
+          recipientId: parentOwner._id as Types.ObjectId,
+          recipientUsername: parentOwner.username,
+          senderUserId: childUser._id as Types.ObjectId,
+          senderUsername: childUser.username,
+          reason: 'Child password response notification',
+          subject: 'Child Secret Response',
+          relatedEntityType: 'password',
+          relatedEntityId: new Types.ObjectId(childSecretId),
+          metadata: {
+            parentSecretId: parentSecretId,
+            childSecretName: childSecretName,
+            responseDate: now,
+          },
+        },
       );
 
       console.log(
@@ -2073,6 +2110,23 @@ You can view the reply in your shared secrets list 📋.`;
             message,
             3,
             replyMarkup,
+            {
+              type: NotificationType.PASSWORD_CHILD_RESPONSE,
+              recipientUserId: user._id as Types.ObjectId,
+              recipientUsername: user.username,
+              senderUserId: childUser._id as Types.ObjectId,
+              senderUsername: childUser.username,
+              reason: 'Child password response notification to shared user',
+              subject: 'Reply to Shared Secret',
+              relatedEntityType: 'password',
+              relatedEntityId: new Types.ObjectId(childSecretId),
+              metadata: {
+                parentSecretId: parentSecretId,
+                childSecretName: childSecretName,
+                parentOwnerUsername: parentOwner.username,
+                responseDate: now,
+              },
+            },
           );
 
           console.log(

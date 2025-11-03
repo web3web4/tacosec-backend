@@ -18,6 +18,11 @@ import { UserFinderUtil } from '../utils/user-finder.util';
 import { AddressDetectorUtil } from '../utils/address-detector.util';
 import { Types } from 'mongoose';
 import { TelegramService } from '../telegram/telegram.service';
+import {
+  NotificationsService,
+  NotificationLogData,
+} from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/schemas/notification.schema';
 
 @Injectable()
 export class ReportService {
@@ -34,6 +39,7 @@ export class ReportService {
     private configService: ConfigService,
     private publicAddressesService: PublicAddressesService,
     private telegramService: TelegramService,
+    private notificationsService: NotificationsService,
   ) {
     // Get the maximum number of reports before ban from environment variables
     // Default to 10 if not specified
@@ -339,6 +345,25 @@ If you believe this report was made in error, please contact our support team.`;
           await this.telegramService.sendMessage(
             Number(reportedUser.telegramId),
             notificationMessage,
+            3,
+            undefined,
+            {
+              type: NotificationType.REPORT_NOTIFICATION,
+              recipientUserId: reportedUser._id as Types.ObjectId,
+              recipientUsername: reportedUser.username,
+              senderUserId: reporter._id as Types.ObjectId,
+              senderUsername: reporter.username,
+              reason: 'User report notification',
+              subject: `Report: ${reportData.report_type}`,
+              relatedEntityType: 'report',
+              relatedEntityId: savedReport._id as Types.ObjectId,
+              metadata: {
+                reportType: reportData.report_type,
+                reportReason: finalReason,
+                secretId: reportData.secret_id,
+                reportDate: new Date(),
+              },
+            },
           );
 
           console.log(

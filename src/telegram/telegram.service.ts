@@ -6,10 +6,17 @@ import {
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
+import { Types } from 'mongoose';
 // import { firstValueFrom } from 'rxjs';
 // import { TelegramValidatorService } from './telegram-validator.service';
 import { UsersService } from '../users/users.service';
 import { PublicAddressesService } from '../public-addresses/public-addresses.service';
+import {
+  NotificationsService,
+  NotificationLogData,
+  NotificationResult,
+} from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/schemas/notification.schema';
 import axios from 'axios';
 
 @Injectable()
@@ -23,6 +30,8 @@ export class TelegramService {
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     private readonly publicAddressesService: PublicAddressesService,
+    @Inject(forwardRef(() => NotificationsService))
+    private readonly notificationsService: NotificationsService,
   ) {
     this.botToken =
       this.configService.get<string>('TELEGRAM_BOT_TOKEN') ||
@@ -80,6 +89,20 @@ export class TelegramService {
     message: string,
     retries = 3,
     replyMarkup?: any,
+    notificationData?: {
+      senderId?: Types.ObjectId;
+      senderUserId?: Types.ObjectId;
+      senderUsername?: string;
+      recipientId?: Types.ObjectId;
+      recipientUserId?: Types.ObjectId;
+      recipientUsername?: string;
+      type?: NotificationType;
+      reason?: string;
+      subject?: string;
+      relatedEntityId?: Types.ObjectId;
+      relatedEntityType?: string;
+      metadata?: Record<string, any>;
+    },
   ): Promise<boolean> {
     const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
 
@@ -94,10 +117,13 @@ export class TelegramService {
       return false;
     }
 
-    // Check user's privacy mode
+    const originalMessage = message;
+    let recipientUser = null;
+
+    // Check user's privacy mode and get recipient info
     try {
-      const user = await this.usersService.findByTelegramId(String(userId));
-      if (user && user.privacyMode) {
+      recipientUser = await this.usersService.findByTelegramId(String(userId));
+      if (recipientUser && recipientUser.privacyMode) {
         // Replace message with privacy-friendly text
         message = 'please check your data';
         console.log('User has privacy mode enabled, using generic message');
@@ -108,6 +134,22 @@ export class TelegramService {
         error.message,
       );
     }
+
+    // Prepare notification log data
+    const logData: NotificationLogData = {
+      message: originalMessage,
+      type: notificationData?.type || NotificationType.GENERAL,
+      recipientUserId: recipientUser?._id || undefined,
+      recipientUsername: recipientUser?.telegramUsername || undefined,
+      senderUserId: notificationData?.senderUserId,
+      senderUsername: notificationData?.senderUsername,
+      reason: notificationData?.reason,
+      subject: notificationData?.subject,
+      relatedEntityId: notificationData?.relatedEntityId,
+      relatedEntityType: notificationData?.relatedEntityType,
+      telegramChatId: String(userId),
+      telegramMessageId: undefined, // Will be set after successful send
+    };
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
@@ -131,7 +173,19 @@ export class TelegramService {
         });
 
         console.log('Message sent successfully:', response.data);
-        return response.data.ok === true;
+
+        if (response.data.ok === true) {
+          // Log successful notification
+          logData.telegramMessageId =
+            response.data.result?.message_id?.toString();
+          await this.notificationsService.logNotificationWithResult(logData, {
+            success: true,
+            telegramMessageId: logData.telegramMessageId,
+          });
+          return true;
+        }
+
+        return false;
       } catch (error) {
         console.error(`Attempt ${attempt} failed:`, error.message);
 
@@ -154,6 +208,13 @@ export class TelegramService {
           console.error(
             'All retry attempts failed for sending Telegram message',
           );
+
+          // Log failed notification
+          await this.notificationsService.logNotificationWithResult(logData, {
+            success: false,
+            error: error.message,
+            errorMessage: error.response?.data,
+          });
           return false;
         }
       }
@@ -231,10 +292,11 @@ export class TelegramService {
       let senderDisplayName = 'Unknown User';
       let senderFirstName = '';
       let senderLastName = '';
+      let sender = null;
 
       if (senderInfo.telegramId) {
         try {
-          const sender = await this.usersService.findByTelegramId(
+          sender = await this.usersService.findByTelegramId(
             senderInfo.telegramId,
           );
           if (sender) {
@@ -268,6 +330,17 @@ ${message}
           const success = await this.sendMessage(
             Number(admin.telegramId),
             formattedMessage,
+            3, // retries
+            undefined, // replyMarkup
+            {
+              senderUserId: sender?._id,
+              senderUsername: senderInfo.username,
+              type: NotificationType.ADMIN_NOTIFICATION,
+              reason: 'User message to admins',
+              subject: subject,
+              relatedEntityId: sender?._id,
+              relatedEntityType: 'user',
+            },
           );
           if (success) {
             successCount++;
@@ -332,10 +405,11 @@ ${message}
       let senderDisplayName = 'Unknown User';
       let senderFirstName = '';
       let senderLastName = '';
+      let sender = null;
 
       if (senderInfo.telegramId) {
         try {
-          const sender = await this.usersService.findByTelegramId(
+          sender = await this.usersService.findByTelegramId(
             senderInfo.telegramId,
           );
           if (sender) {
@@ -367,6 +441,17 @@ ${message}
       const success = await this.sendMessage(
         Number(adminTelegramId),
         formattedMessage,
+        3, // retries
+        undefined, // replyMarkup
+        {
+          senderUserId: sender?._id,
+          senderUsername: senderInfo.username,
+          type: NotificationType.ADMIN_NOTIFICATION,
+          reason: 'User message to specific admin',
+          subject: subject,
+          relatedEntityId: sender?._id,
+          relatedEntityType: 'user',
+        },
       );
 
       if (success) {
@@ -440,7 +525,7 @@ ${message}
     telegramDtoAuthGuard: any,
   ): Promise<{ success: boolean; adminCount: number }> {
     // Extract sender information from request (supports both JWT and Telegram auth)
-    let senderInfo = {
+    const senderInfo = {
       telegramId: '',
       username: '',
       publicAddress: '',
@@ -533,7 +618,7 @@ ${message}
     telegramDtoAuthGuard: any,
   ): Promise<{ success: boolean; adminTelegramId?: string }> {
     // Extract sender information from request (supports both JWT and Telegram auth)
-    let senderInfo = {
+    const senderInfo = {
       telegramId: '',
       username: '',
       publicAddress: '',
@@ -673,6 +758,17 @@ ${message}
       const messageSent = await this.sendMessage(
         Number(targetUser.telegramId),
         formattedMessage,
+        3, // retries
+        undefined, // replyMarkup
+        {
+          senderUserId: adminRequest.user?.userId,
+          senderUsername: adminRequest.user?.username,
+          type: NotificationType.USER_NOTIFICATION,
+          reason: 'Admin message to user',
+          subject: subject,
+          relatedEntityId: new Types.ObjectId(userId),
+          relatedEntityType: 'user',
+        },
       );
 
       return {

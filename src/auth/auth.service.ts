@@ -223,7 +223,7 @@ export class AuthService {
         // User exists, update their data and generate token
         user.firstName = telegramData.firstName || user.firstName;
         user.lastName = telegramData.lastName || user.lastName;
-        user.username = telegramData.username || user.username;
+        user.username = telegramData.username?.toLowerCase() || user.username;
         user.authDate = new Date(telegramData.authDate * 1000);
         user.hash = telegramData.hash;
 
@@ -234,7 +234,7 @@ export class AuthService {
           telegramId: telegramData.telegramId,
           firstName: telegramData.firstName || '',
           lastName: telegramData.lastName || '',
-          username: telegramData.username || '',
+          username: telegramData.username?.toLowerCase() || '',
           authDate: new Date(telegramData.authDate * 1000),
           hash: telegramData.hash,
           role: Role.USER,
@@ -383,7 +383,7 @@ export class AuthService {
         existingTelegramUser.lastName =
           telegramData.lastName || existingTelegramUser.lastName;
         existingTelegramUser.username =
-          telegramData.username || existingTelegramUser.username;
+          telegramData.username?.toLowerCase() || existingTelegramUser.username;
         existingTelegramUser.authDate = new Date(telegramData.authDate * 1000);
         existingTelegramUser.hash = telegramData.hash;
 
@@ -452,7 +452,7 @@ export class AuthService {
           telegramId: telegramData.telegramId,
           firstName: telegramData.firstName || '',
           lastName: telegramData.lastName || '',
-          username: telegramData.username || '',
+          username: telegramData.username?.toLowerCase() || '',
           authDate: new Date(telegramData.authDate * 1000),
           hash: telegramData.hash,
         },
@@ -601,7 +601,7 @@ export class AuthService {
       existingTelegramUser.lastName =
         telegramData.lastName || existingTelegramUser.lastName;
       existingTelegramUser.username =
-        telegramData.username || existingTelegramUser.username;
+        telegramData.username?.toLowerCase() || existingTelegramUser.username;
       existingTelegramUser.authDate = new Date(telegramData.authDate * 1000);
       existingTelegramUser.hash = telegramData.hash;
 
@@ -643,7 +643,7 @@ export class AuthService {
       telegramId: telegramData.telegramId,
       firstName: telegramData.firstName || '',
       lastName: telegramData.lastName || '',
-      username: telegramData.username || '',
+      username: telegramData.username?.toLowerCase() || '',
       authDate: new Date(telegramData.authDate * 1000),
       hash: telegramData.hash,
       role: Role.USER,

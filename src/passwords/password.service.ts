@@ -1242,10 +1242,9 @@ export class PasswordService {
             key: updatedPassword?.key,
             type: (updatedPassword as any)?.type,
             secretId: String(updatedPassword?._id),
-            sharedRecipientsCount:
-              Array.isArray(updatedPassword?.sharedWith)
-                ? updatedPassword.sharedWith.length
-                : 0,
+            sharedRecipientsCount: Array.isArray(updatedPassword?.sharedWith)
+              ? updatedPassword.sharedWith.length
+              : 0,
           },
           {
             userId: updatedPassword?.userId
@@ -1297,10 +1296,9 @@ export class PasswordService {
             key: updatedPassword?.key,
             type: (updatedPassword as any)?.type,
             secretId: String(updatedPassword?._id),
-            sharedRecipientsCount:
-              Array.isArray(updatedPassword?.sharedWith)
-                ? updatedPassword.sharedWith.length
-                : 0,
+            sharedRecipientsCount: Array.isArray(updatedPassword?.sharedWith)
+              ? updatedPassword.sharedWith.length
+              : 0,
           },
           {
             userId: updatedPassword?.userId
@@ -1351,10 +1349,9 @@ export class PasswordService {
               key: updatedPassword?.key,
               type: (updatedPassword as any)?.type,
               secretId: String(updatedPassword?._id),
-              sharedRecipientsCount:
-                Array.isArray(updatedPassword?.sharedWith)
-                  ? updatedPassword.sharedWith.length
-                  : 0,
+              sharedRecipientsCount: Array.isArray(updatedPassword?.sharedWith)
+                ? updatedPassword.sharedWith.length
+                : 0,
             },
             {
               userId: updatedPassword?.userId
@@ -1427,9 +1424,7 @@ export class PasswordService {
       let user: User | null = null;
       try {
         if (savedPassword?.userId) {
-          user = await this.userModel
-            .findById(savedPassword.userId)
-            .exec();
+          user = await this.userModel.findById(savedPassword.userId).exec();
         }
       } catch (e) {
         // ignore fetching user errors
@@ -1441,10 +1436,9 @@ export class PasswordService {
           key: savedPassword?.key,
           type: (savedPassword as any)?.type,
           secretId: String(savedPassword?._id),
-          sharedRecipientsCount:
-            Array.isArray(savedPassword?.sharedWith)
-              ? savedPassword.sharedWith.length
-              : 0,
+          sharedRecipientsCount: Array.isArray(savedPassword?.sharedWith)
+            ? savedPassword.sharedWith.length
+            : 0,
         },
         {
           userId: savedPassword?.userId
@@ -1875,7 +1869,9 @@ export class PasswordService {
             );
 
             if (!sharedWithInfo) {
-              console.log('Skipping notification - shared recipient not found by any identifier');
+              console.log(
+                'Skipping notification - shared recipient not found by any identifier',
+              );
               return;
             }
 

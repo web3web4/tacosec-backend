@@ -140,7 +140,10 @@ export class AuthService {
             },
           );
         } catch (e) {
-          console.error('Failed to log user creation (AuthService non-Telegram)', e);
+          console.error(
+            'Failed to log user creation (AuthService non-Telegram)',
+            e,
+          );
         }
 
         // Create a new public address record for the new user
@@ -278,7 +281,10 @@ export class AuthService {
             },
           );
         } catch (e) {
-          console.error('Failed to log user creation (AuthService pure Telegram)', e);
+          console.error(
+            'Failed to log user creation (AuthService pure Telegram)',
+            e,
+          );
         }
       }
 
@@ -705,7 +711,10 @@ export class AuthService {
         },
       );
     } catch (e) {
-      console.error('Failed to log user creation (AuthService Telegram + address)', e);
+      console.error(
+        'Failed to log user creation (AuthService Telegram + address)',
+        e,
+      );
     }
 
     // Only create public address record if publicAddress is provided and valid

@@ -425,8 +425,7 @@ If you believe this report was made in error, please contact our support team.`;
               recipientUsername: reportedUser.username,
               senderUserId: reporter._id as Types.ObjectId,
               senderUsername: reporter.username,
-              reason:
-                'Telegram unavailable: reported user has no Telegram ID',
+              reason: 'Telegram unavailable: reported user has no Telegram ID',
               subject: `Report: ${reportData.report_type}`,
               relatedEntityType: 'report',
               relatedEntityId: savedReport._id as Types.ObjectId,
@@ -762,6 +761,8 @@ If you believe this report was made in error, please contact our support team.`;
     reportedUserId?: string;
     secret_id?: string;
     priority?: ReportPriority;
+    resolved?: boolean;
+    report_type?: ReportType;
   }) {
     try {
       // Build the base query for finding reports (only modern fields)
@@ -788,6 +789,14 @@ If you believe this report was made in error, please contact our support team.`;
         reportQuery['priority'] = filters.priority;
       }
 
+      if (typeof filters?.resolved === 'boolean') {
+        reportQuery['resolved'] = filters.resolved;
+      }
+
+      if (filters?.report_type) {
+        reportQuery['report_type'] = filters.report_type;
+      }
+
       // Find all unique userIds from modern reports only
       const reportedUserIds = await this.reportModel.distinct(
         'reportedUserInfo.userId',
@@ -812,7 +821,7 @@ If you believe this report was made in error, please contact our support team.`;
       const usersWithReports = await Promise.all(
         reportedUsers.map(async (user) => {
           // Build query for this specific user's reports (only modern fields)
-          let userReportQuery: any = {
+          const userReportQuery: any = {
             'reportedUserInfo.userId': user._id, // Only use modern field
           };
 
@@ -833,6 +842,14 @@ If you believe this report was made in error, please contact our support team.`;
             userReportQuery['priority'] = filters.priority;
           }
 
+          if (typeof filters?.resolved === 'boolean') {
+            userReportQuery['resolved'] = filters.resolved;
+          }
+
+          if (filters?.report_type) {
+            userReportQuery['report_type'] = filters.report_type;
+          }
+
           // Get all reports for this user
           const reports = await this.reportModel
             .find(userReportQuery)
@@ -841,12 +858,16 @@ If you believe this report was made in error, please contact our support team.`;
 
           // Count unresolved reports
           const unresolvedReports = reports.filter((r) => !r.resolved).length;
+          const reportCount =
+            typeof filters?.resolved === 'boolean'
+              ? reports.length
+              : unresolvedReports;
 
           return {
             username: user.username,
             telegramId: user.telegramId,
             userId: user._id,
-            reportCount: unresolvedReports,
+            reportCount,
             sharingRestricted: user.sharingRestricted || false,
             reports: reports.map((report) => ({
               id: report._id,

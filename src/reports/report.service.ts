@@ -937,6 +937,117 @@ If you believe this report was made in error, please contact our support team.`;
   }
 
   /**
+   * Get reported users' reports (Admin only) as a FLAT list with pagination
+   * Filters: reporterUserId, reportedUserId, userId (alias), secret_id, priority, resolved (enum), report_type
+   */
+  async getAllReportedUsersFlat(
+    filters: {
+      reporterUserId?: string;
+      reportedUserId?: string;
+      secret_id?: string;
+      priority?: ReportPriority;
+      resolved?: ResolvedFilterEnum;
+      report_type?: ReportType;
+    } = {},
+    pagination?: { page: number; limit: number; skip: number },
+  ) {
+    try {
+      // Normalize resolved filter from enum string ('true' | 'false') or boolean to a boolean
+      const normalizedResolved: boolean | undefined = (() => {
+        const v: any = filters?.resolved;
+        if (v === ResolvedFilterEnum.TRUE) return true;
+        if (v === ResolvedFilterEnum.FALSE) return false;
+        if (v === true) return true;
+        if (v === false) return false;
+        if (typeof v === 'string') {
+          const s = v.trim().toLowerCase();
+          if (s === 'true' || s === '1') return true;
+          if (s === 'false' || s === '0') return false;
+        }
+        return undefined;
+      })();
+
+      const reportQuery: any = {};
+
+      // reporter filter
+      if (filters?.reporterUserId) {
+        reportQuery['reporterInfo.userId'] = new Types.ObjectId(
+          filters.reporterUserId,
+        );
+      }
+
+      // reported user filter
+      if (filters?.reportedUserId) {
+        reportQuery['reportedUserInfo.userId'] = new Types.ObjectId(
+          filters.reportedUserId,
+        );
+      }
+
+      if (filters?.secret_id) {
+        reportQuery['secret_id'] = filters.secret_id;
+      }
+
+      if (filters?.priority) {
+        reportQuery['priority'] = filters.priority;
+      }
+
+      if (normalizedResolved !== undefined) {
+        if (normalizedResolved === true) {
+          reportQuery['$or'] = [{ resolved: true }, { resolved: 'true' }];
+        } else {
+          reportQuery['$or'] = [
+            { resolved: false },
+            { resolved: 'false' },
+            { resolved: { $exists: false } },
+          ];
+        }
+      }
+
+      if (filters?.report_type) {
+        reportQuery['report_type'] = filters.report_type;
+      }
+
+      const totalCount = await this.reportModel.countDocuments(reportQuery);
+
+      const queryExec = this.reportModel
+        .find(reportQuery)
+        .sort({ createdAt: -1 });
+
+      if (pagination) {
+        queryExec.skip(pagination.skip).limit(pagination.limit);
+      }
+
+      const reports = await queryExec.exec();
+
+      return {
+        count: totalCount,
+        page: pagination?.page ?? 1,
+        limit: pagination?.limit ?? reports.length,
+        reports: reports.map((report) => ({
+          id: report._id,
+          secret_id: report.secret_id,
+          report_type: report.report_type,
+          reason: report.reason,
+          reporterTelegramId: report.reporterTelegramId,
+          reporterInfo: report.reporterInfo,
+          reportedTelegramId: report.reportedTelegramId,
+          reportedUserInfo: report.reportedUserInfo,
+          priority: report.priority,
+          createdAt: report.createdAt,
+          resolved: report.resolved,
+          resolvedAt: report.resolvedAt,
+        })),
+      };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException(
+        'Failed to fetch reported users flat list',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * Get a specific report by its ID (Admin only)
    * @param reportId The ID of the report to retrieve
    * @returns The report with full details

@@ -3,6 +3,8 @@ import {
   IsMongoId,
   IsString,
   IsEnum,
+  IsInt,
+  Min,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ReportPriority } from '../enums/report-priority.enum';
@@ -25,6 +27,25 @@ export class GetReportedUsersQueryDto {
   @IsOptional()
   @IsEnum(ReportPriority)
   priority?: ReportPriority;
+
+  // Pagination params (optional) to avoid ValidationPipe forbidding extra query keys
+  @IsOptional()
+  @Transform(({ value }) => {
+    const num = parseInt(String(value), 10);
+    return Number.isNaN(num) ? undefined : num;
+  })
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    const num = parseInt(String(value), 10);
+    return Number.isNaN(num) ? undefined : num;
+  })
+  @IsInt()
+  @Min(1)
+  limit?: number;
 
   @IsOptional()
   @Transform(({ value }) => {

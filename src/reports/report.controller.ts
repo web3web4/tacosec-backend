@@ -22,6 +22,7 @@ import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { Roles, Role } from '../decorators/roles.decorator';
 import { AuthenticatedRequest } from '../passwords/password.service';
+import { Pagination, PaginationParams } from '../decorators/pagination.decorator';
 
 @Controller('reports')
 export class ReportController {
@@ -92,12 +93,12 @@ export class ReportController {
   @Get('admin/reported-users')
   @FlexibleAuth()
   @Roles(Role.ADMIN)
-  // @UsePipes(new ValidationPipe({ transform: true }))
-  async getAllReportedUsers(@Query() query: GetReportedUsersQueryDto) {
-    // This method doesn't need to extract user data from request
-    // since it's an admin endpoint that returns all reported users
-    // console.log('DEBUG Controller query.resolved:', query.resolved, typeof query.resolved);
-    return this.reportService.getAllReportedUsers(query);
+  async getAllReportedUsers(
+    @Query() query: GetReportedUsersQueryDto,
+    @Pagination() pagination: PaginationParams,
+  ) {
+    // Return a FLAT list of reports with pagination
+    return this.reportService.getAllReportedUsersFlat(query, pagination);
   }
 
   @Get('admin/:id')

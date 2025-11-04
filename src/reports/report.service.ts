@@ -790,7 +790,8 @@ If you believe this report was made in error, please contact our support team.`;
       }
 
       if (filters?.resolved !== undefined) {
-        reportQuery['resolved'] = filters.resolved;
+        reportQuery['resolved'] =
+          filters.resolved === true ? true : { $ne: true };
       }
 
       if (filters?.report_type) {
@@ -843,7 +844,8 @@ If you believe this report was made in error, please contact our support team.`;
           }
 
           if (filters?.resolved !== undefined) {
-            userReportQuery['resolved'] = filters.resolved;
+            userReportQuery['resolved'] =
+              filters.resolved === true ? true : { $ne: true };
           }
 
           if (filters?.report_type) {

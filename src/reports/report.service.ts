@@ -789,7 +789,7 @@ If you believe this report was made in error, please contact our support team.`;
         reportQuery['priority'] = filters.priority;
       }
 
-      if (typeof filters?.resolved === 'boolean') {
+      if (filters?.resolved !== undefined) {
         reportQuery['resolved'] = filters.resolved;
       }
 
@@ -842,7 +842,7 @@ If you believe this report was made in error, please contact our support team.`;
             userReportQuery['priority'] = filters.priority;
           }
 
-          if (typeof filters?.resolved === 'boolean') {
+          if (filters?.resolved !== undefined) {
             userReportQuery['resolved'] = filters.resolved;
           }
 
@@ -859,9 +859,7 @@ If you believe this report was made in error, please contact our support team.`;
           // Count unresolved reports
           const unresolvedReports = reports.filter((r) => !r.resolved).length;
           const reportCount =
-            typeof filters?.resolved === 'boolean'
-              ? reports.length
-              : unresolvedReports;
+            filters?.resolved !== undefined ? reports.length : unresolvedReports;
 
           return {
             username: user.username,

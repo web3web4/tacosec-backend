@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsBoolean,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ReportPriority } from '../enums/report-priority.enum';
 import { ReportType } from './report-user.dto';
 
@@ -26,6 +27,13 @@ export class GetReportedUsersQueryDto {
   priority?: ReportPriority;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    value === true || value === 'true'
+      ? true
+      : value === false || value === 'false'
+      ? false
+      : undefined,
+  )
   @IsBoolean()
   resolved?: boolean;
 

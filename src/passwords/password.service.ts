@@ -1232,6 +1232,29 @@ export class PasswordService {
       .exec();
     if (updatedPassword) {
       await this.sendMessageToUsersBySharedWith(updatedPassword);
+      // Log secret update with share count
+      try {
+        await this.loggerService.saveSystemLog(
+          {
+            event: 'secret_updated',
+            message: 'Secret updated',
+            key: updatedPassword?.key,
+            type: (updatedPassword as any)?.type,
+            secretId: String(updatedPassword?._id),
+            sharedRecipientsCount:
+              Array.isArray(updatedPassword?.sharedWith)
+                ? updatedPassword.sharedWith.length
+                : 0,
+          },
+          {
+            userId: updatedPassword?.userId
+              ? String(updatedPassword.userId)
+              : undefined,
+          },
+        );
+      } catch (e) {
+        console.error('Failed to log secret update', e);
+      }
     }
     return updatedPassword;
   }
@@ -1264,6 +1287,29 @@ export class PasswordService {
       .exec();
     if (updatedPassword) {
       await this.sendMessageToUsersBySharedWith(updatedPassword);
+      // Log secret update with share count
+      try {
+        await this.loggerService.saveSystemLog(
+          {
+            event: 'secret_updated',
+            message: 'Secret updated',
+            key: updatedPassword?.key,
+            type: (updatedPassword as any)?.type,
+            secretId: String(updatedPassword?._id),
+            sharedRecipientsCount:
+              Array.isArray(updatedPassword?.sharedWith)
+                ? updatedPassword.sharedWith.length
+                : 0,
+          },
+          {
+            userId: updatedPassword?.userId
+              ? String(updatedPassword.userId)
+              : undefined,
+          },
+        );
+      } catch (e) {
+        console.error('Failed to log secret update', e);
+      }
     }
     return updatedPassword;
   }
@@ -1294,6 +1340,31 @@ export class PasswordService {
       const updatedPassword = await this.passwordModel
         .findByIdAndUpdate(id, updatePasswordDto, { new: true })
         .exec();
+      // Log secret update with share count
+      try {
+        if (updatedPassword) {
+          await this.loggerService.saveSystemLog(
+            {
+              event: 'secret_updated',
+              message: 'Secret updated',
+              key: updatedPassword?.key,
+              type: (updatedPassword as any)?.type,
+              secretId: String(updatedPassword?._id),
+              sharedRecipientsCount:
+                Array.isArray(updatedPassword?.sharedWith)
+                  ? updatedPassword.sharedWith.length
+                  : 0,
+            },
+            {
+              userId: updatedPassword?.userId
+                ? String(updatedPassword.userId)
+                : undefined,
+            },
+          );
+        }
+      } catch (e) {
+        console.error('Failed to log secret update', e);
+      }
       return updatedPassword;
     } catch (error) {
       // If the error is already an HttpException, preserve its status code
@@ -1369,6 +1440,10 @@ export class PasswordService {
           key: savedPassword?.key,
           type: (savedPassword as any)?.type,
           secretId: String(savedPassword?._id),
+          sharedRecipientsCount:
+            Array.isArray(savedPassword?.sharedWith)
+              ? savedPassword.sharedWith.length
+              : 0,
         },
         {
           userId: savedPassword?.userId
@@ -4587,6 +4662,30 @@ You can view the reply in your shared secrets list 📋.`;
             { new: true },
           )
           .exec();
+
+        // Log secret view event (separate for Telegram vs non-Telegram viewers)
+        try {
+          const eventName = newView.telegramId
+            ? 'secret_viewed_by_telegram'
+            : 'secret_viewed_by_non_telegram';
+          await this.loggerService.saveSystemLog(
+            {
+              event: eventName,
+              message: 'Secret viewed',
+              secretId: String(updatedSecret?._id || secretId),
+              key: updatedSecret?.key || secret.key,
+              viewerHasTelegram: !!newView.telegramId,
+              viewerPublicAddress: newView.publicAddress || undefined,
+            },
+            {
+              userId: newView.userId || undefined,
+              telegramId: newView.telegramId || undefined,
+              username: newView.username || undefined,
+            },
+          );
+        } catch (e) {
+          console.error('Failed to log secret view', e);
+        }
 
         return updatedSecret;
       } else {

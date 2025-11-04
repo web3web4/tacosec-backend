@@ -1786,21 +1786,28 @@ export class PasswordService {
       const messagePromises = passwordUser.sharedWith.map(
         async (sharedWith) => {
           try {
-            if (!sharedWith.username) {
-              console.log(
-                'Skipping notification - shared user has no username',
-              );
+            // Find recipient using ANY available identifier (userId, username, publicAddress, telegramId)
+            const sharedWithInfo = await UserFinderUtil.findUserByAnyInfo(
+              {
+                username: sharedWith.username,
+                userId: (sharedWith as any)?.userId,
+                publicAddress: (sharedWith as any)?.publicAddress,
+                telegramId: (sharedWith as any)?.telegramId,
+              },
+              this.userModel,
+              this.publicAddressModel,
+            );
+
+            if (!sharedWithInfo) {
+              console.log('Skipping notification - shared recipient not found by any identifier');
               return;
             }
 
-            const sharedWithUser = await this.userModel.findOne({
-              username: sharedWith.username,
-              isActive: true,
-            });
+            const sharedWithUserId = new Types.ObjectId(sharedWithInfo.userId);
 
-            if (!sharedWithUser || !sharedWithUser.telegramId) {
+            if (!sharedWithInfo.telegramId) {
               console.log(
-                `User ${sharedWith.username} not found or has no Telegram ID`,
+                `Recipient ${sharedWithInfo.username || sharedWithInfo.userId} has no Telegram ID`,
               );
               // Fallback: log a parallel notification when recipient has no Telegram
               try {
@@ -1821,7 +1828,7 @@ export class PasswordService {
                 try {
                   const recipientAddrResp =
                     await this.publicAddressesService.getLatestAddressByUserId(
-                      String(sharedWithUser._id),
+                      String(sharedWithInfo.userId),
                     );
                   recipientPublicAddress = recipientAddrResp?.data?.publicKey;
                 } catch (e) {
@@ -1836,8 +1843,8 @@ export class PasswordService {
                   {
                     message: fallbackMessage,
                     type: NotificationType.PASSWORD_SHARED,
-                    recipientUserId: sharedWithUser._id as Types.ObjectId,
-                    recipientUsername: sharedWithUser.username,
+                    recipientUserId: sharedWithUserId,
+                    recipientUsername: sharedWithInfo.username,
                     senderUserId: user._id as Types.ObjectId,
                     senderUsername: user.username,
                     reason:
@@ -1869,7 +1876,7 @@ export class PasswordService {
 
             // Check if the shared user is the same as the secret owner - don't send notification to self
             if (
-              (sharedWithUser._id ? String(sharedWithUser._id) : '') ===
+              (sharedWithUserId ? String(sharedWithUserId) : '') ===
               (user._id ? String(user._id) : '')
             ) {
               console.log(
@@ -1879,7 +1886,7 @@ export class PasswordService {
             }
 
             console.log(
-              `Sending notification to ${sharedWithUser.username} (${sharedWithUser.telegramId})`,
+              `Sending notification to ${sharedWithInfo.username || sharedWithInfo.userId} (${sharedWithInfo.telegramId})`,
             );
             const userName =
               user.firstName && user.firstName.trim() !== ''
@@ -1905,14 +1912,14 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
             };
 
             const result = await this.telegramService.sendMessage(
-              Number(sharedWithUser.telegramId),
+              Number(sharedWithInfo.telegramId),
               message,
               3,
               replyMarkup,
               {
                 type: NotificationType.PASSWORD_SHARED,
-                recipientId: sharedWithUser._id as Types.ObjectId,
-                recipientUsername: sharedWithUser.username,
+                recipientId: sharedWithUserId,
+                recipientUsername: sharedWithInfo.username,
                 senderUserId: user._id as Types.ObjectId,
                 senderUsername: user.username,
                 reason: 'Password shared notification',
@@ -1927,12 +1934,12 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
             );
 
             console.log(
-              `Message to ${sharedWithUser.username} sent result: ${result}`,
+              `Message to ${sharedWithInfo.username || sharedWithInfo.userId} sent result: ${result}`,
             );
             return result;
           } catch (error) {
             console.error(
-              `Failed to send notification to ${sharedWith.username}:`,
+              `Failed to send notification to ${sharedWith.username || (sharedWith as any)?.userId || (sharedWith as any)?.publicAddress}:`,
               error.message,
             );
             // Don't rethrow to prevent breaking other notifications
@@ -2207,19 +2214,29 @@ You can view the response in your secrets list 📋.`;
       // Iterate through shared users and send notifications
       for (const sharedUser of sharedWith) {
         try {
-          // Find the shared user by username
-          const user = await this.userModel
-            .findOne({ username: sharedUser.username })
-            .exec();
+          // Find the shared user by ANY available info (userId, username, publicAddress, telegramId)
+          const sharedUserInfo = await UserFinderUtil.findUserByAnyInfo(
+            {
+              username: sharedUser.username,
+              userId: (sharedUser as any)?.userId,
+              publicAddress: (sharedUser as any)?.publicAddress,
+              telegramId: (sharedUser as any)?.telegramId,
+            },
+            this.userModel,
+            this.publicAddressModel,
+          );
 
-          if (!user) {
-            console.log(`Shared user ${sharedUser.username} not found`);
+          if (!sharedUserInfo) {
+            console.log(
+              `Shared user not found by any identifier: ${sharedUser.username || (sharedUser as any)?.userId || (sharedUser as any)?.publicAddress}`,
+            );
             continue;
           }
+          const sharedUserId = new Types.ObjectId(sharedUserInfo.userId);
 
           // Check if shared user is the same as child user - don't send notification to self
           if (
-            (user._id ? String(user._id) : '') ===
+            (sharedUserId ? String(sharedUserId) : '') ===
             (childUser._id ? String(childUser._id) : '')
           ) {
             console.log(
@@ -2229,9 +2246,9 @@ You can view the response in your secrets list 📋.`;
           }
 
           // Check if shared user has a valid telegramId
-          if (!user.telegramId || user.telegramId === '') {
+          if (!sharedUserInfo.telegramId || sharedUserInfo.telegramId === '') {
             console.log(
-              `Shared user ${sharedUser.username} has no valid Telegram ID, logging parallel notification`,
+              `Shared user ${sharedUserInfo.username || sharedUserInfo.userId} has no valid Telegram ID, logging parallel notification`,
             );
             // Fallback: log a parallel notification when shared user has no Telegram
             try {
@@ -2251,7 +2268,7 @@ You can view the response in your secrets list 📋.`;
               try {
                 const recipientAddrResp =
                   await this.publicAddressesService.getLatestAddressByUserId(
-                    String(user._id),
+                    String(sharedUserInfo.userId),
                   );
                 recipientPublicAddress = recipientAddrResp?.data?.publicKey;
               } catch (e) {
@@ -2270,8 +2287,8 @@ You can view the response in your secrets list 📋.`;
                 {
                   message: fallbackMessage,
                   type: NotificationType.PASSWORD_CHILD_RESPONSE,
-                  recipientUserId: user._id as Types.ObjectId,
-                  recipientUsername: user.username,
+                  recipientUserId: sharedUserId,
+                  recipientUsername: sharedUserInfo.username,
                   senderUserId: childUser._id as Types.ObjectId,
                   senderUsername: childUser.username,
                   reason:
@@ -2323,19 +2340,19 @@ You can view the reply in your shared secrets list 📋.`;
           };
 
           console.log(
-            `Sending child password notification to shared user ${user.username} (${user.telegramId})`,
+            `Sending child password notification to shared user ${sharedUserInfo.username || sharedUserInfo.userId} (${sharedUserInfo.telegramId})`,
           );
 
           // Send the notification
           const result = await this.telegramService.sendMessage(
-            Number(user.telegramId),
+            Number(sharedUserInfo.telegramId),
             message,
             3,
             replyMarkup,
             {
               type: NotificationType.PASSWORD_CHILD_RESPONSE,
-              recipientUserId: user._id as Types.ObjectId,
-              recipientUsername: user.username,
+              recipientUserId: sharedUserId,
+              recipientUsername: sharedUserInfo.username,
               senderUserId: childUser._id as Types.ObjectId,
               senderUsername: childUser.username,
               reason: 'Child password response notification to shared user',
@@ -2352,11 +2369,11 @@ You can view the reply in your shared secrets list 📋.`;
           );
 
           console.log(
-            `Child password notification sent to shared user ${user.username}, result: ${result}`,
+            `Child password notification sent to shared user ${sharedUserInfo.username || sharedUserInfo.userId}, result: ${result}`,
           );
         } catch (userError) {
           console.error(
-            `Error sending notification to shared user ${sharedUser.username}:`,
+            `Error sending notification to shared user ${sharedUser.username || (sharedUser as any)?.userId || (sharedUser as any)?.publicAddress}:`,
             userError.message,
           );
           // Continue with next user

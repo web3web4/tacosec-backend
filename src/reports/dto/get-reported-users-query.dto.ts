@@ -3,11 +3,11 @@ import {
   IsMongoId,
   IsString,
   IsEnum,
-  IsBoolean,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ReportPriority } from '../enums/report-priority.enum';
 import { ReportType } from './report-user.dto';
+import { ResolvedFilterEnum } from '../enums/resolved-filter.enum';
 
 export class GetReportedUsersQueryDto {
   @IsOptional()
@@ -28,16 +28,15 @@ export class GetReportedUsersQueryDto {
 
   @IsOptional()
   @Transform(({ value }) => {
-    if (value === true || value === false) return value as boolean;
-    if (typeof value === 'string') {
-      const v = value.trim().toLowerCase();
-      if (v === 'true' || v === '1') return true;
-      if (v === 'false' || v === '0') return false;
-    }
+    if (value === null || value === undefined) return undefined;
+    const v = String(value).trim().toLowerCase();
+    if (v === 'true' || v === '1') return ResolvedFilterEnum.TRUE;
+    if (v === 'false' || v === '0') return ResolvedFilterEnum.FALSE;
     return undefined;
   })
-  @IsBoolean()
-  resolved?: boolean;
+  @IsEnum(ResolvedFilterEnum)
+  resolved?: ResolvedFilterEnum;
+
 
   @IsOptional()
   @IsEnum(ReportType)

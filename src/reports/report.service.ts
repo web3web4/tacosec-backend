@@ -5,6 +5,7 @@ import { Report, ReportDocument } from './schemas/report.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { ReportUserDto, ReportType } from './dto/report-user.dto';
 import { ReportPriority } from './enums/report-priority.enum';
+import { ResolvedFilterEnum } from './enums/resolved-filter.enum';
 import { ConfigService } from '@nestjs/config';
 import {
   Password,
@@ -761,10 +762,26 @@ If you believe this report was made in error, please contact our support team.`;
     reportedUserId?: string;
     secret_id?: string;
     priority?: ReportPriority;
-    resolved?: boolean;
+    resolved?: ResolvedFilterEnum;
     report_type?: ReportType;
   }) {
     try {
+      // Normalize resolved filter from enum string ('true' | 'false') or boolean to a boolean
+      // console.log('DEBUG filters.resolved (raw):', filters?.resolved, typeof filters?.resolved);
+      const normalizedResolved: boolean | undefined = (() => {
+        const v: any = filters?.resolved;
+        if (v === ResolvedFilterEnum.TRUE) return true;
+        if (v === ResolvedFilterEnum.FALSE) return false;
+        if (v === true) return true;
+        if (v === false) return false;
+        if (typeof v === 'string') {
+          const s = v.trim().toLowerCase();
+          if (s === 'true' || s === '1') return true;
+          if (s === 'false' || s === '0') return false;
+        }
+        return undefined;
+      })();
+      console.log('DEBUG normalizedResolved:', normalizedResolved);
       // Build the base query for finding reports (only modern fields)
       const reportQuery: any = {};
 
@@ -789,12 +806,15 @@ If you believe this report was made in error, please contact our support team.`;
         reportQuery['priority'] = filters.priority;
       }
 
-      if (filters?.resolved !== undefined) {
-        if (filters.resolved === true) {
-          reportQuery['resolved'] = true;
+      if (normalizedResolved !== undefined) {
+        if (normalizedResolved === true) {
+          // Include records where resolved is true (boolean) or legacy string 'true'
+          reportQuery['$or'] = [{ resolved: true }, { resolved: 'true' }];
         } else {
+          // Match unresolved reports: boolean false OR string 'false' OR missing resolved field (legacy)
           reportQuery['$or'] = [
             { resolved: false },
+            { resolved: 'false' },
             { resolved: { $exists: false } },
           ];
         }
@@ -849,16 +869,21 @@ If you believe this report was made in error, please contact our support team.`;
             userReportQuery['priority'] = filters.priority;
           }
 
-          if (filters?.resolved !== undefined) {
-            if (filters.resolved === true) {
-              userReportQuery['resolved'] = true;
+          if (normalizedResolved !== undefined) {
+            if (normalizedResolved === true) {
+              // Include records where resolved is true (boolean) or legacy string 'true'
+              userReportQuery['$or'] = [{ resolved: true }, { resolved: 'true' }];
             } else {
               userReportQuery['$or'] = [
                 { resolved: false },
+                { resolved: 'false' },
                 { resolved: { $exists: false } },
               ];
             }
           }
+
+          // Temporary debug log to verify the query being executed
+          // console.log('DEBUG userReportQuery:', JSON.stringify(userReportQuery, null, 2));
 
           if (filters?.report_type) {
             userReportQuery['report_type'] = filters.report_type;
@@ -872,8 +897,8 @@ If you believe this report was made in error, please contact our support team.`;
 
           // Count unresolved reports
           const unresolvedReports = reports.filter((r) => !r.resolved).length;
-          const reportCount =
-            filters?.resolved !== undefined ? reports.length : unresolvedReports;
+          // If resolved filter is provided, count matching reports. If not provided, return all (count all reports).
+          const reportCount = reports.length;
 
           return {
             username: user.username,

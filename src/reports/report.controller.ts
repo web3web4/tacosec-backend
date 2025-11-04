@@ -92,10 +92,11 @@ export class ReportController {
   @Get('admin/reported-users')
   @FlexibleAuth()
   @Roles(Role.ADMIN)
-  @UsePipes(new ValidationPipe({ transform: true }))
+  // @UsePipes(new ValidationPipe({ transform: true }))
   async getAllReportedUsers(@Query() query: GetReportedUsersQueryDto) {
     // This method doesn't need to extract user data from request
     // since it's an admin endpoint that returns all reported users
+    // console.log('DEBUG Controller query.resolved:', query.resolved, typeof query.resolved);
     return this.reportService.getAllReportedUsers(query);
   }
 

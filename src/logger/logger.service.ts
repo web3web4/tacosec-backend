@@ -103,6 +103,33 @@ export class LoggerService {
   }
 
   /**
+   * Save system log without request context
+   * Allows services to log events programmatically
+   * @param logData Any JSON-serializable data to store
+   * @param context Optional user context (userId, telegramId, username)
+   */
+  async saveSystemLog(
+    logData: any,
+    context?: { userId?: string; telegramId?: string; username?: string },
+  ): Promise<ErrorLog> {
+    try {
+      const errorLog = new this.errorLogModel({
+        userId: context?.userId,
+        telegramId: context?.telegramId,
+        username: context?.username,
+        logData,
+      });
+      const savedLog = await errorLog.save();
+      return savedLog;
+    } catch (error) {
+      throw new HttpException(
+        'Failed to save system log',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * Get error logs with flexible authentication and pagination
    * @param req The authenticated request object
    * @param getLogsDto Query parameters for filtering and pagination

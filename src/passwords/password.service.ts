@@ -42,6 +42,7 @@ import {
   NotificationLogData,
 } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
+import { LoggerService } from '../logger/logger.service';
 @Injectable()
 export class PasswordService {
   constructor(
@@ -55,6 +56,7 @@ export class PasswordService {
     private readonly configService: ConfigService,
     private readonly publicAddressesService: PublicAddressesService,
     private readonly notificationsService: NotificationsService,
+    private readonly loggerService: LoggerService,
   ) {}
 
   /**
@@ -1348,6 +1350,37 @@ export class PasswordService {
 
     const newPassword = new this.passwordModel(passwordData);
     const savedPassword = await newPassword.save();
+    // Log secret creation into logger table
+    try {
+      let user: User | null = null;
+      try {
+        if (savedPassword?.userId) {
+          user = await this.userModel
+            .findById(savedPassword.userId)
+            .exec();
+        }
+      } catch (e) {
+        // ignore fetching user errors
+      }
+      await this.loggerService.saveSystemLog(
+        {
+          event: 'secret_created',
+          message: 'New secret created',
+          key: savedPassword?.key,
+          type: (savedPassword as any)?.type,
+          secretId: String(savedPassword?._id),
+        },
+        {
+          userId: savedPassword?.userId
+            ? String(savedPassword.userId)
+            : undefined,
+          telegramId: user?.telegramId,
+          username: user?.username,
+        },
+      );
+    } catch (e) {
+      console.error('Failed to log secret creation', e);
+    }
     if (savedPassword) {
       console.log('sending message to users by shared with');
       await this.sendMessageToUsersBySharedWith(savedPassword);

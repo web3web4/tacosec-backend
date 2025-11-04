@@ -18,6 +18,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ReportsModule } from '../reports/reports.module';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { LoggerModule } from '../logger/logger.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     forwardRef(() => ReportsModule),
     forwardRef(() => PublicAddressesModule),
     forwardRef(() => NotificationsModule),
+    forwardRef(() => LoggerModule),
   ],
   controllers: [PasswordController],
   providers: [PasswordService, TelegramDtoAuthGuard],

@@ -32,6 +32,7 @@ import {
   NotificationLogData,
 } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
+import { LoggerService } from '../logger/logger.service';
 
 @Injectable()
 export class UsersService {
@@ -47,6 +48,7 @@ export class UsersService {
     @Inject(forwardRef(() => PublicAddressesService))
     private readonly publicAddressesService: PublicAddressesService,
     private readonly notificationsService: NotificationsService,
+    private readonly loggerService: LoggerService,
   ) {}
 
   async createAndUpdateUser(telegramInitDto: TelegramInitDto): Promise<User> {
@@ -66,6 +68,24 @@ export class UsersService {
     if (!user) {
       console.log('User not found, creating new user');
       user = await this.userModel.create(telegramInitDto);
+      // Log user creation in logger table
+      try {
+        await this.loggerService.saveSystemLog(
+          {
+            event: 'user_created',
+            message: 'User created via Telegram init data',
+            username: user.username,
+            telegramId: user.telegramId,
+          },
+          {
+            userId: String(user._id),
+            telegramId: user.telegramId,
+            username: user.username,
+          },
+        );
+      } catch (e) {
+        console.error('Failed to log user creation', e);
+      }
     } else {
       console.log('Found existing user:', {
         id: user._id,
@@ -205,6 +225,24 @@ As a result:
       console.log('User not found, creating new user');
       const newUser = new this.userModel(userData);
       const savedUser = await newUser.save();
+      // Log user creation in logger table (DTO signup path)
+      try {
+        await this.loggerService.saveSystemLog(
+          {
+            event: 'user_created',
+            message: 'User created via DTO signup',
+            username: savedUser.username,
+            telegramId: savedUser.telegramId,
+          },
+          {
+            userId: String(savedUser._id),
+            telegramId: savedUser.telegramId,
+            username: savedUser.username,
+          },
+        );
+      } catch (e) {
+        console.error('Failed to log user creation (DTO)', e);
+      }
       return savedUser;
     } catch (error) {
       // console.error('Error creating or updating user:', error);

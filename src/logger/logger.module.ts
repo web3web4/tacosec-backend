@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -30,7 +30,7 @@ import { UsersModule } from '../users/users.module';
       inject: [ConfigService],
     }),
     // Import UsersModule to access UsersService for RolesGuard
-    UsersModule,
+    forwardRef(() => UsersModule),
   ],
   controllers: [LoggerController],
   providers: [

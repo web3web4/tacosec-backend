@@ -17,6 +17,7 @@ import {
 } from '../public-addresses/schemas/public-address.schema';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { LoggerModule } from '../logger/logger.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     forwardRef(() => UsersModule),
     forwardRef(() => PublicAddressesModule),
     forwardRef(() => NotificationsModule),
+    forwardRef(() => LoggerModule),
     ConfigModule,
   ],
   controllers: [ReportController],

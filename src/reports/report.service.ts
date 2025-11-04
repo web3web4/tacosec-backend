@@ -23,6 +23,7 @@ import {
   NotificationLogData,
 } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
+import { LoggerService } from '../logger/logger.service';
 
 @Injectable()
 export class ReportService {
@@ -40,6 +41,7 @@ export class ReportService {
     private publicAddressesService: PublicAddressesService,
     private telegramService: TelegramService,
     private notificationsService: NotificationsService,
+    private loggerService: LoggerService,
   ) {
     // Get the maximum number of reports before ban from environment variables
     // Default to 10 if not specified
@@ -302,6 +304,28 @@ export class ReportService {
       });
 
       const savedReport = await report.save();
+
+      // Log report creation into logger table
+      try {
+        await this.loggerService.saveSystemLog(
+          {
+            event: 'report_created',
+            message: 'New report created',
+            reportType: reportData.report_type,
+            reason: finalReason,
+            secretId: reportData.secret_id,
+            reportedUserId: String(reportedUser._id),
+            reporterUserId: String(reporter._id),
+          },
+          {
+            userId: String(reporter._id),
+            telegramId: reporter.telegramId,
+            username: reporter.username,
+          },
+        );
+      } catch (e) {
+        console.error('Failed to log report creation', e);
+      }
 
       // Count total unresolved reports for this user using userId only
       const reportCount = await this.reportModel.countDocuments({

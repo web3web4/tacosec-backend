@@ -21,6 +21,7 @@ import { TelegramModule } from '../telegram/telegram.module';
 import { ReportsModule } from '../reports/reports.module';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { LoggerModule } from '../logger/logger.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     forwardRef(() => ReportsModule),
     forwardRef(() => PublicAddressesModule),
     NotificationsModule,
+    forwardRef(() => LoggerModule),
   ],
   controllers: [UsersController],
   providers: [

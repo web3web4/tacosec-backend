@@ -19,6 +19,7 @@ import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { UsersService } from '../users/users.service';
 import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { LoggerService } from '../logger/logger.service';
 
 export interface LoginResponse {
   access_token: string;
@@ -59,6 +60,7 @@ export class AuthService {
     private usersService: UsersService,
     private configService: ConfigService,
     private publicAddressesService: PublicAddressesService,
+    private readonly loggerService: LoggerService,
   ) {}
 
   async login(
@@ -121,6 +123,24 @@ export class AuthService {
         });
 
         const savedUser = await newUser.save();
+
+        // Log user creation in logger table (non-Telegram login path)
+        try {
+          await this.loggerService.saveSystemLog(
+            {
+              event: 'user_created',
+              message: 'User created via publicAddress login',
+              publicAddress,
+            },
+            {
+              userId: String(savedUser._id),
+              telegramId: savedUser.telegramId,
+              username: savedUser.username,
+            },
+          );
+        } catch (e) {
+          console.error('Failed to log user creation (AuthService non-Telegram)', e);
+        }
 
         // Create a new public address record for the new user
         const newAddressRecord = new this.publicAddressModel({
@@ -242,6 +262,23 @@ export class AuthService {
         });
 
         user = await newUser.save();
+
+        // Log user creation in logger table (pure Telegram login path)
+        try {
+          await this.loggerService.saveSystemLog(
+            {
+              event: 'user_created',
+              message: 'User created via pure Telegram login',
+            },
+            {
+              userId: String(user._id),
+              telegramId: user.telegramId,
+              username: user.username,
+            },
+          );
+        } catch (e) {
+          console.error('Failed to log user creation (AuthService pure Telegram)', e);
+        }
       }
 
       // Get latest public address for the user (same logic as generateTokens)
@@ -651,6 +688,24 @@ export class AuthService {
     });
 
     const savedUser = await newUser.save();
+
+    // Log user creation in logger table (Telegram login with publicAddress path)
+    try {
+      await this.loggerService.saveSystemLog(
+        {
+          event: 'user_created',
+          message: 'User created via Telegram login with publicAddress',
+          publicAddress,
+        },
+        {
+          userId: String(savedUser._id),
+          telegramId: savedUser.telegramId,
+          username: savedUser.username,
+        },
+      );
+    } catch (e) {
+      console.error('Failed to log user creation (AuthService Telegram + address)', e);
+    }
 
     // Only create public address record if publicAddress is provided and valid
     if (publicAddress && publicAddress.trim() !== '') {

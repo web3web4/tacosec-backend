@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SharedJwtModule } from '../shared/jwt.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller';
@@ -13,6 +13,7 @@ import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
+import { LoggerModule } from '../logger/logger.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
     TelegramModule,
     UsersModule,
     PublicAddressesModule,
+    forwardRef(() => LoggerModule),
   ],
   controllers: [AuthController],
   providers: [AuthService, TelegramDtoAuthGuard],

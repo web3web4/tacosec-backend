@@ -790,8 +790,14 @@ If you believe this report was made in error, please contact our support team.`;
       }
 
       if (filters?.resolved !== undefined) {
-        reportQuery['resolved'] =
-          filters.resolved === true ? true : { $ne: true };
+        if (filters.resolved === true) {
+          reportQuery['resolved'] = true;
+        } else {
+          reportQuery['$or'] = [
+            { resolved: false },
+            { resolved: { $exists: false } },
+          ];
+        }
       }
 
       if (filters?.report_type) {
@@ -844,8 +850,14 @@ If you believe this report was made in error, please contact our support team.`;
           }
 
           if (filters?.resolved !== undefined) {
-            userReportQuery['resolved'] =
-              filters.resolved === true ? true : { $ne: true };
+            if (filters.resolved === true) {
+              userReportQuery['resolved'] = true;
+            } else {
+              userReportQuery['$or'] = [
+                { resolved: false },
+                { resolved: { $exists: false } },
+              ];
+            }
           }
 
           if (filters?.report_type) {

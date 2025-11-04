@@ -27,13 +27,15 @@ export class GetReportedUsersQueryDto {
   priority?: ReportPriority;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    value === true || value === 'true'
-      ? true
-      : value === false || value === 'false'
-      ? false
-      : undefined,
-  )
+  @Transform(({ value }) => {
+    if (value === true || value === false) return value as boolean;
+    if (typeof value === 'string') {
+      const v = value.trim().toLowerCase();
+      if (v === 'true' || v === '1') return true;
+      if (v === 'false' || v === '0') return false;
+    }
+    return undefined;
+  })
   @IsBoolean()
   resolved?: boolean;
 

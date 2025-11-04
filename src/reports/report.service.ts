@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { Report, ReportDocument } from './schemas/report.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { ReportUserDto, ReportType } from './dto/report-user.dto';
+import { ReportPriority } from './enums/report-priority.enum';
 import { ConfigService } from '@nestjs/config';
 import {
   Password,
@@ -302,6 +303,8 @@ export class ReportService {
         secret_id: reportData.secret_id,
         report_type: reportData.report_type,
         reason: finalReason,
+        // Default to MEDIUM priority when not provided
+        priority: reportData.priority ?? ReportPriority.MEDIUM,
       });
 
       const savedReport = await report.save();
@@ -758,6 +761,7 @@ If you believe this report was made in error, please contact our support team.`;
     reporterUserId?: string;
     reportedUserId?: string;
     secret_id?: string;
+    priority?: ReportPriority;
   }) {
     try {
       // Build the base query for finding reports (only modern fields)
@@ -778,6 +782,10 @@ If you believe this report was made in error, please contact our support team.`;
 
       if (filters?.secret_id) {
         reportQuery['secret_id'] = filters.secret_id;
+      }
+
+      if (filters?.priority) {
+        reportQuery['priority'] = filters.priority;
       }
 
       // Find all unique userIds from modern reports only
@@ -820,6 +828,11 @@ If you believe this report was made in error, please contact our support team.`;
             userReportQuery['secret_id'] = filters.secret_id;
           }
 
+          // Apply priority filter if provided
+          if (filters?.priority) {
+            userReportQuery['priority'] = filters.priority;
+          }
+
           // Get all reports for this user
           const reports = await this.reportModel
             .find(userReportQuery)
@@ -844,6 +857,7 @@ If you believe this report was made in error, please contact our support team.`;
               reporterInfo: report.reporterInfo,
               reportedTelegramId: report.reportedTelegramId,
               reportedUserInfo: report.reportedUserInfo,
+              priority: report.priority,
               createdAt: report.createdAt,
               resolved: report.resolved,
               resolvedAt: report.resolvedAt,

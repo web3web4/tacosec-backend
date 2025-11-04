@@ -6,6 +6,7 @@ import {
   ValidateIf,
   IsMongoId,
 } from 'class-validator';
+import { ReportPriority } from '../enums/report-priority.enum';
 
 // Enum for report types
 export enum ReportType {
@@ -27,6 +28,10 @@ export class ReportUserDto {
   @IsEnum(ReportType)
   @IsNotEmpty()
   report_type: ReportType;
+
+  @IsEnum(ReportPriority)
+  @IsOptional()
+  priority?: ReportPriority;
 
   // Reason is optional for all report types, but required when report_type is 'Other'
   @ValidateIf((o) => o.report_type === ReportType.OTHER)

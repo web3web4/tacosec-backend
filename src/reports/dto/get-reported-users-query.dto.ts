@@ -1,4 +1,5 @@
-import { IsOptional, IsMongoId, IsString } from 'class-validator';
+import { IsOptional, IsMongoId, IsString, IsEnum } from 'class-validator';
+import { ReportPriority } from '../enums/report-priority.enum';
 
 export class GetReportedUsersQueryDto {
   @IsOptional()
@@ -12,4 +13,8 @@ export class GetReportedUsersQueryDto {
   @IsOptional()
   @IsString()
   secret_id?: string;
+
+  @IsOptional()
+  @IsEnum(ReportPriority)
+  priority?: ReportPriority;
 }

@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { ReportType } from '../dto/report-user.dto';
+import { ReportPriority } from '../enums/report-priority.enum';
 
 export type ReportDocument = Report & Document;
 
@@ -62,6 +63,14 @@ export class Report {
 
   @Prop({ type: String, required: false, default: null })
   reason: string | null; // Optional field, null when report_type is not 'Other'
+
+  @Prop({
+    type: String,
+    enum: Object.values(ReportPriority),
+    required: true,
+    default: ReportPriority.MEDIUM,
+  })
+  priority: ReportPriority;
 
   @Prop({ default: false })
   resolved: boolean;

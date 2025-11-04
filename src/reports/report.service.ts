@@ -376,6 +376,53 @@ If you believe this report was made in error, please contact our support team.`;
           );
           // Don't throw error here as the report was still created successfully
         }
+      } else {
+        // Fallback: log a parallel notification when reported user has no Telegram
+        try {
+          const fallbackMessage = `Report notification.\n\nYou have received a report regarding your shared content. Please review your shared information to ensure it complies with our community guidelines.\n\nReport type: ${reportData.report_type}\n${
+            finalReason ? `Reason: ${finalReason}\n` : ''
+          }Date: ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}\n\nReporter: [id: ${String(
+            reporter._id,
+          )}, publicAddress: ${
+            reporterLatestPublicAddress || 'N/A'
+          }]\nReported user: [id: ${String(
+            reportedUser._id,
+          )}, publicAddress: ${reportedUserLatestPublicAddress || 'N/A'}]`;
+
+          await this.notificationsService.logNotificationWithResult(
+            {
+              message: fallbackMessage,
+              type: NotificationType.REPORT_NOTIFICATION,
+              recipientUserId: reportedUser._id as Types.ObjectId,
+              recipientUsername: reportedUser.username,
+              senderUserId: reporter._id as Types.ObjectId,
+              senderUsername: reporter.username,
+              reason:
+                'Telegram unavailable: reported user has no Telegram ID',
+              subject: `Report: ${reportData.report_type}`,
+              relatedEntityType: 'report',
+              relatedEntityId: savedReport._id as Types.ObjectId,
+              metadata: {
+                reportType: reportData.report_type,
+                reportReason: finalReason,
+                secretId: reportData.secret_id,
+                reportDate: new Date(),
+                reporterPublicAddress: reporterLatestPublicAddress,
+                reportedUserPublicAddress: reportedUserLatestPublicAddress,
+                telegramSent: false,
+              },
+            },
+            {
+              success: false,
+              errorMessage: 'Recipient has no Telegram account',
+            },
+          );
+        } catch (logError) {
+          console.error(
+            'Failed to log fallback notification for reported user without Telegram:',
+            logError,
+          );
+        }
       }
 
       return savedReport;

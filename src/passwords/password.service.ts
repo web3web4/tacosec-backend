@@ -1767,6 +1767,68 @@ export class PasswordService {
               console.log(
                 `User ${sharedWith.username} not found or has no Telegram ID`,
               );
+              // Fallback: log a parallel notification when recipient has no Telegram
+              try {
+                // Fetch latest public addresses for sender and recipient (if available)
+                let senderPublicAddress: string | undefined;
+                let recipientPublicAddress: string | undefined;
+
+                try {
+                  const senderAddrResp =
+                    await this.publicAddressesService.getLatestAddressByUserId(
+                      String(user._id),
+                    );
+                  senderPublicAddress = senderAddrResp?.data?.publicKey;
+                } catch (e) {
+                  senderPublicAddress = undefined;
+                }
+
+                try {
+                  const recipientAddrResp =
+                    await this.publicAddressesService.getLatestAddressByUserId(
+                      String(sharedWithUser._id),
+                    );
+                  recipientPublicAddress = recipientAddrResp?.data?.publicKey;
+                } catch (e) {
+                  recipientPublicAddress = undefined;
+                }
+
+                const fallbackMessage = `Secret shared with you.\n\nUser [id: ${String(
+                  user._id,
+                )}, publicAddress: ${senderPublicAddress || 'N/A'}] has shared a secret with you.\n\nYou can view it under the "Shared with me" tab.`;
+
+                await this.notificationsService.logNotificationWithResult(
+                  {
+                    message: fallbackMessage,
+                    type: NotificationType.PASSWORD_SHARED,
+                    recipientUserId: sharedWithUser._id as Types.ObjectId,
+                    recipientUsername: sharedWithUser.username,
+                    senderUserId: user._id as Types.ObjectId,
+                    senderUsername: user.username,
+                    reason:
+                      'Telegram unavailable: recipient has no Telegram ID',
+                    subject: 'Secret Shared With You',
+                    relatedEntityType: 'password',
+                    relatedEntityId: passwordUser._id as Types.ObjectId,
+                    metadata: {
+                      passwordKey: passwordUser.key,
+                      sharedAt: new Date(),
+                      senderPublicAddress,
+                      recipientPublicAddress,
+                      telegramSent: false,
+                    },
+                  },
+                  {
+                    success: false,
+                    errorMessage: 'Recipient has no Telegram account',
+                  },
+                );
+              } catch (logError) {
+                console.error(
+                  'Failed to log fallback notification for user without Telegram:',
+                  logError,
+                );
+              }
               return;
             }
 
@@ -1900,8 +1962,68 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
       // Check if parent owner has a valid telegramId before sending notification
       if (!parentOwner.telegramId || parentOwner.telegramId === '') {
         console.log(
-          'Parent password owner has no valid Telegram ID, skipping notification',
+          'Parent password owner has no valid Telegram ID, logging parallel notification',
         );
+        // Fallback: log a parallel notification when parent owner has no Telegram
+        try {
+          let senderPublicAddress: string | undefined;
+          let recipientPublicAddress: string | undefined;
+
+          try {
+            const senderAddrResp =
+              await this.publicAddressesService.getLatestAddressByUserId(
+                String(childUser._id),
+              );
+            senderPublicAddress = senderAddrResp?.data?.publicKey;
+          } catch (e) {
+            senderPublicAddress = undefined;
+          }
+
+          try {
+            const recipientAddrResp =
+              await this.publicAddressesService.getLatestAddressByUserId(
+                String(parentOwner._id),
+              );
+            recipientPublicAddress = recipientAddrResp?.data?.publicKey;
+          } catch (e) {
+            recipientPublicAddress = undefined;
+          }
+
+          const fallbackMessage = `Child secret response.\n\nUser [id: ${String(
+            childUser._id,
+          )}, publicAddress: ${senderPublicAddress || 'N/A'}] has responded to your secret with a new secret.`;
+
+          await this.notificationsService.logNotificationWithResult(
+            {
+              message: fallbackMessage,
+              type: NotificationType.PASSWORD_CHILD_RESPONSE,
+              recipientUserId: parentOwner._id as Types.ObjectId,
+              recipientUsername: parentOwner.username,
+              senderUserId: childUser._id as Types.ObjectId,
+              senderUsername: childUser.username,
+              reason: 'Telegram unavailable: parent owner has no Telegram ID',
+              subject: 'Child Secret Response',
+              relatedEntityType: 'password',
+              relatedEntityId: new Types.ObjectId(childSecretId),
+              metadata: {
+                parentSecretId: parentSecretId,
+                childSecretName: childSecretName,
+                senderPublicAddress,
+                recipientPublicAddress,
+                telegramSent: false,
+              },
+            },
+            {
+              success: false,
+              errorMessage: 'Recipient has no Telegram account',
+            },
+          );
+        } catch (logError) {
+          console.error(
+            'Failed to log fallback notification (parent owner without Telegram):',
+            logError,
+          );
+        }
         return;
       }
 
@@ -2074,8 +2196,73 @@ You can view the response in your secrets list 📋.`;
           // Check if shared user has a valid telegramId
           if (!user.telegramId || user.telegramId === '') {
             console.log(
-              `Shared user ${sharedUser.username} has no valid Telegram ID, skipping notification`,
+              `Shared user ${sharedUser.username} has no valid Telegram ID, logging parallel notification`,
             );
+            // Fallback: log a parallel notification when shared user has no Telegram
+            try {
+              let senderPublicAddress: string | undefined;
+              let recipientPublicAddress: string | undefined;
+
+              try {
+                const senderAddrResp =
+                  await this.publicAddressesService.getLatestAddressByUserId(
+                    String(childUser._id),
+                  );
+                senderPublicAddress = senderAddrResp?.data?.publicKey;
+              } catch (e) {
+                senderPublicAddress = undefined;
+              }
+
+              try {
+                const recipientAddrResp =
+                  await this.publicAddressesService.getLatestAddressByUserId(
+                    String(user._id),
+                  );
+                recipientPublicAddress = recipientAddrResp?.data?.publicKey;
+              } catch (e) {
+                recipientPublicAddress = undefined;
+              }
+
+              const fallbackMessage = `Reply to shared secret.\n\nUser [id: ${String(
+                childUser._id,
+              )}, publicAddress: ${senderPublicAddress || 'N/A'}] has replied to [id: ${String(
+                parentOwner._id,
+              )}, publicAddress: ${
+                recipientPublicAddress || 'N/A'
+              }] secret that was shared with you.`;
+
+              await this.notificationsService.logNotificationWithResult(
+                {
+                  message: fallbackMessage,
+                  type: NotificationType.PASSWORD_CHILD_RESPONSE,
+                  recipientUserId: user._id as Types.ObjectId,
+                  recipientUsername: user.username,
+                  senderUserId: childUser._id as Types.ObjectId,
+                  senderUsername: childUser.username,
+                  reason:
+                    'Telegram unavailable: shared user has no Telegram ID',
+                  subject: 'Reply to Shared Secret',
+                  relatedEntityType: 'password',
+                  relatedEntityId: new Types.ObjectId(childSecretId),
+                  metadata: {
+                    parentSecretId: parentSecretId,
+                    childSecretName: childSecretName,
+                    senderPublicAddress,
+                    recipientPublicAddress,
+                    telegramSent: false,
+                  },
+                },
+                {
+                  success: false,
+                  errorMessage: 'Recipient has no Telegram account',
+                },
+              );
+            } catch (logError) {
+              console.error(
+                'Failed to log fallback notification (shared user without Telegram):',
+                logError,
+              );
+            }
             continue;
           }
 

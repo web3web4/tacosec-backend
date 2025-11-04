@@ -1765,10 +1765,12 @@ export class PasswordService {
         return; // Don't throw exception, just return to prevent breaking the main flow
       }
 
-      // Check if user has a valid telegramId before sending messages
+      // Do NOT short‑circuit when the sender has no Telegram ID.
+      // We still need to create notifications (fallback) and we can send Telegram messages to recipients who DO have Telegram.
       if (!user.telegramId || user.telegramId === '') {
-        console.log('User has no valid Telegram ID, skipping notifications');
-        return;
+        console.log(
+          'Sender has no Telegram ID — proceeding with fallback and recipient-specific notifications',
+        );
       }
 
       if (!passwordUser.sharedWith || passwordUser.sharedWith.length === 0) {

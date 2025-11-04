@@ -3,7 +3,9 @@ import {
   IsString,
   IsDateString,
   IsNumberString,
+  IsEnum,
 } from 'class-validator';
+import { LogEvent } from './log-event.enum';
 
 export class AdminGetLogsDto {
   @IsOptional()
@@ -37,4 +39,9 @@ export class AdminGetLogsDto {
   @IsOptional()
   @IsString()
   username?: string;
+
+  // Filter by event name stored inside logData.event
+  @IsOptional()
+  @IsEnum(LogEvent)
+  event?: LogEvent;
 }

@@ -357,6 +357,11 @@ export class LoggerService {
         ];
       }
 
+      // Filter by event inside logData.event (restricted to LogEvent enum via DTO)
+      if (adminGetLogsDto.event) {
+        filter['logData.event'] = adminGetLogsDto.event;
+      }
+
       // Execute queries
       const [logs, totalCount] = await Promise.all([
         this.errorLogModel

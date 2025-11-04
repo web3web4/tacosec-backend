@@ -24,6 +24,7 @@ import {
 } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
 import { LoggerService } from '../logger/logger.service';
+import { LogEvent } from '../logger/dto/log-event.enum';
 
 @Injectable()
 export class ReportService {
@@ -309,7 +310,7 @@ export class ReportService {
       try {
         await this.loggerService.saveSystemLog(
           {
-            event: 'report_created',
+            event: LogEvent.ReportCreated,
             message: 'New report created',
             reportType: reportData.report_type,
             reason: finalReason,

@@ -33,6 +33,7 @@ import {
 } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
 import { LoggerService } from '../logger/logger.service';
+import { LogEvent } from '../logger/dto/log-event.enum';
 
 @Injectable()
 export class UsersService {
@@ -72,7 +73,7 @@ export class UsersService {
       try {
         await this.loggerService.saveSystemLog(
           {
-            event: 'user_created',
+            event: LogEvent.UserCreated,
             message: 'User created via Telegram init data',
             username: user.username,
             telegramId: user.telegramId,
@@ -229,7 +230,7 @@ As a result:
       try {
         await this.loggerService.saveSystemLog(
           {
-            event: 'user_created',
+            event: LogEvent.UserCreated,
             message: 'User created via DTO signup',
             username: savedUser.username,
             telegramId: savedUser.telegramId,

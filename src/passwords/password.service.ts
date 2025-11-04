@@ -43,6 +43,7 @@ import {
 } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
 import { LoggerService } from '../logger/logger.service';
+import { LogEvent } from '../logger/dto/log-event.enum';
 @Injectable()
 export class PasswordService {
   constructor(
@@ -1236,7 +1237,7 @@ export class PasswordService {
       try {
         await this.loggerService.saveSystemLog(
           {
-            event: 'secret_updated',
+            event: LogEvent.SecretUpdated,
             message: 'Secret updated',
             key: updatedPassword?.key,
             type: (updatedPassword as any)?.type,
@@ -1291,7 +1292,7 @@ export class PasswordService {
       try {
         await this.loggerService.saveSystemLog(
           {
-            event: 'secret_updated',
+            event: LogEvent.SecretUpdated,
             message: 'Secret updated',
             key: updatedPassword?.key,
             type: (updatedPassword as any)?.type,
@@ -1345,7 +1346,7 @@ export class PasswordService {
         if (updatedPassword) {
           await this.loggerService.saveSystemLog(
             {
-              event: 'secret_updated',
+              event: LogEvent.SecretUpdated,
               message: 'Secret updated',
               key: updatedPassword?.key,
               type: (updatedPassword as any)?.type,
@@ -1435,7 +1436,7 @@ export class PasswordService {
       }
       await this.loggerService.saveSystemLog(
         {
-          event: 'secret_created',
+          event: LogEvent.SecretCreated,
           message: 'New secret created',
           key: savedPassword?.key,
           type: (savedPassword as any)?.type,
@@ -4666,8 +4667,8 @@ You can view the reply in your shared secrets list 📋.`;
         // Log secret view event (separate for Telegram vs non-Telegram viewers)
         try {
           const eventName = newView.telegramId
-            ? 'secret_viewed_by_telegram'
-            : 'secret_viewed_by_non_telegram';
+            ? LogEvent.SecretViewedByTelegram
+            : LogEvent.SecretViewedByNonTelegram;
           await this.loggerService.saveSystemLog(
             {
               event: eventName,

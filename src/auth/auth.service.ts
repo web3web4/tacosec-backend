@@ -20,6 +20,7 @@ import { UsersService } from '../users/users.service';
 import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { LoggerService } from '../logger/logger.service';
+import { LogEvent } from '../logger/dto/log-event.enum';
 
 export interface LoginResponse {
   access_token: string;
@@ -128,7 +129,7 @@ export class AuthService {
         try {
           await this.loggerService.saveSystemLog(
             {
-              event: 'user_created',
+              event: LogEvent.UserCreated,
               message: 'User created via publicAddress login',
               publicAddress,
             },
@@ -267,7 +268,7 @@ export class AuthService {
         try {
           await this.loggerService.saveSystemLog(
             {
-              event: 'user_created',
+              event: LogEvent.UserCreated,
               message: 'User created via pure Telegram login',
             },
             {
@@ -693,7 +694,7 @@ export class AuthService {
     try {
       await this.loggerService.saveSystemLog(
         {
-          event: 'user_created',
+          event: LogEvent.UserCreated,
           message: 'User created via Telegram login with publicAddress',
           publicAddress,
         },

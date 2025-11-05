@@ -1019,24 +1019,68 @@ If you believe this report was made in error, please contact our support team.`;
 
       const reports = await queryExec.exec();
 
+      // Build counters based on the same base filters (excluding resolved constraint to compute both statuses)
+      const baseNoResolved: any = { ...reportQuery };
+      if (baseNoResolved.$or) {
+        // Remove only the resolved-related $or if present
+        delete baseNoResolved.$or;
+      }
+
+      const resolvedTrueQuery = {
+        ...baseNoResolved,
+        $or: [{ resolved: true }, { resolved: 'true' }],
+      };
+      const unresolvedQuery = {
+        ...baseNoResolved,
+        $or: [
+          { resolved: false },
+          { resolved: 'false' },
+          { resolved: { $exists: false } },
+        ],
+      };
+      const highPriorityQuery = {
+        ...baseNoResolved,
+        priority: ReportPriority.HIGH,
+      };
+
+      const [resolvedCount, pendingCount, highPriorityCount] = await Promise.all([
+        this.reportModel.countDocuments(resolvedTrueQuery),
+        this.reportModel.countDocuments(unresolvedQuery),
+        this.reportModel.countDocuments(highPriorityQuery),
+      ]);
+
       return {
-        count: totalCount,
+        // count: totalCount,
+        reports: reports.map((report: any) => {
+          const isResolved =
+            report?.resolved === true || report?.resolved === 'true';
+          return {
+            id: report._id,
+            reportType: report.report_type,
+            reportDetails: report.reason,
+            reportedContent: report.reason,
+            contentOwner: report?.reportedUserInfo?.username ?? null,
+            secretId: report.secret_id,
+            reporterHandle: report?.reporterInfo?.username ?? null,
+            status: isResolved ? 'resolved' : 'pending',
+            priority: report.priority,
+            reporterTelegramId: report.reporterTelegramId,
+            reporterInfo: report.reporterInfo,
+            reportedTelegramId: report.reportedTelegramId,
+            reportedUserInfo: report.reportedUserInfo,
+            createdDate: report.createdAt,
+            updatedDate: report.updatedAt,
+            resolved: report.resolved,
+            resolvedAt: report.resolvedAt,
+          };
+        }),
+        total: totalCount,
         page: pagination?.page ?? 1,
         limit: pagination?.limit ?? reports.length,
-        reports: reports.map((report) => ({
-          id: report._id,
-          secret_id: report.secret_id,
-          report_type: report.report_type,
-          reason: report.reason,
-          reporterTelegramId: report.reporterTelegramId,
-          reporterInfo: report.reporterInfo,
-          reportedTelegramId: report.reportedTelegramId,
-          reportedUserInfo: report.reportedUserInfo,
-          priority: report.priority,
-          createdAt: report.createdAt,
-          resolved: report.resolved,
-          resolvedAt: report.resolvedAt,
-        })),
+        'TOTAL REPORTS': totalCount,
+        PENDING: pendingCount,
+        'HIGH PRIORITY': highPriorityCount,
+        RESOLVED: resolvedCount,
       };
     } catch (error) {
       if (error instanceof HttpException) throw error;

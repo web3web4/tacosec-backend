@@ -267,6 +267,159 @@ export class NotificationsService {
   }
 
   /**
+   * Get notifications for the current authenticated user with sender/recipient/all filter.
+   * This encapsulates the business logic previously placed in the controller.
+   */
+  async getMyNotifications(
+    currentUserId: string,
+    senderOrRecipientRaw?: string,
+    query: Omit<GetNotificationsDto, 'senderUserId' | 'recipientUserId'> = {},
+  ) {
+    try {
+      // Normalize filter (case-insensitive), default to 'all'.
+      const normalized = String(
+        senderOrRecipientRaw || (query as any).senderOrRecipient || 'all',
+      ).toLowerCase();
+      const filterChoice: 'sender' | 'recipient' | 'all' =
+        normalized === 'sender'
+          ? 'sender'
+          : normalized === 'recipient'
+            ? 'recipient'
+            : 'all';
+
+      // Extract common query params (same handling as getNotifications)
+      const {
+        page = 1,
+        limit = 10,
+        recipientTelegramId,
+        recipientUsername,
+        senderTelegramId,
+        senderUsername,
+        type,
+        status,
+        startDate,
+        endDate,
+        search,
+        relatedEntityId,
+        relatedEntityType,
+        sortBy = 'createdAt',
+        sortOrder = 'desc',
+      } = query as GetNotificationsDto;
+
+      // Build filter
+      const filter: any = {};
+
+      // User-specific part
+      const userIdObj = Types.ObjectId.isValid(currentUserId)
+        ? new Types.ObjectId(currentUserId)
+        : currentUserId;
+      if (filterChoice === 'sender') {
+        filter.senderUserId = userIdObj;
+      } else if (filterChoice === 'recipient') {
+        filter.recipientUserId = userIdObj;
+      } else {
+        filter.$or = [
+          { senderUserId: userIdObj },
+          { recipientUserId: userIdObj },
+        ];
+      }
+
+      // Other filters
+      if (recipientTelegramId) filter.recipientTelegramId = recipientTelegramId;
+      if (recipientUsername)
+        filter.recipientUsername = new RegExp(recipientUsername, 'i');
+      if (senderTelegramId) filter.senderTelegramId = senderTelegramId;
+      if (senderUsername)
+        filter.senderUsername = new RegExp(senderUsername, 'i');
+      if (type) filter.type = type;
+      if (status) filter.status = status;
+      if (relatedEntityId) {
+        filter.relatedEntityId = Types.ObjectId.isValid(relatedEntityId)
+          ? new Types.ObjectId(relatedEntityId)
+          : relatedEntityId;
+      }
+      if (relatedEntityType) filter.relatedEntityType = relatedEntityType;
+
+      // Date range
+      if (startDate || endDate) {
+        filter.createdAt = {};
+        if (startDate) filter.createdAt.$gte = new Date(startDate);
+        if (endDate) filter.createdAt.$lte = new Date(endDate);
+      }
+
+      // Text search
+      if (search) {
+        const searchRegex = new RegExp(search, 'i');
+        const orSearch = [
+          { message: searchRegex },
+          { subject: searchRegex },
+          { reason: searchRegex },
+          { recipientUsername: searchRegex },
+          { senderUsername: searchRegex },
+        ];
+        // If we already have $or for user filtering, merge search into $and to preserve both
+        if (filter.$or) {
+          filter.$and = [{ $or: filter.$or }, { $or: orSearch }];
+          delete filter.$or; // consolidated into $and
+        } else {
+          filter.$or = orSearch;
+        }
+      }
+
+      // Pagination and sorting
+      const skip = (page - 1) * limit;
+      const sortOptions: any = {};
+      sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+      // Execute query
+      const [notifications, total] = await Promise.all([
+        this.notificationModel
+          .find(filter)
+          .sort(sortOptions)
+          .skip(skip)
+          .limit(limit)
+          .lean()
+          .exec(),
+        this.notificationModel.countDocuments(filter).exec(),
+      ]);
+
+      // Enrich with currentUserRole
+      const currentIdStr = String(userIdObj);
+      const enriched = (notifications || []).map((n: any) => {
+        const senderIdStr = n.senderUserId ? String(n.senderUserId) : undefined;
+        const recipientIdStr = n.recipientUserId
+          ? String(n.recipientUserId)
+          : undefined;
+        let role: 'sender' | 'recipient' | undefined = undefined;
+        if (senderIdStr === currentIdStr) role = 'sender';
+        else if (recipientIdStr === currentIdStr) role = 'recipient';
+        else if (filterChoice !== 'all') role = filterChoice; // fallback
+        return { ...n, currentUserRole: role };
+      });
+
+      // Pagination info
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPrevPage = page > 1;
+
+      return {
+        notifications: enriched,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems: total,
+          itemsPerPage: limit,
+          hasNextPage,
+          hasPrevPage,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error getting my notifications:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get notification statistics
    */
   async getNotificationStats(userId?: string) {

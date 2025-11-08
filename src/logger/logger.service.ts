@@ -587,12 +587,14 @@ export class LoggerService {
           .exec(),
       ]);
 
-      const totalViews = Array.isArray(totalViewsAgg) && totalViewsAgg.length
-        ? totalViewsAgg[0].totalViews || 0
-        : 0;
-      const viewsToday = Array.isArray(viewsTodayAgg) && viewsTodayAgg.length
-        ? viewsTodayAgg[0].viewsToday || 0
-        : 0;
+      const totalViews =
+        Array.isArray(totalViewsAgg) && totalViewsAgg.length
+          ? totalViewsAgg[0].totalViews || 0
+          : 0;
+      const viewsToday =
+        Array.isArray(viewsTodayAgg) && viewsTodayAgg.length
+          ? viewsTodayAgg[0].viewsToday || 0
+          : 0;
 
       return {
         data: mappedLogs,

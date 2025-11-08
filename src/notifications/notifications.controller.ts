@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Delete,
   Param,
+  Request,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { GetNotificationsDto } from './dto';
@@ -15,11 +16,15 @@ import { Roles } from '../decorators/roles.decorator';
 import { Role } from '../decorators/roles.decorator';
 import { RolesGuard } from '../guards/roles.guard';
 import { FlexibleAuthGuard } from '../guards/flexible-auth.guard';
+import { UsersService } from '../users/users.service';
 
 @Controller('notifications')
 @UseGuards(FlexibleAuthGuard, RolesGuard)
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly usersService: UsersService,
+  ) {}
 
   /**
    * Get all notifications with filters and pagination
@@ -188,6 +193,38 @@ export class NotificationsController {
     } catch (error) {
       throw new HttpException(
         'Failed to retrieve notifications by status',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * User endpoint: get notifications for the currently authenticated user
+   * Supports filter "senderOrrecipient" (case-insensitive):
+   * - sender: return notifications where senderUserId matches current user
+   * - recipient: return notifications where recipientUserId matches current user
+   * - all (default): return notifications where either matches
+   * Adds an extra field "currentUserRole" to each notification indicating
+   * whether the current user is the sender or recipient for that notification.
+   */
+  @Get('my')
+  @FlexibleAuth()
+  async getMyNotifications(
+    @Query('senderOrrecipient') senderOrrecipient: string,
+    @Query()
+    query: Omit<GetNotificationsDto, 'senderUserId' | 'recipientUserId'>,
+    @Request() req: any,
+  ) {
+    try {
+      const currentUserId = await this.usersService.getCurrentUserId(req);
+      return await this.notificationsService.getMyNotifications(
+        currentUserId,
+        senderOrrecipient,
+        query,
+      );
+    } catch (error) {
+      throw new HttpException(
+        'Failed to retrieve my notifications',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

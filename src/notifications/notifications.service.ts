@@ -306,45 +306,48 @@ export class NotificationsService {
         sortOrder = 'desc',
       } = query as GetNotificationsDto;
 
-      // Build filter
-      const filter: any = {};
+      // Build filter using a unified $and pipeline so totalItems is counted AFTER applying ALL filters
+      const conditions: any[] = [];
 
       // User-specific part
       const userIdObj = Types.ObjectId.isValid(currentUserId)
         ? new Types.ObjectId(currentUserId)
         : currentUserId;
       if (filterChoice === 'sender') {
-        filter.senderUserId = userIdObj;
+        conditions.push({ senderUserId: userIdObj });
       } else if (filterChoice === 'recipient') {
-        filter.recipientUserId = userIdObj;
+        conditions.push({ recipientUserId: userIdObj });
       } else {
-        filter.$or = [
-          { senderUserId: userIdObj },
-          { recipientUserId: userIdObj },
-        ];
+        conditions.push({
+          $or: [{ senderUserId: userIdObj }, { recipientUserId: userIdObj }],
+        });
       }
 
       // Other filters
-      if (recipientTelegramId) filter.recipientTelegramId = recipientTelegramId;
+      if (recipientTelegramId) conditions.push({ recipientTelegramId });
       if (recipientUsername)
-        filter.recipientUsername = new RegExp(recipientUsername, 'i');
-      if (senderTelegramId) filter.senderTelegramId = senderTelegramId;
+        conditions.push({
+          recipientUsername: new RegExp(recipientUsername, 'i'),
+        });
+      if (senderTelegramId) conditions.push({ senderTelegramId });
       if (senderUsername)
-        filter.senderUsername = new RegExp(senderUsername, 'i');
-      if (type) filter.type = type;
-      if (status) filter.status = status;
+        conditions.push({ senderUsername: new RegExp(senderUsername, 'i') });
+      if (type) conditions.push({ type });
+      if (status) conditions.push({ status });
       if (relatedEntityId) {
-        filter.relatedEntityId = Types.ObjectId.isValid(relatedEntityId)
+        const relId = Types.ObjectId.isValid(relatedEntityId)
           ? new Types.ObjectId(relatedEntityId)
           : relatedEntityId;
+        conditions.push({ relatedEntityId: relId });
       }
-      if (relatedEntityType) filter.relatedEntityType = relatedEntityType;
+      if (relatedEntityType) conditions.push({ relatedEntityType });
 
       // Date range
       if (startDate || endDate) {
-        filter.createdAt = {};
-        if (startDate) filter.createdAt.$gte = new Date(startDate);
-        if (endDate) filter.createdAt.$lte = new Date(endDate);
+        const createdAtRange: any = {};
+        if (startDate) createdAtRange.$gte = new Date(startDate);
+        if (endDate) createdAtRange.$lte = new Date(endDate);
+        conditions.push({ createdAt: createdAtRange });
       }
 
       // Text search
@@ -357,14 +360,10 @@ export class NotificationsService {
           { recipientUsername: searchRegex },
           { senderUsername: searchRegex },
         ];
-        // If we already have $or for user filtering, merge search into $and to preserve both
-        if (filter.$or) {
-          filter.$and = [{ $or: filter.$or }, { $or: orSearch }];
-          delete filter.$or; // consolidated into $and
-        } else {
-          filter.$or = orSearch;
-        }
+        conditions.push({ $or: orSearch });
       }
+
+      const filter: any = conditions.length > 0 ? { $and: conditions } : {};
 
       // Pagination and sorting
       const skip = (page - 1) * limit;

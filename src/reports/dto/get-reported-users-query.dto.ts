@@ -58,7 +58,6 @@ export class GetReportedUsersQueryDto {
   @IsEnum(ResolvedFilterEnum)
   resolved?: ResolvedFilterEnum;
 
-
   @IsOptional()
   @IsEnum(ReportType)
   report_type?: ReportType;

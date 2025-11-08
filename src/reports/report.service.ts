@@ -872,7 +872,10 @@ If you believe this report was made in error, please contact our support team.`;
           if (normalizedResolved !== undefined) {
             if (normalizedResolved === true) {
               // Include records where resolved is true (boolean) or legacy string 'true'
-              userReportQuery['$or'] = [{ resolved: true }, { resolved: 'true' }];
+              userReportQuery['$or'] = [
+                { resolved: true },
+                { resolved: 'true' },
+              ];
             } else {
               userReportQuery['$or'] = [
                 { resolved: false },
@@ -1043,11 +1046,12 @@ If you believe this report was made in error, please contact our support team.`;
         priority: ReportPriority.HIGH,
       };
 
-      const [resolvedCount, pendingCount, highPriorityCount] = await Promise.all([
-        this.reportModel.countDocuments(resolvedTrueQuery),
-        this.reportModel.countDocuments(unresolvedQuery),
-        this.reportModel.countDocuments(highPriorityQuery),
-      ]);
+      const [resolvedCount, pendingCount, highPriorityCount] =
+        await Promise.all([
+          this.reportModel.countDocuments(resolvedTrueQuery),
+          this.reportModel.countDocuments(unresolvedQuery),
+          this.reportModel.countDocuments(highPriorityQuery),
+        ]);
 
       return {
         // count: totalCount,

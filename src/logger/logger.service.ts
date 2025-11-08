@@ -8,6 +8,7 @@ import { GetLogsDto, PaginatedLogsResponse } from './dto/get-logs.dto';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { AdminGetLogsDto } from './dto/admin-get-logs.dto';
 import { LogEvent } from './dto/log-event.enum';
+import { UsersService } from '../users/users.service';
 
 // Extend Request interface to include user property for flexible authentication
 export interface AuthenticatedRequest extends Request {
@@ -27,7 +28,62 @@ export class LoggerService {
   constructor(
     @InjectModel(ErrorLog.name) private errorLogModel: Model<ErrorLogDocument>,
     private telegramDtoAuthGuard: TelegramDtoAuthGuard,
+    private readonly usersService: UsersService,
   ) {}
+
+  /**
+   * Format relative time string per requirements
+   */
+  private formatRelativeTime(createdAt?: Date): string {
+    if (!createdAt) return 'unknown';
+    const now = new Date().getTime();
+    const ts = new Date(createdAt).getTime();
+    const diffMs = Math.max(0, now - ts);
+
+    const sec = 1000;
+    const min = 60 * sec;
+    const hour = 60 * min;
+    const day = 24 * hour;
+    const week = 7 * day;
+    const month = 30 * day; // approximate
+    const year = 365 * day; // approximate
+
+    const plural = (val: number, unit: string) =>
+      `${val} ${unit}${val === 1 ? '' : 's'}`;
+
+    if (diffMs < min) {
+      const seconds = Math.floor(diffMs / sec);
+      return `${plural(seconds, 'Second')} ago`;
+    }
+    if (diffMs < hour) {
+      const minutes = Math.floor(diffMs / min);
+      const seconds = Math.floor((diffMs % min) / sec);
+      return `${plural(minutes, 'Minute')} ${plural(seconds, 'Second')} ago`;
+    }
+    if (diffMs < day) {
+      const hours = Math.floor(diffMs / hour);
+      const minutes = Math.floor((diffMs % hour) / min);
+      return `${plural(hours, 'Hour')} ${plural(minutes, 'Minute')} ago`;
+    }
+    if (diffMs < week) {
+      const days = Math.floor(diffMs / day);
+      const hours = Math.floor((diffMs % day) / hour);
+      return `${plural(days, 'Day')} ${plural(hours, 'Hour')} ago`;
+    }
+    if (diffMs < month) {
+      const weeks = Math.floor(diffMs / week);
+      const days = Math.floor((diffMs % week) / day);
+      return `${plural(weeks, 'Week')} ${plural(days, 'Day')} ago`;
+    }
+    if (diffMs < year) {
+      const months = Math.floor(diffMs / month);
+      const weeks = Math.floor((diffMs % month) / week);
+      return `${plural(months, 'Month')} ${plural(weeks, 'Week')} ago`;
+    }
+    const years = Math.floor(diffMs / year);
+    const months = Math.floor((diffMs % year) / month);
+    return `${plural(years, 'Year')} ${plural(months, 'Month')} ago`;
+  }
 
   /**
    * Extract user authentication data from request
@@ -384,8 +440,52 @@ export class LoggerService {
 
       const totalPages = Math.ceil(totalCount / limit);
 
+      // Build user map to resolve username by userId in batch
+      const userIds = Array.from(
+        new Set(
+          logs
+            .map((l) => (l.userId ? String(l.userId) : null))
+            .filter((v): v is string => !!v),
+        ),
+      );
+      let userMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        try {
+          const users = await this.usersService.findByQuery({
+            _id: { $in: userIds },
+          });
+          userMap = users.reduce(
+            (acc, u: any) => {
+              const idStr = String(u._id);
+              acc[idStr] = u.username || null;
+              return acc;
+            },
+            {} as Record<string, string>,
+          );
+        } catch (e) {
+          // Fallback silently if user lookup fails
+          userMap = {};
+        }
+      }
+
+      // Map logs to include type, user, and formatted time
+      const mappedLogs = logs.map((log) => {
+        const obj =
+          typeof (log as any).toObject === 'function'
+            ? (log as any).toObject()
+            : (log as any);
+        const type = obj?.logData?.event ?? null;
+        const userIdStr = obj?.userId ? String(obj.userId) : null;
+        const user =
+          userIdStr && userMap[userIdStr]
+            ? userMap[userIdStr]
+            : (obj?.username ?? null);
+        const time = this.formatRelativeTime(obj?.createdAt);
+        return { ...obj, type, user, time };
+      });
+
       return {
-        data: logs,
+        data: mappedLogs,
         pagination: {
           currentPage: page,
           totalPages,

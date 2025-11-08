@@ -5,6 +5,7 @@ import {
   IsNumberString,
   IsEnum,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { LogEvent } from './log-event.enum';
 
 export class AdminGetLogsDto {
@@ -42,6 +43,16 @@ export class AdminGetLogsDto {
 
   // Filter by event name stored inside logData.event
   @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      const v = value.trim();
+      if (v.toLowerCase() === 'all') {
+        return LogEvent.All;
+      }
+      return value;
+    }
+    return value;
+  })
   @IsEnum(LogEvent)
   event?: LogEvent;
 }

@@ -7,6 +7,7 @@ import { CreateLogDto } from './dto/create-log.dto';
 import { GetLogsDto, PaginatedLogsResponse } from './dto/get-logs.dto';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { AdminGetLogsDto } from './dto/admin-get-logs.dto';
+import { LogEvent } from './dto/log-event.enum';
 
 // Extend Request interface to include user property for flexible authentication
 export interface AuthenticatedRequest extends Request {
@@ -357,9 +358,17 @@ export class LoggerService {
         ];
       }
 
-      // Filter by event inside logData.event (restricted to LogEvent enum via DTO)
+      // Filter by event inside logData.event
+      // Support special value LogEvent.All to return any log that HAS logData.event (exclude logs missing this field)
       if (adminGetLogsDto.event) {
-        filter['logData.event'] = adminGetLogsDto.event;
+        if (
+          adminGetLogsDto.event === LogEvent.All ||
+          (adminGetLogsDto.event as any) === 'All'
+        ) {
+          filter['logData.event'] = { $exists: true };
+        } else {
+          filter['logData.event'] = adminGetLogsDto.event;
+        }
       }
 
       // Execute queries

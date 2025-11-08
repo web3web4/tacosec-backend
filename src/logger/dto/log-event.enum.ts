@@ -1,4 +1,5 @@
 export enum LogEvent {
+  All = 'All',
   UserCreated = 'user_created',
   SecretCreated = 'secret_created',
   SecretUpdated = 'secret_updated',

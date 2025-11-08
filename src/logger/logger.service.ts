@@ -139,6 +139,60 @@ export class LoggerService {
   }
 
   /**
+   * Persist arbitrary exception/error details. Works even if request is missing auth.
+   */
+  async logException(
+    err: unknown,
+    req?: AuthenticatedRequest,
+    extra: Record<string, any> = {},
+  ): Promise<ErrorLog> {
+    // Try to extract auth data, but do not fail logging if unavailable
+    let userId: string | undefined;
+    let telegramId: string | undefined;
+    let username: string | undefined;
+    try {
+      if (req) {
+        const auth = this.extractUserAuthData(req);
+        userId = auth.userId;
+        telegramId = auth.telegramId;
+        username = auth.username;
+      }
+    } catch (_) {
+      // ignore auth extraction failure
+    }
+
+    const isHttp = err instanceof HttpException;
+    const status = isHttp ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+    const responseBody = isHttp
+      ? (err as HttpException).getResponse()
+      : undefined;
+
+    const logData = {
+      message: isHttp
+        ? typeof responseBody === 'string'
+          ? responseBody
+          : (responseBody as any)?.message
+        : (err as any)?.message,
+      error: (err as any)?.name || 'Error',
+      stack: (err as any)?.stack,
+      status,
+      path: (req as any)?.originalUrl || (req as any)?.url,
+      method: (req as any)?.method,
+      userAgent: (req as any)?.headers?.['user-agent'],
+      timestamp: new Date().toISOString(),
+      ...extra,
+    };
+
+    const errorLog = new this.errorLogModel({
+      userId,
+      telegramId,
+      username,
+      logData,
+    });
+    return errorLog.save();
+  }
+
+  /**
    * Save error log with flexible authentication
    * @param createLogDto The log data to save
    * @param req The authenticated request object

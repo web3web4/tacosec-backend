@@ -53,10 +53,14 @@ export class LoggerController {
   @FlexibleAuth()
   @UsePipes(new ValidationPipe({ transform: true }))
   async saveLog(
-    @Body() createLogDto: CreateLogDto,
+    @Body() body: any,
     @Request() req: AuthenticatedRequest,
   ): Promise<ErrorLog> {
-    return this.loggerService.saveLog(createLogDto, req);
+    const dto: CreateLogDto =
+      body && typeof body === 'object' && 'logData' in body
+        ? (body as CreateLogDto)
+        : ({ logData: body } as CreateLogDto);
+    return this.loggerService.saveLog(dto, req);
   }
 
   /**

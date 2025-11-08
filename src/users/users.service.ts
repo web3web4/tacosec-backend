@@ -49,6 +49,7 @@ export class UsersService {
     @Inject(forwardRef(() => PublicAddressesService))
     private readonly publicAddressesService: PublicAddressesService,
     private readonly notificationsService: NotificationsService,
+    @Inject(forwardRef(() => LoggerService))
     private readonly loggerService: LoggerService,
   ) {}
 

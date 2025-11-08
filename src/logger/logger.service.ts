@@ -458,7 +458,10 @@ export class LoggerService {
           userMap = users.reduce(
             (acc, u: any) => {
               const idStr = String(u._id);
-              acc[idStr] = u.username || null;
+              // Preserve empty string "" as-is; only skip when username is undefined or null
+              if (u.username !== undefined && u.username !== null) {
+                acc[idStr] = u.username;
+              }
               return acc;
             },
             {} as Record<string, string>,
@@ -477,12 +480,22 @@ export class LoggerService {
             : (log as any);
         const type = obj?.logData?.event ?? null;
         const userIdStr = obj?.userId ? String(obj.userId) : null;
-        const user =
-          userIdStr && userMap[userIdStr]
-            ? userMap[userIdStr]
-            : (obj?.username ?? null);
+
+        // Preserve empty string ""; do not rely on truthiness
+        let user: string | null = null;
+        if (
+          userIdStr &&
+          Object.prototype.hasOwnProperty.call(userMap, userIdStr)
+        ) {
+          user = userMap[userIdStr];
+        } else if (obj?.username !== undefined) {
+          user = obj.username;
+        } else {
+          user = null;
+        }
+
         const time = this.formatRelativeTime(obj?.createdAt);
-        return { ...obj, type, user, time };
+        return { type, user, time, ...obj };
       });
 
       return {

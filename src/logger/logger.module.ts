@@ -6,6 +6,8 @@ import { LoggerController } from './logger.controller';
 import { LoggerService } from './logger.service';
 import { ErrorLog, ErrorLogSchema } from './schemas/error-log.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
+import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
+import { Report, ReportSchema } from '../reports/schemas/report.schema';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { FlexibleAuthGuard } from '../guards/flexible-auth.guard';
 import { TelegramValidatorService } from '../telegram/telegram-validator.service';
@@ -17,6 +19,8 @@ import { UsersModule } from '../users/users.module';
     MongooseModule.forFeature([
       { name: ErrorLog.name, schema: ErrorLogSchema },
       { name: User.name, schema: UserSchema }, // Required for authentication guards
+      { name: Password.name, schema: PasswordSchema },
+      { name: Report.name, schema: ReportSchema },
     ]),
     // JWT module for token verification
     JwtModule.registerAsync({

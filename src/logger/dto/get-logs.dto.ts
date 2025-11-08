@@ -37,5 +37,13 @@ export interface PaginatedLogsResponse {
     limit: number;
     hasNextPage: boolean;
     hasPrevPage: boolean;
+    // Additional platform statistics for admin
+    totalUsers?: number;
+    activeUsers?: number;
+    totalSecrets?: number;
+    newToday?: number;
+    totalViews?: number;
+    viewsToday?: number;
+    pendingReports?: number;
   };
 }

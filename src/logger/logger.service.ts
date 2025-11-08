@@ -1,4 +1,10 @@
-import { Injectable, HttpException, HttpStatus, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  HttpException,
+  HttpStatus,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Request } from 'express';
@@ -9,6 +15,12 @@ import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { AdminGetLogsDto } from './dto/admin-get-logs.dto';
 import { LogEvent } from './dto/log-event.enum';
 import { UsersService } from '../users/users.service';
+import { User, UserDocument } from '../users/schemas/user.schema';
+import {
+  Password,
+  PasswordDocument,
+} from '../passwords/schemas/password.schema';
+import { Report, ReportDocument } from '../reports/schemas/report.schema';
 
 // Extend Request interface to include user property for flexible authentication
 export interface AuthenticatedRequest extends Request {
@@ -27,6 +39,9 @@ export interface AuthenticatedRequest extends Request {
 export class LoggerService {
   constructor(
     @InjectModel(ErrorLog.name) private errorLogModel: Model<ErrorLogDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
+    @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
     private telegramDtoAuthGuard: TelegramDtoAuthGuard,
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
@@ -498,6 +513,87 @@ export class LoggerService {
         return { type, user, time, ...obj };
       });
 
+      // ----- Additional pagination statistics requested by admin -----
+      // Date boundaries for "today" (UTC)
+      const startOfToday = new Date();
+      startOfToday.setUTCHours(0, 0, 0, 0);
+      const endOfToday = new Date();
+      endOfToday.setUTCHours(23, 59, 59, 999);
+
+      // Parent secrets filter: parent_secret_id is null, empty, or not present
+      const parentSecretsFilter = {
+        $or: [
+          { parent_secret_id: { $exists: false } },
+          { parent_secret_id: null },
+          { parent_secret_id: '' },
+        ],
+      } as any;
+
+      const [
+        totalUsers,
+        activeUsers,
+        totalSecrets,
+        newToday,
+        pendingReports,
+        totalViewsAgg,
+        viewsTodayAgg,
+      ] = await Promise.all([
+        this.userModel.countDocuments({}).exec(),
+        this.userModel.countDocuments({ isActive: true }).exec(),
+        this.passwordModel.countDocuments(parentSecretsFilter).exec(),
+        this.passwordModel
+          .countDocuments({
+            ...parentSecretsFilter,
+            createdAt: { $gte: startOfToday, $lt: endOfToday },
+          })
+          .exec(),
+        this.reportModel.countDocuments({ resolved: false }).exec(),
+        this.passwordModel
+          .aggregate([
+            { $match: parentSecretsFilter },
+            {
+              $project: {
+                viewsCount: {
+                  $size: { $ifNull: ['$secretViews', []] },
+                },
+              },
+            },
+            { $group: { _id: null, totalViews: { $sum: '$viewsCount' } } },
+          ])
+          .exec(),
+        this.passwordModel
+          .aggregate([
+            { $match: parentSecretsFilter },
+            {
+              $project: {
+                todayViewsCount: {
+                  $size: {
+                    $filter: {
+                      input: { $ifNull: ['$secretViews', []] },
+                      as: 'view',
+                      cond: {
+                        $and: [
+                          { $gte: ['$$view.viewedAt', startOfToday] },
+                          { $lt: ['$$view.viewedAt', endOfToday] },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            { $group: { _id: null, viewsToday: { $sum: '$todayViewsCount' } } },
+          ])
+          .exec(),
+      ]);
+
+      const totalViews = Array.isArray(totalViewsAgg) && totalViewsAgg.length
+        ? totalViewsAgg[0].totalViews || 0
+        : 0;
+      const viewsToday = Array.isArray(viewsTodayAgg) && viewsTodayAgg.length
+        ? viewsTodayAgg[0].viewsToday || 0
+        : 0;
+
       return {
         data: mappedLogs,
         pagination: {
@@ -507,6 +603,13 @@ export class LoggerService {
           limit,
           hasNextPage: page < totalPages,
           hasPrevPage: page > 1,
+          totalUsers,
+          activeUsers,
+          totalSecrets,
+          newToday,
+          totalViews,
+          viewsToday,
+          pendingReports,
         },
       };
     } catch (error) {

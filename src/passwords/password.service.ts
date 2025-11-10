@@ -1967,7 +1967,7 @@ export class PasswordService {
 
             const message = `🔐 <b>Secret Shared With You</b> 
 
-User <b>${userName}</b> has shared a secret with you 🔁.
+User <span class="tg-spoiler"><b>${userName}</b></span> has shared a secret with you 🔁.
 
 You can view it under the <b>"Shared with me"</b> tab 📂.
 `;
@@ -2161,7 +2161,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
       // Create the notification message
       const message = `🔐 <b>Child Secret Response</b>
 
-User <b>${childUserDisplayName}</b> has responded to your secret with a new secret " 🔄
+User <span class="tg-spoiler"><b>${childUserDisplayName}</b></span> has responded to your secret with a new secret " 🔄
 
 📅 <b>Response Date & Time:</b> ${dateTime}
 
@@ -2393,7 +2393,7 @@ You can view the response in your secrets list 📋.`;
           // Create the notification message
           const message = `🔐 <b>Reply to Shared Secret</b>
 
-User <b>${childUserDisplayName}</b> has replied to <b>${parentOwnerDisplayName}</b>'s secret that was shared with you 🔄
+User <span class="tg-spoiler"><b>${childUserDisplayName}</b></span> has replied to <b>${parentOwnerDisplayName}</b>'s secret that was shared with you 🔄
 
 📅 <b>Reply Date & Time:</b> ${dateTime}
 

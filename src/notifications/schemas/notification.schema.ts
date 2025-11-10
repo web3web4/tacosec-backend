@@ -38,7 +38,7 @@ export class Notification {
     enum: NotificationStatus,
     default: NotificationStatus.PENDING,
   })
-  status: NotificationStatus;
+  telegramStatus: NotificationStatus;
 
   // User ID that received the notification
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
@@ -104,7 +104,7 @@ export const NotificationSchema = SchemaFactory.createForClass(Notification);
 NotificationSchema.index({ recipientUserId: 1, createdAt: -1 });
 NotificationSchema.index({ senderUserId: 1, createdAt: -1 });
 NotificationSchema.index({ type: 1, createdAt: -1 });
-NotificationSchema.index({ status: 1, createdAt: -1 });
+NotificationSchema.index({ telegramStatus: 1, createdAt: -1 });
 NotificationSchema.index({ recipientTelegramId: 1, createdAt: -1 });
 NotificationSchema.index({ senderTelegramId: 1, createdAt: -1 });
 NotificationSchema.index({ relatedEntityId: 1, createdAt: -1 });

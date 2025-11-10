@@ -58,7 +58,7 @@ export class GetNotificationsDto {
 
   @IsOptional()
   @IsEnum(NotificationStatus)
-  status?: NotificationStatus;
+  telegramStatus?: NotificationStatus;
 
   @IsOptional()
   @IsDateString()

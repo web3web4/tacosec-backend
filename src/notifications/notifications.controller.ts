@@ -178,21 +178,21 @@ export class NotificationsController {
   }
 
   /**
-   * Search notifications by status
+   * Search notifications by telegram status
    */
-  @Get('by-status/:status')
+  @Get('by-telegram-status/:telegramStatus')
   @FlexibleAuth()
   @Roles(Role.ADMIN)
-  async getNotificationsByStatus(
-    @Param('status') status: string,
-    @Query() query: Omit<GetNotificationsDto, 'status'>,
+  async getNotificationsByTelegramStatus(
+    @Param('telegramStatus') telegramStatus: string,
+    @Query() query: Omit<GetNotificationsDto, 'telegramStatus'>,
   ) {
     try {
-      const searchQuery = { ...query, status: status as any };
+      const searchQuery = { ...query, telegramStatus: telegramStatus as any };
       return await this.notificationsService.getNotifications(searchQuery);
     } catch (error) {
       throw new HttpException(
-        'Failed to retrieve notifications by status',
+        'Failed to retrieve notifications by telegram status',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

@@ -70,7 +70,7 @@ export class NotificationsService {
 
       const notification = new this.notificationModel({
         ...processedData,
-        status: NotificationStatus.PENDING,
+        telegramStatus: NotificationStatus.PENDING,
         retryCount: 0,
       });
 
@@ -93,7 +93,7 @@ export class NotificationsService {
   ): Promise<void> {
     try {
       const updateData: any = {
-        status: result.success
+        telegramStatus: result.success
           ? NotificationStatus.SENT
           : NotificationStatus.FAILED,
         telegramResponse: result.telegramResponse,
@@ -114,7 +114,7 @@ export class NotificationsService {
       );
 
       this.logger.log(
-        `Notification ${notificationId} status updated to ${updateData.status}`,
+        `Notification ${notificationId} status updated to ${updateData.telegramStatus}`,
       );
     } catch (error) {
       this.logger.error('Error updating notification status:', error);
@@ -131,7 +131,7 @@ export class NotificationsService {
     try {
       const notification = new this.notificationModel({
         ...data,
-        status: result.success
+        telegramStatus: result.success
           ? NotificationStatus.SENT
           : NotificationStatus.FAILED,
         telegramMessageId: result.telegramMessageId,
@@ -144,7 +144,7 @@ export class NotificationsService {
 
       const savedNotification = await notification.save();
       this.logger.log(
-        `Notification logged with result, ID: ${savedNotification._id}, Status: ${savedNotification.status}`,
+        `Notification logged with result, ID: ${savedNotification._id}, Status: ${savedNotification.telegramStatus}`,
       );
 
       return savedNotification;
@@ -169,7 +169,7 @@ export class NotificationsService {
         senderTelegramId,
         senderUsername,
         type,
-        status,
+        telegramStatus,
         startDate,
         endDate,
         search,
@@ -201,7 +201,7 @@ export class NotificationsService {
         filter.senderUsername = new RegExp(senderUsername, 'i');
       }
       if (type) filter.type = type;
-      if (status) filter.status = status;
+      if (telegramStatus) filter.telegramStatus = telegramStatus;
       if (relatedEntityId) {
         filter.relatedEntityId = Types.ObjectId.isValid(relatedEntityId)
           ? new Types.ObjectId(relatedEntityId)
@@ -296,7 +296,7 @@ export class NotificationsService {
         senderTelegramId,
         senderUsername,
         type,
-        status,
+        telegramStatus,
         startDate,
         endDate,
         search,
@@ -333,7 +333,7 @@ export class NotificationsService {
       if (senderUsername)
         conditions.push({ senderUsername: new RegExp(senderUsername, 'i') });
       if (type) conditions.push({ type });
-      if (status) conditions.push({ status });
+      if (telegramStatus) conditions.push({ telegramStatus });
       if (relatedEntityId) {
         const relId = Types.ObjectId.isValid(relatedEntityId)
           ? new Types.ObjectId(relatedEntityId)
@@ -448,17 +448,17 @@ export class NotificationsService {
             total: { $sum: 1 },
             sent: {
               $sum: {
-                $cond: [{ $eq: ['$status', NotificationStatus.SENT] }, 1, 0],
+                $cond: [{ $eq: ['$telegramStatus', NotificationStatus.SENT] }, 1, 0],
               },
             },
             failed: {
               $sum: {
-                $cond: [{ $eq: ['$status', NotificationStatus.FAILED] }, 1, 0],
+                $cond: [{ $eq: ['$telegramStatus', NotificationStatus.FAILED] }, 1, 0],
               },
             },
             pending: {
               $sum: {
-                $cond: [{ $eq: ['$status', NotificationStatus.PENDING] }, 1, 0],
+                $cond: [{ $eq: ['$telegramStatus', NotificationStatus.PENDING] }, 1, 0],
               },
             },
           },
@@ -518,7 +518,7 @@ export class NotificationsService {
     try {
       return await this.notificationModel
         .find({
-          status: NotificationStatus.FAILED,
+          telegramStatus: NotificationStatus.FAILED,
           retryCount: { $lt: maxRetries },
         })
         .sort({ failedAt: 1 })

@@ -81,6 +81,10 @@ export class GetNotificationsDto {
   relatedEntityType?: string;
 
   @IsOptional()
+  @IsMongoId()
+  parentId?: string;
+
+  @IsOptional()
   @Transform(({ value }) => {
     if (value === 'createdAt' || value === 'sentAt' || value === 'updatedAt') {
       return value;

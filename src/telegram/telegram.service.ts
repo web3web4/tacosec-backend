@@ -101,6 +101,7 @@ export class TelegramService {
       subject?: string;
       relatedEntityId?: Types.ObjectId;
       relatedEntityType?: string;
+      parentId?: Types.ObjectId;
       metadata?: Record<string, any>;
     },
   ): Promise<boolean> {
@@ -147,6 +148,7 @@ export class TelegramService {
       subject: notificationData?.subject,
       relatedEntityId: notificationData?.relatedEntityId,
       relatedEntityType: notificationData?.relatedEntityType,
+      parentId: notificationData?.parentId,
       telegramChatId: String(userId),
       telegramMessageId: undefined, // Will be set after successful send
     };

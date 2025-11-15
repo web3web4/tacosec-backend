@@ -22,6 +22,7 @@ export interface NotificationLogData {
   subject?: string;
   relatedEntityId?: Types.ObjectId;
   relatedEntityType?: string;
+  parentId?: Types.ObjectId;
   telegramChatId?: string;
   telegramMessageId?: number;
   metadata?: Record<string, any>;
@@ -66,6 +67,10 @@ export class NotificationsService {
           data.relatedEntityId && typeof data.relatedEntityId === 'string'
             ? new Types.ObjectId(data.relatedEntityId)
             : data.relatedEntityId,
+        parentId:
+          data.parentId && typeof data.parentId === 'string'
+            ? new Types.ObjectId(data.parentId)
+            : data.parentId,
       };
 
       const notification = new this.notificationModel({
@@ -175,6 +180,7 @@ export class NotificationsService {
         search,
         relatedEntityId,
         relatedEntityType,
+        parentId,
         sortBy = 'createdAt',
         sortOrder = 'desc',
       } = query;
@@ -208,6 +214,11 @@ export class NotificationsService {
           : relatedEntityId;
       }
       if (relatedEntityType) filter.relatedEntityType = relatedEntityType;
+      if (parentId) {
+        filter.parentId = Types.ObjectId.isValid(parentId)
+          ? new Types.ObjectId(parentId)
+          : parentId;
+      }
 
       // Date filter
       if (startDate || endDate) {
@@ -302,6 +313,7 @@ export class NotificationsService {
         search,
         relatedEntityId,
         relatedEntityType,
+        parentId,
         sortBy = 'createdAt',
         sortOrder = 'desc',
       } = query as GetNotificationsDto;
@@ -341,6 +353,12 @@ export class NotificationsService {
         conditions.push({ relatedEntityId: relId });
       }
       if (relatedEntityType) conditions.push({ relatedEntityType });
+      if (parentId) {
+        const pId = Types.ObjectId.isValid(parentId)
+          ? new Types.ObjectId(parentId)
+          : parentId;
+        conditions.push({ parentId: pId });
+      }
 
       // Date range
       if (startDate || endDate) {

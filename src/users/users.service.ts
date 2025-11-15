@@ -127,8 +127,8 @@ As a result:
 • 🔐 However, they can <b>no longer be decrypted</b>.
 • 🚫 You will also <b>lose access</b> to any secrets shared with you by other users.
 
-<b>Old username:</b> <code>${user.username}</code>
-<b>New username:</b> <code>${telegramInitDto.username}</code>
+<b>Old username:</b> <span class="tg-spoiler"><code>${user.username}</code></span>
+<b>New username:</b> <span class="tg-spoiler"><code>${telegramInitDto.username}</code></span>
 
 <i>😞 We're sorry for the inconvenience.</i>
 🔁 To recover your secrets, please log in again using your old username.`,
@@ -200,8 +200,8 @@ As a result:
 • 🔐 However, they can <b>no longer be decrypted</b>.
 • 🚫 You will also <b>lose access</b> to any secrets shared with you by other users.
 
-<b>Old username:</b> <code>${existingUser.username}</code>
-<b>New username:</b> <code>${userData.username}</code>
+<b>Old username:</b> <span class="tg-spoiler"><code>${existingUser.username}</code></span>
+<b>New username:</b> <span class="tg-spoiler"><code>${userData.username}</code></span>
 
 <i>😞 We're sorry for the inconvenience.</i>
 🔁 To recover your secrets, please log in again using your old username.`,

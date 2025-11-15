@@ -54,6 +54,10 @@ export class CreateNotificationDto {
   relatedEntityType?: string;
 
   @IsOptional()
+  @IsMongoId()
+  parentId?: string;
+
+  @IsOptional()
   @IsObject()
   metadata?: Record<string, any>;
 }

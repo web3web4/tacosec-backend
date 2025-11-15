@@ -74,6 +74,10 @@ export class Notification {
   @Prop()
   relatedEntityType: string;
 
+  // Parent secret ID for reply-type notifications
+  @Prop({ type: Types.ObjectId })
+  parentId: Types.ObjectId;
+
   // Technical information about the sending
   @Prop()
   telegramMessageId: number;
@@ -108,6 +112,7 @@ NotificationSchema.index({ telegramStatus: 1, createdAt: -1 });
 NotificationSchema.index({ recipientTelegramId: 1, createdAt: -1 });
 NotificationSchema.index({ senderTelegramId: 1, createdAt: -1 });
 NotificationSchema.index({ relatedEntityId: 1, createdAt: -1 });
+NotificationSchema.index({ parentId: 1, createdAt: -1 });
 
 // Interface for notification result
 export interface NotificationResult {

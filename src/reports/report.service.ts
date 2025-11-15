@@ -366,8 +366,8 @@ export class ReportService {
 
 You have received a report regarding your shared content. Please review your shared information to ensure it complies with our community guidelines.
 
-📋 <b>Report Type:</b> ${reportData.report_type}
-${finalReason ? `💬 <b>Reason:</b> ${finalReason}\n` : ''}⏰ <b>Date:</b> ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}
+📋 <b>Report Type:</b> <span class="tg-spoiler">${reportData.report_type}</span>
+${finalReason ? `💬 <b>Reason:</b> <span class="tg-spoiler">${finalReason}</span>\n` : ''}⏰ <b>Date:</b> ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}
 
 If you believe this report was made in error, please contact our support team.`;
 

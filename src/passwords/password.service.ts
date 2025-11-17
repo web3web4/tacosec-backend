@@ -4474,8 +4474,19 @@ You can view the reply in your shared secrets list 📋.`;
       // Check if user is the owner of the secret
       const isOwner = userId && String(secret.userId) === userId;
 
-      // If user is not the owner and secret is not shared with them, return empty response
-      if (!isOwner && !isSharedWithUser) {
+      // Allow parent secret owner to view child secret response even if not shared
+      let isParentOwnerViewingChild = false;
+      if (!isOwner && !isSharedWithUser && secret.parent_secret_id && userId) {
+        const parentSecret = await this.passwordModel
+          .findById(secret.parent_secret_id)
+          .select('userId')
+          .exec();
+        if (parentSecret && String(parentSecret.userId) === String(userId)) {
+          isParentOwnerViewingChild = true;
+        }
+      }
+
+      if (!isOwner && !isSharedWithUser && !isParentOwnerViewingChild) {
         console.log('🚫 Access denied: Secret not shared with user');
         return {}; // Return empty response with 200 status
       }
@@ -4563,32 +4574,7 @@ You can view the reply in your shared secrets list 📋.`;
         return secret;
       }
 
-      // Check if the secret has been shared with the viewing user
-      const isSecretSharedWithUser = secret.sharedWith?.some((shared) => {
-        return (
-          (userId && shared.userId === userId) ||
-          (username &&
-            shared.username &&
-            shared.username.toLowerCase() === username.toLowerCase()) ||
-          (publicAddress && shared.publicAddress === publicAddress)
-        );
-      });
-
-      let isParentOwnerViewingChild = false;
-      if (!isSecretSharedWithUser && secret.parent_secret_id && userId) {
-        const parentSecret = await this.passwordModel
-          .findById(secret.parent_secret_id)
-          .select('userId')
-          .exec();
-        if (parentSecret && String(parentSecret.userId) === String(userId)) {
-          isParentOwnerViewingChild = true;
-        }
-      }
-
-      if (!isSecretSharedWithUser && !isParentOwnerViewingChild) {
-        console.log('🚫 Secret not shared with user - not recording view');
-        return secret;
-      }
+      // Proceed with recording view (privacy checks follow)
 
       // Check privacy settings - if either the viewing user or secret owner has privacy mode enabled, don't record the view
       if (viewingUser.privacyMode || secretOwner.privacyMode) {

@@ -1917,9 +1917,9 @@ export class PasswordService {
                   recipientPublicAddress = undefined;
                 }
 
-                const fallbackMessage = `Secret shared with you.\n\nUser [id: ${String(
-                  user._id,
-                )}, publicAddress: ${senderPublicAddress || 'N/A'}] has shared a secret with you.\n\nYou can view it under the "Shared with me" tab.`;
+                const fallbackMessage = `Secret shared with you.
+                 User ${user.username} [ User Public Address: ${senderPublicAddress || 'N/A'}] has shared a secret with you. 
+                 You can view it under the "Shared with me" tab.`;
 
                 await this.notificationsService.logNotificationWithResult(
                   {
@@ -2104,9 +2104,8 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
             recipientPublicAddress = undefined;
           }
 
-          const fallbackMessage = `Child secret response.\n\nUser [id: ${String(
-            childUser._id,
-          )}, publicAddress: ${senderPublicAddress || 'N/A'}] has responded to your secret with a new secret.`;
+          const fallbackMessage = `Child secret response.
+          User ${childUser.username} [ User Public Address: ${senderPublicAddress || 'N/A'}] has responded to your secret with a new secret.`;
 
           await this.notificationsService.logNotificationWithResult(
             {

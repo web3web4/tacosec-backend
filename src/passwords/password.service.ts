@@ -4574,8 +4574,18 @@ You can view the reply in your shared secrets list 📋.`;
         );
       });
 
-      if (!isSecretSharedWithUser) {
-        // Secret has not been shared with this user - don't record the view
+      let isParentOwnerViewingChild = false;
+      if (!isSecretSharedWithUser && secret.parent_secret_id && userId) {
+        const parentSecret = await this.passwordModel
+          .findById(secret.parent_secret_id)
+          .select('userId')
+          .exec();
+        if (parentSecret && String(parentSecret.userId) === String(userId)) {
+          isParentOwnerViewingChild = true;
+        }
+      }
+
+      if (!isSecretSharedWithUser && !isParentOwnerViewingChild) {
         console.log('🚫 Secret not shared with user - not recording view');
         return secret;
       }

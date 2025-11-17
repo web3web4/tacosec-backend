@@ -23,7 +23,9 @@ async function migrate() {
     console.log('Connecting to MongoDB...');
     const connection = await connect(MONGODB_URI);
 
-    console.log('Connected. Migrating notifications status to telegramStatus...');
+    console.log(
+      'Connected. Migrating notifications status to telegramStatus...',
+    );
 
     const notificationsCollection =
       connection.connection.collection('notifications');

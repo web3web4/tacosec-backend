@@ -368,7 +368,11 @@ export class AuthService {
         }
 
         // User exists but telegramId is empty, proceed with Telegram validation
-        return this.linkTelegramToExistingUser(user, telegramInitData);
+        return this.linkTelegramToExistingUser(
+          user,
+          telegramInitData,
+          publicAddress,
+        );
       }
 
       // No address record found, this shouldn't happen in normal flow
@@ -392,6 +396,7 @@ export class AuthService {
   private async linkTelegramToExistingUser(
     user: UserDocument,
     telegramInitData: string,
+    requestedPublicAddress?: string,
   ): Promise<any> {
     // Step 2: Validate Telegram init data
     const isValid =
@@ -462,14 +467,14 @@ export class AuthService {
           latestPublicAddress = undefined;
         }
 
-        // Create JWT payload - use same publicAddress logic as response
+        // Create JWT payload - prefer the publicAddress used for login if provided
         const payload = {
           userId: savedUser._id.toString(),
           sub: savedUser._id.toString(),
           telegramId: savedUser.telegramId,
           username: savedUser.username,
           role: savedUser.role,
-          publicAddress: latestPublicAddress, // Use same logic as generateTokens
+          publicAddress: requestedPublicAddress || latestPublicAddress,
         };
 
         // Generate JWT tokens
@@ -554,7 +559,7 @@ export class AuthService {
       telegramId: updatedUser.telegramId,
       username: updatedUser.username,
       role: updatedUser.role,
-      publicAddress: latestPublicAddress, // Use same logic as generateTokens
+      publicAddress: requestedPublicAddress || latestPublicAddress,
     };
 
     // Generate JWT tokens
@@ -813,11 +818,11 @@ export class AuthService {
       }
     }
 
-    // Get latest public address for the user and update payload
+    // Preserve publicAddress from payload when provided (e.g., login via specific publicAddress).
+    // Only fetch latest when payload lacks publicAddress.
     let updatedPayload = { ...payload };
-    if (user) {
+    if (user && !updatedPayload.publicAddress) {
       try {
-        // First try to get address by telegramId if available
         if (user.telegramId) {
           const addressResponse =
             await this.publicAddressesService.getLatestAddressByTelegramId(
@@ -828,7 +833,6 @@ export class AuthService {
           }
         }
 
-        // If no address found by telegramId, try by userId
         if (!updatedPayload.publicAddress && user._id) {
           const addressResponse =
             await this.publicAddressesService.getLatestAddressByUserId(
@@ -839,7 +843,7 @@ export class AuthService {
           }
         }
       } catch (error) {
-        // If address retrieval fails, keep original publicAddress from payload
+        // Keep original payload publicAddress if fetching fails
       }
     }
 

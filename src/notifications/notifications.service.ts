@@ -466,17 +466,29 @@ export class NotificationsService {
             total: { $sum: 1 },
             sent: {
               $sum: {
-                $cond: [{ $eq: ['$telegramStatus', NotificationStatus.SENT] }, 1, 0],
+                $cond: [
+                  { $eq: ['$telegramStatus', NotificationStatus.SENT] },
+                  1,
+                  0,
+                ],
               },
             },
             failed: {
               $sum: {
-                $cond: [{ $eq: ['$telegramStatus', NotificationStatus.FAILED] }, 1, 0],
+                $cond: [
+                  { $eq: ['$telegramStatus', NotificationStatus.FAILED] },
+                  1,
+                  0,
+                ],
               },
             },
             pending: {
               $sum: {
-                $cond: [{ $eq: ['$telegramStatus', NotificationStatus.PENDING] }, 1, 0],
+                $cond: [
+                  { $eq: ['$telegramStatus', NotificationStatus.PENDING] },
+                  1,
+                  0,
+                ],
               },
             },
           },

@@ -1876,6 +1876,16 @@ export class PasswordService {
             }
 
             const sharedWithUserId = new Types.ObjectId(sharedWithInfo.userId);
+            // Skip notification to self before any fallback logging
+            if (
+              (sharedWithUserId ? String(sharedWithUserId) : '') ===
+              (user._id ? String(user._id) : '')
+            ) {
+              console.log(
+                'Secret owner is the same as shared user, skipping notification',
+              );
+              return;
+            }
 
             if (!sharedWithInfo.telegramId) {
               console.log(
@@ -1911,50 +1921,39 @@ export class PasswordService {
                   user._id,
                 )}, publicAddress: ${senderPublicAddress || 'N/A'}] has shared a secret with you.\n\nYou can view it under the "Shared with me" tab.`;
 
-          await this.notificationsService.logNotificationWithResult(
-            {
-              message: fallbackMessage,
-              type: NotificationType.PASSWORD_SHARED,
-              recipientUserId: sharedWithUserId,
-              recipientUsername: sharedWithInfo.username,
-              senderUserId: user._id as Types.ObjectId,
-              senderUsername: user.username,
-              reason:
-                'Telegram unavailable: recipient has no Telegram ID',
-              subject: 'Secret Shared With You',
-              relatedEntityType: 'password',
-              relatedEntityId: passwordUser._id as Types.ObjectId,
-              parentId: undefined,
-              metadata: {
-                passwordKey: passwordUser.key,
-                sharedAt: new Date(),
-                senderPublicAddress,
-                recipientPublicAddress,
-                telegramSent: false,
-              },
-            },
-            {
-              success: false,
-              errorMessage: 'Recipient has no Telegram account',
-            },
-          );
+                await this.notificationsService.logNotificationWithResult(
+                  {
+                    message: fallbackMessage,
+                    type: NotificationType.PASSWORD_SHARED,
+                    recipientUserId: sharedWithUserId,
+                    recipientUsername: sharedWithInfo.username,
+                    senderUserId: user._id as Types.ObjectId,
+                    senderUsername: user.username,
+                    reason:
+                      'Telegram unavailable: recipient has no Telegram ID',
+                    subject: 'Secret Shared With You',
+                    relatedEntityType: 'password',
+                    relatedEntityId: passwordUser._id as Types.ObjectId,
+                    parentId: undefined,
+                    metadata: {
+                      passwordKey: passwordUser.key,
+                      sharedAt: new Date(),
+                      senderPublicAddress,
+                      recipientPublicAddress,
+                      telegramSent: false,
+                    },
+                  },
+                  {
+                    success: false,
+                    errorMessage: 'Recipient has no Telegram account',
+                  },
+                );
               } catch (logError) {
                 console.error(
                   'Failed to log fallback notification for user without Telegram:',
                   logError,
                 );
               }
-              return;
-            }
-
-            // Check if the shared user is the same as the secret owner - don't send notification to self
-            if (
-              (sharedWithUserId ? String(sharedWithUserId) : '') ===
-              (user._id ? String(user._id) : '')
-            ) {
-              console.log(
-                'Secret owner is the same as shared user, skipping notification',
-              );
               return;
             }
 
@@ -2193,29 +2192,29 @@ You can view the response in your secrets list 📋.`;
       );
 
       // Send the notification
-        const result = await this.telegramService.sendMessage(
-          Number(parentOwner.telegramId),
-          message,
-          3,
-          replyMarkup,
-          {
-            type: NotificationType.PASSWORD_CHILD_RESPONSE,
-            recipientId: parentOwner._id as Types.ObjectId,
-            recipientUsername: parentOwner.username,
-            senderUserId: childUser._id as Types.ObjectId,
-            senderUsername: childUser.username,
-            reason: 'Child password response notification',
-            subject: 'Child Secret Response',
-            relatedEntityType: 'password',
-            relatedEntityId: new Types.ObjectId(childSecretId),
-            parentId: new Types.ObjectId(parentSecretId),
-            metadata: {
-              parentSecretId: parentSecretId,
-              childSecretName: childSecretName,
-              responseDate: now,
-            },
+      const result = await this.telegramService.sendMessage(
+        Number(parentOwner.telegramId),
+        message,
+        3,
+        replyMarkup,
+        {
+          type: NotificationType.PASSWORD_CHILD_RESPONSE,
+          recipientId: parentOwner._id as Types.ObjectId,
+          recipientUsername: parentOwner.username,
+          senderUserId: childUser._id as Types.ObjectId,
+          senderUsername: childUser.username,
+          reason: 'Child password response notification',
+          subject: 'Child Secret Response',
+          relatedEntityType: 'password',
+          relatedEntityId: new Types.ObjectId(childSecretId),
+          parentId: new Types.ObjectId(parentSecretId),
+          metadata: {
+            parentSecretId: parentSecretId,
+            childSecretName: childSecretName,
+            responseDate: now,
           },
-        );
+        },
+      );
 
       console.log(
         `Child password notification sent to ${parentOwner.username}, result: ${result}`,
@@ -2359,33 +2358,33 @@ You can view the response in your secrets list 📋.`;
                 recipientPublicAddress || 'N/A'
               }] secret that was shared with you.`;
 
-          await this.notificationsService.logNotificationWithResult(
-            {
-              message: fallbackMessage,
-              type: NotificationType.PASSWORD_CHILD_RESPONSE,
-              recipientUserId: sharedUserId,
-              recipientUsername: sharedUserInfo.username,
-              senderUserId: childUser._id as Types.ObjectId,
-              senderUsername: childUser.username,
-              reason:
-                'Telegram unavailable: shared user has no Telegram ID',
-              subject: 'Reply to Shared Secret',
-              relatedEntityType: 'password',
-              relatedEntityId: new Types.ObjectId(childSecretId),
-              parentId: new Types.ObjectId(parentSecretId),
-              metadata: {
-                parentSecretId: parentSecretId,
-                childSecretName: childSecretName,
-                senderPublicAddress,
-                recipientPublicAddress,
-                telegramSent: false,
-              },
-            },
-            {
-              success: false,
-              errorMessage: 'Recipient has no Telegram account',
-            },
-          );
+              await this.notificationsService.logNotificationWithResult(
+                {
+                  message: fallbackMessage,
+                  type: NotificationType.PASSWORD_CHILD_RESPONSE,
+                  recipientUserId: sharedUserId,
+                  recipientUsername: sharedUserInfo.username,
+                  senderUserId: childUser._id as Types.ObjectId,
+                  senderUsername: childUser.username,
+                  reason:
+                    'Telegram unavailable: shared user has no Telegram ID',
+                  subject: 'Reply to Shared Secret',
+                  relatedEntityType: 'password',
+                  relatedEntityId: new Types.ObjectId(childSecretId),
+                  parentId: new Types.ObjectId(parentSecretId),
+                  metadata: {
+                    parentSecretId: parentSecretId,
+                    childSecretName: childSecretName,
+                    senderPublicAddress,
+                    recipientPublicAddress,
+                    telegramSent: false,
+                  },
+                },
+                {
+                  success: false,
+                  errorMessage: 'Recipient has no Telegram account',
+                },
+              );
             } catch (logError) {
               console.error(
                 'Failed to log fallback notification (shared user without Telegram):',

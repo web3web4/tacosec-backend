@@ -36,4 +36,3 @@ export class AllExceptionsLoggerFilter implements ExceptionFilter {
     res.status(status).json(body as any);
   }
 }
-

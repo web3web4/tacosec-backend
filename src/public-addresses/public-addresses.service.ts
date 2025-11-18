@@ -101,7 +101,6 @@ export class PublicAddressesService {
 
       // If the address already exists, check ownership
       if (existingAddress) {
-        // Check if the existing address belongs to the same user
         if (
           existingAddress.userId.toString() !==
           (user as UserDocument)._id.toString()
@@ -112,18 +111,26 @@ export class PublicAddressesService {
           );
         }
 
-        // If it belongs to the same user, update only the encryptedSecret
         const updatedEncryptedSecret = createDto.secret
           ? this.cryptoUtil.encrypt(createDto.secret)
           : existingAddress.encryptedSecret;
 
-        existingAddress.encryptedSecret = updatedEncryptedSecret;
-        const updatedAddress = await existingAddress.save();
+        await this.publicAddressModel.updateOne(
+          { _id: existingAddress._id },
+          {
+            $set: {
+              encryptedSecret: updatedEncryptedSecret,
+              updatedAt: new Date(),
+            },
+            $inc: { __v: 1 },
+          },
+        );
 
-        // Transform the response to include userTelegramId and exclude userId
-        const addressObj = updatedAddress.toObject() as any;
+        const refreshed = await this.publicAddressModel
+          .findById(existingAddress._id)
+          .exec();
 
-        // Decrypt the secret if it exists
+        const addressObj = refreshed.toObject() as any;
         const secret = addressObj.encryptedSecret
           ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
           : undefined;

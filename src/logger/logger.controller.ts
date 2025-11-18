@@ -64,13 +64,9 @@ export class LoggerController {
   }
 
   /**
-   * Get error logs endpoint with pagination and filtering
-   * Supports flexible authentication (JWT token or Telegram init data)
+   * Admin endpoint to get all error logs with pagination and filtering
+   * Only accessible by users with 'admin' role
    * GET /logger
-   *
-   * Headers:
-   * - Authorization: Bearer <jwt_token> (for JWT auth)
-   * - x-telegram-init-data: <telegram_init_data> (for Telegram auth)
    *
    * Query Parameters:
    * - page: Page number (default: 1)
@@ -80,13 +76,13 @@ export class LoggerController {
    * - search: Search in log data (message, error, stack)
    */
   @Get()
-  @FlexibleAuth()
+  @UseGuards(FlexibleAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @UsePipes(new ValidationPipe({ transform: true }))
   async getLogs(
     @Query() getLogsDto: GetLogsDto,
-    @Request() req: AuthenticatedRequest,
   ): Promise<PaginatedLogsResponse> {
-    return this.loggerService.getLogs(req, getLogsDto);
+    return this.loggerService.getLogsForAdmin(getLogsDto as any);
   }
 
   /**

@@ -87,7 +87,7 @@ export class UserFinderUtil {
       // Get latest public address
       const publicAddress = await publicAddressModel
         .findOne({ userId: user._id })
-        .sort({ createdAt: -1 })
+        .sort({ updatedAt: -1 })
         .exec();
 
       const result: UserFoundInfo = {

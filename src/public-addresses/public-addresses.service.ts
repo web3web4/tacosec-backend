@@ -539,10 +539,9 @@ export class PublicAddressesService {
         );
       }
 
-      // Get the latest address by sorting by createdAt in descending order
       const latestAddress = await this.publicAddressModel
         .findOne({ userId: (user as UserDocument)._id })
-        .sort({ createdAt: -1 })
+        .sort({ updatedAt: -1 })
         .exec();
 
       if (!latestAddress) {
@@ -615,10 +614,9 @@ export class PublicAddressesService {
         );
       }
 
-      // Get the latest address by sorting by createdAt in descending order
       const latestAddress = await this.publicAddressModel
         .findOne({ userId })
-        .sort({ createdAt: -1 })
+        .sort({ updatedAt: -1 })
         .exec();
 
       if (!latestAddress) {

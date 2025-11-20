@@ -820,7 +820,7 @@ export class AuthService {
 
     // Preserve publicAddress from payload when provided (e.g., login via specific publicAddress).
     // Only fetch latest when payload lacks publicAddress.
-    let updatedPayload = { ...payload };
+    const updatedPayload = { ...payload };
     if (user && !updatedPayload.publicAddress) {
       try {
         if (user.telegramId) {

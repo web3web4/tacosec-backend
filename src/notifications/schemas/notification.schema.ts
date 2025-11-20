@@ -98,6 +98,9 @@ export class Notification {
   failedAt: Date;
 
   // Additional information that can be stored as JSON
+  @Prop()
+  tagname: string;
+
   @Prop({ type: Object })
   metadata: Record<string, any>;
 }

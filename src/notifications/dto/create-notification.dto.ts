@@ -46,6 +46,10 @@ export class CreateNotificationDto {
   subject?: string;
 
   @IsOptional()
+  @IsString()
+  tagname?: string;
+
+  @IsOptional()
   @IsMongoId()
   relatedEntityId?: string;
 

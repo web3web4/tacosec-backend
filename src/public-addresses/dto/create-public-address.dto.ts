@@ -45,6 +45,13 @@ export class CreatePublicAddressDto {
   signature: string;
 
   /**
+   * Optional secret to be stored as is
+   */
+  @IsString()
+  @IsOptional()
+  secret?: string;
+
+  /**
    * Telegram init data string (populated from headers for Telegram auth)
    * @internal
    */

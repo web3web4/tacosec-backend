@@ -156,7 +156,13 @@ export class PublicAddressesService {
           );
         }
 
-        // Only bump updatedAt since we no longer store secrets
+        // Update secret if provided
+        if (createDto.secret) {
+          existingAddress.encryptedSecret = this.cryptoUtil.encrypt(
+            createDto.secret,
+          );
+        }
+
         existingAddress.updatedAt = new Date();
         await existingAddress.save();
 
@@ -166,11 +172,17 @@ export class PublicAddressesService {
 
         const addressObj = refreshed.toObject() as any;
 
+        // Decrypt the secret if it exists
+        const secret = addressObj.encryptedSecret
+          ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
+          : undefined;
+
         // Prepare the response data
         const responseData = [
           {
             _id: addressObj._id,
             publicKey: addressObj.publicKey,
+            secret,
             userTelegramId: (user as any).telegramId,
             createdAt: addressObj.createdAt,
             updatedAt: addressObj.updatedAt,
@@ -189,7 +201,9 @@ export class PublicAddressesService {
       const newAddress = new this.publicAddressModel({
         userIds: [(user as UserDocument)._id as Types.ObjectId],
         publicKey: createDto.publicKey,
-        encryptedSecret: null,
+        encryptedSecret: createDto.secret
+          ? this.cryptoUtil.encrypt(createDto.secret)
+          : null,
       });
 
       const savedAddress = await newAddress.save();
@@ -202,6 +216,7 @@ export class PublicAddressesService {
         {
           _id: addressObj._id,
           publicKey: addressObj.publicKey,
+          secret: createDto.secret,
           userTelegramId: (user as any).telegramId,
           createdAt: addressObj.createdAt,
           updatedAt: addressObj.updatedAt,
@@ -470,7 +485,9 @@ export class PublicAddressesService {
     userId: string,
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
     try {
-      const addresses = await this.publicAddressModel.find({ userIds: userId }).exec();
+      const addresses = await this.publicAddressModel
+        .find({ userIds: userId })
+        .exec();
       const user = await this.usersService.findOne(userId);
 
       // Transform the response to include userTelegramId and exclude userId

@@ -69,13 +69,19 @@ export class UserFinderUtil {
       if (!user && userInfo.publicAddress) {
         const publicAddressRecord = await publicAddressModel
           .findOne({ publicKey: userInfo.publicAddress })
-          .populate('userId')
+          .populate('userIds')
           .exec();
 
-        if (publicAddressRecord && publicAddressRecord.userId) {
-          const populatedUser = publicAddressRecord.userId as any;
-          if (populatedUser.isActive) {
-            user = populatedUser;
+        if (
+          publicAddressRecord &&
+          publicAddressRecord.userIds &&
+          publicAddressRecord.userIds.length > 0
+        ) {
+          // Find the first active user
+          const users = publicAddressRecord.userIds as UserDocument[];
+          const activeUser = users.find((u) => u.isActive);
+          if (activeUser) {
+            user = activeUser;
           }
         }
       }
@@ -86,7 +92,7 @@ export class UserFinderUtil {
 
       // Get latest public address
       const publicAddress = await publicAddressModel
-        .findOne({ userId: user._id })
+        .findOne({ userIds: user._id })
         .sort({ updatedAt: -1 })
         .exec();
 

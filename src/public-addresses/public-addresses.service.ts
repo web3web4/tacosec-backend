@@ -6,7 +6,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   PublicAddress,
   PublicAddressDocument,
@@ -145,26 +145,20 @@ export class PublicAddressesService {
 
       // If the address already exists, check ownership
       if (existingAddress) {
-        if (
-          existingAddress.userId.toString() !==
-          (user as UserDocument)._id.toString()
-        ) {
-          throw new HttpException(
-            'This public address already exists and belongs to another user',
-            HttpStatus.CONFLICT,
+        const userIdStr = (user as UserDocument)._id.toString();
+        const isLinked = existingAddress.userIds.some(
+          (id) => id.toString() === userIdStr,
+        );
+
+        if (!isLinked) {
+          (existingAddress.userIds as Types.ObjectId[]).push(
+            (user as UserDocument)._id as Types.ObjectId,
           );
         }
 
         // Only bump updatedAt since we no longer store secrets
-        await this.publicAddressModel.updateOne(
-          { _id: existingAddress._id },
-          {
-            $set: {
-              updatedAt: new Date(),
-            },
-            $inc: { __v: 1 },
-          },
-        );
+        existingAddress.updatedAt = new Date();
+        await existingAddress.save();
 
         const refreshed = await this.publicAddressModel
           .findById(existingAddress._id)
@@ -193,7 +187,7 @@ export class PublicAddressesService {
 
       // Create the new public address
       const newAddress = new this.publicAddressModel({
-        userId: (user as UserDocument)._id,
+        userIds: [(user as UserDocument)._id as Types.ObjectId],
         publicKey: createDto.publicKey,
         encryptedSecret: null,
       });
@@ -384,7 +378,7 @@ export class PublicAddressesService {
           const newAddress = new this.publicAddressModel({
             // id: uuidv4(),
             // Cast to UserDocument to access _id
-            userId: (user as UserDocument)._id,
+            userIds: [(user as UserDocument)._id as Types.ObjectId],
             publicKey: entry['public-key'],
             encryptedSecret: null,
           });
@@ -476,7 +470,7 @@ export class PublicAddressesService {
     userId: string,
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
     try {
-      const addresses = await this.publicAddressModel.find({ userId }).exec();
+      const addresses = await this.publicAddressModel.find({ userIds: userId }).exec();
       const user = await this.usersService.findOne(userId);
 
       // Transform the response to include userTelegramId and exclude userId
@@ -544,7 +538,7 @@ export class PublicAddressesService {
 
       // Then get their addresses
       const addresses = await this.publicAddressModel
-        .find({ userId: (user as UserDocument)._id })
+        .find({ userIds: (user as UserDocument)._id })
         .exec();
 
       // Transform the response to include userTelegramId and exclude userId
@@ -608,7 +602,7 @@ export class PublicAddressesService {
       }
 
       const latestAddress = await this.publicAddressModel
-        .findOne({ userId: (user as UserDocument)._id })
+        .findOne({ userIds: (user as UserDocument)._id })
         .sort({ updatedAt: -1 })
         .exec();
 
@@ -683,7 +677,7 @@ export class PublicAddressesService {
       }
 
       const latestAddress = await this.publicAddressModel
-        .findOne({ userId })
+        .findOne({ userIds: userId })
         .sort({ updatedAt: -1 })
         .exec();
 

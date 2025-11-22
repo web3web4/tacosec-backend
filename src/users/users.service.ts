@@ -707,24 +707,14 @@ As a result:
       // Find the public address record
       const publicAddressRecord = await this.publicAddressModel
         .findOne({ publicKey: publicAddress })
-        .populate('userId')
+        .populate('userIds')
         .exec();
 
       // If no public address found, return empty result
-      if (!publicAddressRecord || !publicAddressRecord.userId) {
-        return {
-          data: [],
-          total: 0,
-        };
-      }
-
-      const user = publicAddressRecord.userId as any;
-
-      // Check if user is active and optionally exclude current user
       if (
-        !user.isActive ||
-        (!allowCurrentUser &&
-          user._id.toString() === currentUser._id.toString())
+        !publicAddressRecord ||
+        !publicAddressRecord.userIds ||
+        publicAddressRecord.userIds.length === 0
       ) {
         return {
           data: [],
@@ -732,48 +722,62 @@ As a result:
         };
       }
 
-      // Check if user has telegram account linked
-      let displayUsername = user.username;
-      if (!user.telegramId) {
-        displayUsername = 'User has no Telegram account currently';
+      const results = [];
+
+      // Iterate over all users associated with this address
+      for (const user of publicAddressRecord.userIds as UserDocument[]) {
+        // Check if user is active and optionally exclude current user
+        if (
+          !user.isActive ||
+          (!allowCurrentUser &&
+            user._id.toString() === currentUser._id.toString())
+        ) {
+          continue;
+        }
+
+        // Check if user has telegram account linked
+        let displayUsername = user.username;
+        if (!user.telegramId) {
+          displayUsername = 'User has no Telegram account currently';
+        }
+
+        // Check if this user was previously shared with
+        const sharedPasswords = await this.passwordModel
+          .find({
+            userId: currentUser._id,
+            isActive: true,
+            'sharedWith.0': { $exists: true },
+          })
+          .select('sharedWith')
+          .exec();
+
+        let isPreviouslyShared = false;
+        sharedPasswords.forEach((password) => {
+          password.sharedWith?.forEach((shared) => {
+            if (
+              shared.username &&
+              shared.username.toLowerCase() === user.username?.toLowerCase()
+            ) {
+              isPreviouslyShared = true;
+            }
+            if (shared.publicAddress === publicAddress) {
+              isPreviouslyShared = true;
+            }
+          });
+        });
+
+        results.push({
+          username: displayUsername,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isPreviouslyShared,
+          latestPublicAddress: publicAddress,
+        });
       }
 
-      // Check if this user was previously shared with
-      const sharedPasswords = await this.passwordModel
-        .find({
-          userId: currentUser._id,
-          isActive: true,
-          'sharedWith.0': { $exists: true },
-        })
-        .select('sharedWith')
-        .exec();
-
-      let isPreviouslyShared = false;
-      sharedPasswords.forEach((password) => {
-        password.sharedWith?.forEach((shared) => {
-          if (
-            shared.username &&
-            shared.username.toLowerCase() === user.username?.toLowerCase()
-          ) {
-            isPreviouslyShared = true;
-          }
-          if (shared.publicAddress === publicAddress) {
-            isPreviouslyShared = true;
-          }
-        });
-      });
-
-      const result = {
-        username: displayUsername,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        isPreviouslyShared,
-        latestPublicAddress: publicAddress,
-      };
-
       return {
-        data: [result],
-        total: 1,
+        data: results,
+        total: results.length,
       };
     } catch (error) {
       console.error('Error in searchByPublicAddress:', error);

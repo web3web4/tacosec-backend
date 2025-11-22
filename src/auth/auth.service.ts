@@ -134,7 +134,7 @@ export class AuthService {
           const { publicAddress } = loginDto;
           const addressRecord = await this.publicAddressModel
             .findOne({ publicKey: publicAddress })
-            .populate('userId')
+            .populate('userIds')
             .exec();
           return this.handleTelegramLogin(
             publicAddress,
@@ -166,7 +166,7 @@ export class AuthService {
       // Find the public address in the database
       const addressRecord = await this.publicAddressModel
         .findOne({ publicKey: publicAddress })
-        .populate('userId')
+        .populate('userIds')
         .exec();
 
       // Original login logic when no Telegram data is provided
@@ -208,7 +208,7 @@ export class AuthService {
         // Create a new public address record for the new user
         const newAddressRecord = new this.publicAddressModel({
           publicKey: publicAddress,
-          userId: savedUser._id,
+          userIds: [savedUser._id],
         });
 
         await newAddressRecord.save();
@@ -235,7 +235,9 @@ export class AuthService {
       }
 
       // Get the user information
-      const user = addressRecord.userId as UserDocument;
+      // In many-to-many, we pick the first user if multiple exist and no specific user context is given
+      const users = addressRecord.userIds as UserDocument[];
+      const user = users && users.length > 0 ? users[0] : null;
 
       if (!user || !user.isActive) {
         throw new HttpException(
@@ -409,34 +411,136 @@ export class AuthService {
     addressRecord: any,
   ): Promise<any> {
     try {
-      // Step 1: Check if public address exists and is linked to a user
-      if (addressRecord) {
-        const user = addressRecord.userId as UserDocument;
-
-        // Check if user has a non-empty telegramId
-        if (user.telegramId && user.telegramId !== '') {
-          throw new HttpException(
-            {
-              success: false,
-              message:
-                'The specified public wallet address is already linked to a real Telegram user',
-              error: 'Conflict',
-            },
-            HttpStatus.CONFLICT,
-          );
-        }
-
-        // User exists but telegramId is empty, proceed with Telegram validation
-        return this.linkTelegramToExistingUser(
-          user,
-          telegramInitData,
-          publicAddress,
+      // Validate Telegram init data
+      const isValid =
+        this.telegramValidator.validateTelegramInitData(telegramInitData);
+      if (!isValid) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Invalid Telegram authentication data or signature',
+            error: 'Unauthorized',
+          },
+          HttpStatus.UNAUTHORIZED,
         );
       }
 
-      // No address record found, this shouldn't happen in normal flow
-      // but we'll handle it by creating a new user with Telegram data
-      return this.createUserWithTelegramData(publicAddress, telegramInitData);
+      // Parse Telegram data
+      const telegramData =
+        this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
+
+      // Check if a user with this telegramId already exists
+      let user = await this.userModel
+        .findOne({
+          telegramId: telegramData.telegramId,
+        })
+        .exec();
+
+      if (user) {
+        // Update user data
+        user.firstName = telegramData.firstName || user.firstName;
+        user.lastName = telegramData.lastName || user.lastName;
+        user.username = telegramData.username?.toLowerCase() || user.username;
+        user.authDate = new Date(telegramData.authDate * 1000);
+        user.hash = telegramData.hash;
+        user = await user.save();
+      } else {
+        // Create new user
+        const newUser = new this.userModel({
+          telegramId: telegramData.telegramId,
+          firstName: telegramData.firstName || '',
+          lastName: telegramData.lastName || '',
+          username: telegramData.username?.toLowerCase() || '',
+          authDate: new Date(telegramData.authDate * 1000),
+          hash: telegramData.hash,
+          role: Role.USER,
+          isActive: true,
+        });
+        user = await newUser.save();
+
+        // Log user creation
+        try {
+          await this.loggerService.saveSystemLog(
+            {
+              event: LogEvent.UserCreated,
+              message: 'User created via Telegram login with publicAddress',
+              publicAddress,
+            },
+            {
+              userId: String(user._id),
+              telegramId: user.telegramId,
+              username: user.username,
+            },
+          );
+        } catch (e) {
+          console.error('Failed to log user creation', e);
+        }
+      }
+
+      // Link address to user
+      if (addressRecord) {
+        const userIdStr = user._id.toString();
+        const isLinked = addressRecord.userIds.some(
+          (id) => id.toString() === userIdStr,
+        );
+
+        if (!isLinked) {
+          addressRecord.userIds.push(user._id);
+          await addressRecord.save();
+        }
+      } else {
+        // Create new address record
+        const newAddressRecord = new this.publicAddressModel({
+          publicKey: publicAddress,
+          userIds: [user._id],
+        });
+        await newAddressRecord.save();
+      }
+
+      // Update shared secrets
+      await this.updateSharedSecretsForNewUser(
+        publicAddress,
+        user.username,
+        user._id.toString(),
+      );
+
+      // Get latest public address for the user
+      let latestPublicAddress: string | undefined;
+      try {
+        if (user.telegramId) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByTelegramId(
+              user.telegramId,
+            );
+          if (addressResponse.success && addressResponse.data) {
+            latestPublicAddress = addressResponse.data.publicKey;
+          }
+        }
+
+        if (!latestPublicAddress && user._id) {
+          const addressResponse =
+            await this.publicAddressesService.getLatestAddressByUserId(
+              user._id.toString(),
+            );
+          if (addressResponse.success && addressResponse.data) {
+            latestPublicAddress = addressResponse.data.publicKey;
+          }
+        }
+      } catch (error) {
+        latestPublicAddress = undefined;
+      }
+
+      // Create JWT payload
+      const payload = {
+        userId: user._id.toString(),
+        sub: user._id.toString(),
+        telegramId: user.telegramId,
+        username: user.username,
+        role: user.role,
+        publicAddress: publicAddress || latestPublicAddress,
+      };
+
+      return await this.generateTokens(payload, user);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -452,178 +556,7 @@ export class AuthService {
     }
   }
 
-  private async linkTelegramToExistingUser(
-    user: UserDocument,
-    telegramInitData: string,
-    requestedPublicAddress?: string,
-  ): Promise<any> {
-    // Step 2: Validate Telegram init data
-    const isValid =
-      this.telegramValidator.validateTelegramInitData(telegramInitData);
-    if (!isValid) {
-      throw new HttpException(
-        {
-          success: false,
-          message: 'Invalid Telegram authentication data or signature',
-          error: 'Unauthorized',
-        },
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
 
-    // Step 3: Parse Telegram data
-    const telegramData =
-      this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
-
-    // Step 4: Check if a user with this telegramId already exists
-    const existingTelegramUser = await this.userModel
-      .findOne({
-        telegramId: telegramData.telegramId,
-      })
-      .exec();
-
-    if (existingTelegramUser) {
-      // If the existing user is the same as the current user, update their data
-      if (existingTelegramUser._id.toString() === user._id.toString()) {
-        // Update the current user's data
-        existingTelegramUser.firstName =
-          telegramData.firstName || existingTelegramUser.firstName;
-        existingTelegramUser.lastName =
-          telegramData.lastName || existingTelegramUser.lastName;
-        existingTelegramUser.username =
-          telegramData.username?.toLowerCase() || existingTelegramUser.username;
-        existingTelegramUser.authDate = new Date(telegramData.authDate * 1000);
-        existingTelegramUser.hash = telegramData.hash;
-
-        const savedUser = await existingTelegramUser.save();
-
-        // Get latest public address for the user (same logic as generateTokens)
-        let latestPublicAddress: string | undefined;
-        try {
-          // First try to get address by telegramId if available
-          if (savedUser.telegramId) {
-            const addressResponse =
-              await this.publicAddressesService.getLatestAddressByTelegramId(
-                savedUser.telegramId,
-              );
-            if (addressResponse.success && addressResponse.data) {
-              latestPublicAddress = addressResponse.data.publicKey;
-            }
-          }
-
-          // If no address found by telegramId, try by userId
-          if (!latestPublicAddress && savedUser._id) {
-            const addressResponse =
-              await this.publicAddressesService.getLatestAddressByUserId(
-                savedUser._id.toString(),
-              );
-            if (addressResponse.success && addressResponse.data) {
-              latestPublicAddress = addressResponse.data.publicKey;
-            }
-          }
-        } catch (error) {
-          // If address retrieval fails, latestPublicAddress remains undefined
-          latestPublicAddress = undefined;
-        }
-
-        // Create JWT payload - prefer the publicAddress used for login if provided
-        const payload = {
-          userId: savedUser._id.toString(),
-          sub: savedUser._id.toString(),
-          telegramId: savedUser.telegramId,
-          username: savedUser.username,
-          role: savedUser.role,
-          publicAddress: requestedPublicAddress || latestPublicAddress,
-        };
-
-        // Generate JWT tokens
-        return await this.generateTokens(payload, savedUser);
-      } else {
-        // Different user with same telegramId - this is a conflict for linking
-        throw new HttpException(
-          {
-            success: false,
-            message:
-              'User already exists. Linking is only possible with new users',
-            error: 'Conflict',
-          },
-          HttpStatus.CONFLICT,
-        );
-      }
-    }
-
-    // Step 5: Update user with Telegram data
-    const updatedUser = await this.userModel
-      .findByIdAndUpdate(
-        user._id,
-        {
-          telegramId: telegramData.telegramId,
-          firstName: telegramData.firstName || '',
-          lastName: telegramData.lastName || '',
-          username: telegramData.username?.toLowerCase() || '',
-          authDate: new Date(telegramData.authDate * 1000),
-          hash: telegramData.hash,
-        },
-        { new: true },
-      )
-      .exec();
-
-    // Get the user's public address to update shared secrets
-    const userPublicAddress = await this.publicAddressModel
-      .findOne({ userId: updatedUser._id })
-      .exec();
-
-    if (userPublicAddress) {
-      // Update shared secrets that contain this public address
-      await this.updateSharedSecretsForNewUser(
-        userPublicAddress.publicKey,
-        updatedUser.username,
-        updatedUser._id.toString(),
-      );
-    }
-
-    // Get latest public address for the user (same logic as generateTokens)
-    let latestPublicAddress: string | undefined;
-    try {
-      // First try to get address by telegramId if available
-      if (updatedUser.telegramId) {
-        const addressResponse =
-          await this.publicAddressesService.getLatestAddressByTelegramId(
-            updatedUser.telegramId,
-          );
-        if (addressResponse.success && addressResponse.data) {
-          latestPublicAddress = addressResponse.data.publicKey;
-        }
-      }
-
-      // If no address found by telegramId, try by userId
-      if (!latestPublicAddress && updatedUser._id) {
-        const addressResponse =
-          await this.publicAddressesService.getLatestAddressByUserId(
-            updatedUser._id.toString(),
-          );
-        if (addressResponse.success && addressResponse.data) {
-          latestPublicAddress = addressResponse.data.publicKey;
-        }
-      }
-    } catch (error) {
-      // If address retrieval fails, latestPublicAddress remains undefined
-      latestPublicAddress = undefined;
-    }
-
-    // Create JWT payload - use same publicAddress logic as response
-    const payload = {
-      userId: updatedUser._id.toString(),
-      sub: updatedUser._id.toString(),
-      telegramId: updatedUser.telegramId,
-      username: updatedUser.username,
-      role: updatedUser.role,
-      publicAddress: requestedPublicAddress || latestPublicAddress,
-    };
-
-    // Generate JWT tokens
-    return await this.generateTokens(payload, updatedUser);
-  }
 
   /**
    * Update secrets that contain sharedWith with the same public address
@@ -645,27 +578,63 @@ export class AuthService {
 
       // Update each password's sharedWith array
       for (const password of passwordsWithSharedAddress) {
-        const updatedSharedWith = password.sharedWith.map((shared) => {
-          // If this shared entry has the matching public address, update it
-          if (shared.publicAddress === publicAddress) {
-            return {
-              ...shared,
-              username: username,
-              userId: userId,
-              publicAddress: publicAddress, // Keep the existing public address
-            };
-          }
-          return shared;
-        });
+        const sharedWith = [...password.sharedWith];
+        let updated = false;
+        let foundForUser = false;
 
-        // Update the password document
-        await this.passwordModel
-          .findByIdAndUpdate(
-            password._id,
-            { sharedWith: updatedSharedWith },
-            { new: true },
-          )
-          .exec();
+        // 1. Check if user already has an entry
+        for (let i = 0; i < sharedWith.length; i++) {
+          if (
+            sharedWith[i].publicAddress === publicAddress &&
+            sharedWith[i].userId === userId
+          ) {
+            sharedWith[i].username = username; // Update username
+            foundForUser = true;
+            updated = true;
+          }
+        }
+
+        if (!foundForUser) {
+          // 2. Check for unclaimed entry
+          let claimed = false;
+          for (let i = 0; i < sharedWith.length; i++) {
+            if (
+              sharedWith[i].publicAddress === publicAddress &&
+              !sharedWith[i].userId
+            ) {
+              sharedWith[i].userId = userId;
+              sharedWith[i].username = username;
+              claimed = true;
+              updated = true;
+              break; // Claim one
+            }
+          }
+
+          // 3. If not found for user and no unclaimed entry, add new entry
+          if (!claimed) {
+            const existing = sharedWith.find(
+              (s) => s.publicAddress === publicAddress,
+            );
+            if (existing) {
+              sharedWith.push({
+                ...existing,
+                userId: userId,
+                username: username,
+              });
+              updated = true;
+            }
+          }
+        }
+
+        if (updated) {
+          await this.passwordModel
+            .findByIdAndUpdate(
+              password._id,
+              { sharedWith },
+              { new: true },
+            )
+            .exec();
+        }
       }
     } catch (error) {
       console.error('Error updating shared secrets for new user:', error);
@@ -673,174 +642,7 @@ export class AuthService {
     }
   }
 
-  private async createUserWithTelegramData(
-    publicAddress: string,
-    telegramInitData: string,
-  ): Promise<any> {
-    // Validate Telegram init data
-    const isValid =
-      this.telegramValidator.validateTelegramInitData(telegramInitData);
-    if (!isValid) {
-      throw new HttpException(
-        {
-          success: false,
-          message: 'Invalid Telegram authentication data or signature',
-          error: 'Unauthorized',
-        },
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
 
-    // Parse Telegram data
-    const telegramData =
-      this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
-
-    // Check if a user with this telegramId already exists
-    const existingTelegramUser = await this.userModel
-      .findOne({
-        telegramId: telegramData.telegramId,
-      })
-      .exec();
-
-    if (existingTelegramUser) {
-      // User exists, update their data
-      existingTelegramUser.firstName =
-        telegramData.firstName || existingTelegramUser.firstName;
-      existingTelegramUser.lastName =
-        telegramData.lastName || existingTelegramUser.lastName;
-      existingTelegramUser.username =
-        telegramData.username?.toLowerCase() || existingTelegramUser.username;
-      existingTelegramUser.authDate = new Date(telegramData.authDate * 1000);
-      existingTelegramUser.hash = telegramData.hash;
-
-      const savedUser = await existingTelegramUser.save();
-
-      // Only create public address record if publicAddress is provided and valid
-      if (publicAddress && publicAddress.trim() !== '') {
-        // Check if public address already exists for this user
-        const existingAddress = await this.publicAddressModel
-          .findOne({ publicKey: publicAddress })
-          .exec();
-
-        if (!existingAddress) {
-          // Create a new public address record
-          const newAddressRecord = new this.publicAddressModel({
-            publicKey: publicAddress,
-            userId: savedUser._id,
-          });
-          await newAddressRecord.save();
-        }
-      }
-
-      // Create JWT payload - use the publicAddress from login request if provided
-      const payload = {
-        userId: savedUser._id.toString(),
-        sub: savedUser._id.toString(),
-        telegramId: savedUser.telegramId,
-        username: savedUser.username,
-        role: savedUser.role,
-        publicAddress: publicAddress, // Use the publicAddress from login request
-      };
-
-      // Generate JWT tokens
-      return await this.generateTokens(payload, savedUser);
-    }
-
-    // Create new user with Telegram data
-    const newUser = new this.userModel({
-      telegramId: telegramData.telegramId,
-      firstName: telegramData.firstName || '',
-      lastName: telegramData.lastName || '',
-      username: telegramData.username?.toLowerCase() || '',
-      authDate: new Date(telegramData.authDate * 1000),
-      hash: telegramData.hash,
-      role: Role.USER,
-      isActive: true,
-    });
-
-    const savedUser = await newUser.save();
-
-    // Log user creation in logger table (Telegram login with publicAddress path)
-    try {
-      await this.loggerService.saveSystemLog(
-        {
-          event: LogEvent.UserCreated,
-          message: 'User created via Telegram login with publicAddress',
-          publicAddress,
-        },
-        {
-          userId: String(savedUser._id),
-          telegramId: savedUser.telegramId,
-          username: savedUser.username,
-        },
-      );
-    } catch (e) {
-      console.error(
-        'Failed to log user creation (AuthService Telegram + address)',
-        e,
-      );
-    }
-
-    // Only create public address record if publicAddress is provided and valid
-    if (publicAddress && publicAddress.trim() !== '') {
-      // Create a new public address record for the new user
-      const newAddressRecord = new this.publicAddressModel({
-        publicKey: publicAddress,
-        userId: savedUser._id,
-      });
-
-      await newAddressRecord.save();
-
-      // Update shared secrets that contain this public address
-      await this.updateSharedSecretsForNewUser(
-        publicAddress,
-        savedUser.username,
-        savedUser._id.toString(),
-      );
-    }
-
-    // Get latest public address for the user
-    let latestPublicAddress: string | undefined;
-    try {
-      if (savedUser.telegramId) {
-        const addressResponse =
-          await this.publicAddressesService.getLatestAddressByTelegramId(
-            savedUser.telegramId,
-          );
-        if (addressResponse.success && addressResponse.data) {
-          latestPublicAddress = addressResponse.data.publicKey;
-        }
-      }
-
-      if (!latestPublicAddress && savedUser._id) {
-        const addressResponse =
-          await this.publicAddressesService.getLatestAddressByUserId(
-            savedUser._id.toString(),
-          );
-        if (addressResponse.success && addressResponse.data) {
-          latestPublicAddress = addressResponse.data.publicKey;
-        }
-      }
-    } catch (error) {
-      latestPublicAddress = undefined;
-    }
-
-    // Create JWT payload - use publicAddress from login request if provided
-    const payload = {
-      sub: savedUser._id.toString(),
-      telegramId: savedUser.telegramId,
-      username: savedUser.username,
-      role: savedUser.role,
-      publicAddress: publicAddress || latestPublicAddress, // Use publicAddress from request, fallback to latest
-    };
-
-    // Generate JWT token
-    const access_token = this.jwtService.sign(payload);
-
-    return {
-      access_token,
-    };
-  }
 
   /**
    * Generate access and refresh tokens for a user

@@ -12,7 +12,7 @@ export class LoginDto {
   /**
    * Signature over the publicAddress (message = publicAddress)
    */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  signature: string;
+  signature?: string;
 }

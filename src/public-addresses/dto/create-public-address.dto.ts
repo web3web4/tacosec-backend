@@ -21,9 +21,9 @@ export class WalletEntryDto {
   /**
    * Signature over the public key (message = public key)
    */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  signature: string;
+  signature?: string;
 }
 
 /**
@@ -40,9 +40,9 @@ export class CreatePublicAddressDto {
   /**
    * Signature over the public key (message = public key)
    */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  signature: string;
+  signature?: string;
 
   /**
    * Optional secret to be stored as is

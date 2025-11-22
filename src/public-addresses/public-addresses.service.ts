@@ -94,8 +94,11 @@ export class PublicAddressesService {
         );
       }
 
-      // Require signature
-      if (!createDto.signature?.trim()) {
+      // Require signature only when not in staging
+      const isStagingRaw =
+        this.configService.get<string>('IS_STAGING') || process.env.IS_STAGING;
+      const isStaging = String(isStagingRaw).toLowerCase() === 'true';
+      if (!isStaging && !createDto.signature?.trim()) {
         throw new HttpException(
           'Signature is required for adding public address',
           HttpStatus.BAD_REQUEST,
@@ -103,9 +106,6 @@ export class PublicAddressesService {
       }
 
       // Verify Ethereum signatures when applicable (message = publicKey) unless in staging
-      const isStagingRaw =
-        this.configService.get<string>('IS_STAGING') || process.env.IS_STAGING;
-      const isStaging = String(isStagingRaw).toLowerCase() === 'true';
       const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(createDto.publicKey);
       if (isEthereumAddress && !isStaging) {
         try {
@@ -285,6 +285,10 @@ export class PublicAddressesService {
     createDto: CreateMultiplePublicAddressesDto,
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
     try {
+      // Determine staging mode once
+      const isStagingRaw =
+        this.configService.get<string>('IS_STAGING') || process.env.IS_STAGING;
+      const isStaging = String(isStagingRaw).toLowerCase() === 'true';
       // Extract user from telegram init data
       const user = await this.usersService.getUserFromTelegramInitData(
         createDto.telegramInitData,
@@ -303,6 +307,7 @@ export class PublicAddressesService {
         );
       }
       if (
+        !isStaging &&
         createDto.publicAddresses.some((entry) => !entry['signature']?.trim())
       ) {
         throw new HttpException(
@@ -357,10 +362,6 @@ export class PublicAddressesService {
       // Create a public address for each unique address in the array
       const createdAddresses = await Promise.all(
         uniqueAddresses.map(async (entry) => {
-          const isStagingRaw =
-            this.configService.get<string>('IS_STAGING') ||
-            process.env.IS_STAGING;
-          const isStaging = String(isStagingRaw).toLowerCase() === 'true';
           // Verify Ethereum signatures when applicable (message = public-key)
           const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(
             entry['public-key'],

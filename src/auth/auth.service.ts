@@ -71,7 +71,14 @@ export class AuthService {
     try {
       // If loginDto contains an Ethereum-style publicAddress and signature, verify it first (unless IS_STAGING=true)
       if (loginDto && loginDto.publicAddress) {
-        if (!loginDto.signature || loginDto.signature.trim() === '') {
+        const isStagingRaw =
+          this.configService.get<string>('IS_STAGING') ||
+          process.env.IS_STAGING;
+        const isStaging = String(isStagingRaw).toLowerCase() === 'true';
+        if (
+          !isStaging &&
+          (!loginDto.signature || loginDto.signature.trim() === '')
+        ) {
           throw new HttpException(
             {
               success: false,

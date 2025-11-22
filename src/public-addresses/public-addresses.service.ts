@@ -96,7 +96,7 @@ export class PublicAddressesService {
 
       // Require signature only when not in staging
       const isStagingRaw =
-        this.configService.get<string>('IS_STAGING') || process.env.IS_STAGING;
+        this.configService.get<string>('IS_STAGING');
       const isStaging = ['true', '1', 'yes', 'y', 'on'].includes(
         String(isStagingRaw).trim().toLowerCase(),
       );
@@ -288,8 +288,7 @@ export class PublicAddressesService {
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
     try {
       // Determine staging mode once
-      const isStagingRaw =
-        this.configService.get<string>('IS_STAGING') || process.env.IS_STAGING;
+      const isStagingRaw = this.configService.get<string>('IS_STAGING');
       const isStaging = ['true', '1', 'yes', 'y', 'on'].includes(
         String(isStagingRaw).trim().toLowerCase(),
       );

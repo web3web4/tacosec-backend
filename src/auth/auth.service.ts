@@ -142,7 +142,11 @@ export class AuthService {
       if (telegramInitData) {
         // If loginDto is provided, use existing logic with publicAddress
         if (loginDto) {
-          const { publicAddress } = loginDto;
+          const publicAddress = (loginDto.publicAddress || '').trim();
+          if (!publicAddress) {
+            // No public address provided, fall back to pure Telegram authentication
+            return this.handlePureTelegramLogin(telegramInitData);
+          }
           const addressRecord = await this.publicAddressModel
             .findOne({ publicKey: publicAddress })
             .populate('userIds')
@@ -488,8 +492,11 @@ export class AuthService {
         }
       }
 
-      // Link address to user
-      if (addressRecord) {
+      // Link address to user if a valid publicAddress is provided
+      const hasValidPublicAddress =
+        typeof publicAddress === 'string' && publicAddress.trim() !== '';
+
+      if (hasValidPublicAddress && addressRecord) {
         const userIdStr = user._id.toString();
         const isLinked = addressRecord.userIds.some(
           (id) => id.toString() === userIdStr,
@@ -499,7 +506,7 @@ export class AuthService {
           addressRecord.userIds.push(user._id);
           await addressRecord.save();
         }
-      } else {
+      } else if (hasValidPublicAddress && !addressRecord) {
         // Create new address record
         const newAddressRecord = new this.publicAddressModel({
           publicKey: publicAddress,
@@ -508,12 +515,14 @@ export class AuthService {
         await newAddressRecord.save();
       }
 
-      // Update shared secrets
-      await this.updateSharedSecretsForNewUser(
-        publicAddress,
-        user.username,
-        user._id.toString(),
-      );
+      // Update shared secrets only if a valid publicAddress is provided
+      if (hasValidPublicAddress) {
+        await this.updateSharedSecretsForNewUser(
+          publicAddress,
+          user.username,
+          user._id.toString(),
+        );
+      }
 
       // Get latest public address for the user
       let latestPublicAddress: string | undefined;
@@ -548,7 +557,9 @@ export class AuthService {
         telegramId: user.telegramId,
         username: user.username,
         role: user.role,
-        publicAddress: publicAddress || latestPublicAddress,
+        publicAddress: hasValidPublicAddress
+          ? publicAddress
+          : latestPublicAddress,
       };
 
       return await this.generateTokens(payload, user);

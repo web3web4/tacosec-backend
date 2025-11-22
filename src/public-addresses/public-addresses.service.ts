@@ -96,10 +96,11 @@ export class PublicAddressesService {
 
       // Require signature only when not in staging
       const isStagingRaw =
-        this.configService.get<string>('IS_STAGING');
+        this.configService.get<string>('IS_STAGING') ?? 'true';
       const isStaging = ['true', '1', 'yes', 'y', 'on'].includes(
         String(isStagingRaw).trim().toLowerCase(),
       );
+      console.log('isStaging :', isStaging);
       if (!isStaging && !createDto.signature?.trim()) {
         throw new HttpException(
           'Signature is required for adding public address',
@@ -288,10 +289,12 @@ export class PublicAddressesService {
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
     try {
       // Determine staging mode once
-      const isStagingRaw = this.configService.get<string>('IS_STAGING');
+      const isStagingRaw =
+        this.configService.get<string>('IS_STAGING') ?? 'true';
       const isStaging = ['true', '1', 'yes', 'y', 'on'].includes(
         String(isStagingRaw).trim().toLowerCase(),
       );
+      console.log('isStaging :', isStaging);
       // Extract user from telegram init data
       const user = await this.usersService.getUserFromTelegramInitData(
         createDto.telegramInitData,

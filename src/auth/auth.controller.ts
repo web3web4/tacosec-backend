@@ -19,7 +19,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @UsePipes(new ValidationPipe({ skipMissingProperties: true }))
+  @UsePipes(new ValidationPipe())
   async login(
     @Body() loginDto?: LoginDto,
     @Request() req?: ExpressRequest,

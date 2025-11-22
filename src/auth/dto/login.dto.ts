@@ -10,9 +10,9 @@ export class LoginDto {
   publicAddress?: string;
 
   /**
-   * Signature (currently not validated, but required)
+   * Signature over the publicAddress (message = publicAddress)
    */
-  @IsOptional()
   @IsString()
-  signature?: string;
+  @IsNotEmpty()
+  signature: string;
 }

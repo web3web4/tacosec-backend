@@ -92,6 +92,50 @@ export class PublicAddressesService {
         );
       }
 
+      // Require signature
+      if (!createDto.signature?.trim()) {
+        throw new HttpException(
+          'Signature is required for adding public address',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Verify Ethereum signatures when applicable (message = publicKey)
+      const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(createDto.publicKey);
+      if (isEthereumAddress) {
+        try {
+          const { verifyMessage } = await import('ethers');
+          const recoveredAddress = verifyMessage(
+            createDto.publicKey,
+            createDto.signature,
+          );
+          if (
+            recoveredAddress.toLowerCase() !== createDto.publicKey.toLowerCase()
+          ) {
+            throw new HttpException(
+              {
+                success: false,
+                message:
+                  'Signature does not match the provided public address (Ethereum)',
+                error: 'Unauthorized',
+              },
+              HttpStatus.UNAUTHORIZED,
+            );
+          }
+        } catch (e) {
+          if (e instanceof HttpException) throw e;
+          throw new HttpException(
+            {
+              success: false,
+              message:
+                'Invalid signature format or verification failure for the provided message',
+              error: 'Unauthorized',
+            },
+            HttpStatus.UNAUTHORIZED,
+          );
+        }
+      }
+
       // Check if the public key already exists in the system
       const existingAddress = await this.publicAddressModel
         .findOne({
@@ -111,15 +155,11 @@ export class PublicAddressesService {
           );
         }
 
-        const updatedEncryptedSecret = createDto.secret
-          ? this.cryptoUtil.encrypt(createDto.secret)
-          : existingAddress.encryptedSecret;
-
+        // Only bump updatedAt since we no longer store secrets
         await this.publicAddressModel.updateOne(
           { _id: existingAddress._id },
           {
             $set: {
-              encryptedSecret: updatedEncryptedSecret,
               updatedAt: new Date(),
             },
             $inc: { __v: 1 },
@@ -131,16 +171,12 @@ export class PublicAddressesService {
           .exec();
 
         const addressObj = refreshed.toObject() as any;
-        const secret = addressObj.encryptedSecret
-          ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
-          : undefined;
 
         // Prepare the response data
         const responseData = [
           {
             _id: addressObj._id,
             publicKey: addressObj.publicKey,
-            secret,
             userTelegramId: (user as any).telegramId,
             createdAt: addressObj.createdAt,
             updatedAt: addressObj.updatedAt,
@@ -155,16 +191,11 @@ export class PublicAddressesService {
         };
       }
 
-      // Encrypt the secret if it exists
-      const encryptedSecret = createDto.secret
-        ? this.cryptoUtil.encrypt(createDto.secret)
-        : null;
-
       // Create the new public address
       const newAddress = new this.publicAddressModel({
         userId: (user as UserDocument)._id,
         publicKey: createDto.publicKey,
-        encryptedSecret,
+        encryptedSecret: null,
       });
 
       const savedAddress = await newAddress.save();
@@ -172,17 +203,11 @@ export class PublicAddressesService {
       // Transform the response to include userTelegramId and exclude userId
       const addressObj = savedAddress.toObject() as any;
 
-      // Decrypt the secret if it exists
-      const secret = addressObj.encryptedSecret
-        ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
-        : undefined;
-
       // Prepare the response data
       const responseData = [
         {
           _id: addressObj._id,
           publicKey: addressObj.publicKey,
-          secret,
           userTelegramId: (user as any).telegramId,
           createdAt: addressObj.createdAt,
           updatedAt: addressObj.updatedAt,
@@ -254,12 +279,20 @@ export class PublicAddressesService {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
 
-      // Validate that no entries have null or empty public key
+      // Validate that no entries have null or empty public key or missing signature
       if (
         createDto.publicAddresses.some((entry) => !entry['public-key']?.trim())
       ) {
         throw new HttpException(
           'Public key cannot be null or empty',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      if (
+        createDto.publicAddresses.some((entry) => !entry['signature']?.trim())
+      ) {
+        throw new HttpException(
+          'Signature is required for each public address',
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -310,17 +343,50 @@ export class PublicAddressesService {
       // Create a public address for each unique address in the array
       const createdAddresses = await Promise.all(
         uniqueAddresses.map(async (entry) => {
-          // Encrypt the secret if it exists
-          const encryptedSecret = entry.secret
-            ? this.cryptoUtil.encrypt(entry.secret)
-            : null;
-
+          // Verify Ethereum signatures when applicable (message = public-key)
+          const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(
+            entry['public-key'],
+          );
+          if (isEthereumAddress) {
+            try {
+              const { verifyMessage } = await import('ethers');
+              const recoveredAddress = verifyMessage(
+                entry['public-key'],
+                entry['signature'],
+              );
+              if (
+                recoveredAddress.toLowerCase() !==
+                entry['public-key'].toLowerCase()
+              ) {
+                throw new HttpException(
+                  {
+                    success: false,
+                    message:
+                      'Signature does not match the provided public address (Ethereum)',
+                    error: 'Unauthorized',
+                  },
+                  HttpStatus.UNAUTHORIZED,
+                );
+              }
+            } catch (e) {
+              if (e instanceof HttpException) throw e;
+              throw new HttpException(
+                {
+                  success: false,
+                  message:
+                    'Invalid signature format or verification failure for the provided message',
+                  error: 'Unauthorized',
+                },
+                HttpStatus.UNAUTHORIZED,
+              );
+            }
+          }
           const newAddress = new this.publicAddressModel({
             // id: uuidv4(),
             // Cast to UserDocument to access _id
             userId: (user as UserDocument)._id,
             publicKey: entry['public-key'],
-            encryptedSecret,
+            encryptedSecret: null,
           });
           return newAddress.save();
         }),
@@ -331,15 +397,10 @@ export class PublicAddressesService {
         const addressObj = address.toObject() as any;
 
         // Decrypt the secret if it exists
-        const secret = addressObj.encryptedSecret
-          ? this.cryptoUtil.decryptSafe(addressObj.encryptedSecret)
-          : undefined;
-
         // Return the fields in the desired order
         return {
           _id: addressObj._id,
           publicKey: addressObj.publicKey,
-          secret,
           userTelegramId: (user as any).telegramId,
           createdAt: addressObj.createdAt,
           updatedAt: addressObj.updatedAt,

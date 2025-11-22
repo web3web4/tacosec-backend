@@ -70,6 +70,19 @@ export class AuthService {
   ): Promise<LoginResponse | any> {
     try {
       // If loginDto contains an Ethereum-style publicAddress and signature, verify it first
+      if (loginDto && loginDto.publicAddress) {
+        if (!loginDto.signature || loginDto.signature.trim() === '') {
+          throw new HttpException(
+            {
+              success: false,
+              message: 'Signature is required when publicAddress is provided',
+              error: 'Bad Request',
+            },
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
       if (loginDto && loginDto.publicAddress && loginDto.signature) {
         const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(
           loginDto.publicAddress,

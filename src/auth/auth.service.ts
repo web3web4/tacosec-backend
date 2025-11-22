@@ -69,6 +69,51 @@ export class AuthService {
     telegramInitData?: string,
   ): Promise<LoginResponse | any> {
     try {
+      // If loginDto contains an Ethereum-style publicAddress and signature, verify it first
+      if (loginDto && loginDto.publicAddress && loginDto.signature) {
+        const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(
+          loginDto.publicAddress,
+        );
+
+        if (isEthereumAddress) {
+          const messageToVerify = loginDto.publicAddress;
+          let recoveredAddress = '';
+          try {
+            const { verifyMessage } = await import('ethers');
+            recoveredAddress = verifyMessage(
+              messageToVerify,
+              loginDto.signature,
+            );
+          } catch (e) {
+            throw new HttpException(
+              {
+                success: false,
+                message:
+                  'Invalid signature format or verification failure for the provided message',
+                error: 'Unauthorized',
+              },
+              HttpStatus.UNAUTHORIZED,
+            );
+          }
+
+          if (
+            recoveredAddress.toLowerCase() !==
+            loginDto.publicAddress.toLowerCase()
+          ) {
+            throw new HttpException(
+              {
+                success: false,
+                message:
+                  'Signature does not match the provided public address (Ethereum)',
+                error: 'Unauthorized',
+              },
+              HttpStatus.UNAUTHORIZED,
+            );
+          }
+        }
+        // For non-Ethereum addresses, signature verification is skipped here.
+        // Chain-specific verification can be added if required.
+      }
       // If X-Telegram-Init-Data header is provided, handle Telegram authentication
       if (telegramInitData) {
         // If loginDto is provided, use existing logic with publicAddress
@@ -103,6 +148,7 @@ export class AuthService {
       }
 
       const { publicAddress } = loginDto;
+      // If signature exists, it has been verified above when applicable
 
       // Find the public address in the database
       const addressRecord = await this.publicAddressModel

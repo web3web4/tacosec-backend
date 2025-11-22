@@ -20,6 +20,7 @@ import {
 // import { v4 as uuidv4 } from 'uuid';
 import { UserDocument } from '../users/schemas/user.schema';
 import { CryptoUtil } from '../utils/crypto.util';
+import { ConfigService } from '@nestjs/config';
 
 // Interface for the response that includes telegram_id
 export interface PublicAddressResponse {
@@ -49,6 +50,7 @@ export class PublicAddressesService {
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     private readonly cryptoUtil: CryptoUtil,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -100,9 +102,12 @@ export class PublicAddressesService {
         );
       }
 
-      // Verify Ethereum signatures when applicable (message = publicKey)
+      // Verify Ethereum signatures when applicable (message = publicKey) unless in staging
+      const isStagingRaw =
+        this.configService.get<string>('IS_STAGING') || process.env.IS_STAGING;
+      const isStaging = String(isStagingRaw).toLowerCase() === 'true';
       const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(createDto.publicKey);
-      if (isEthereumAddress) {
+      if (isEthereumAddress && !isStaging) {
         try {
           const { verifyMessage } = await import('ethers');
           const recoveredAddress = verifyMessage(
@@ -352,11 +357,15 @@ export class PublicAddressesService {
       // Create a public address for each unique address in the array
       const createdAddresses = await Promise.all(
         uniqueAddresses.map(async (entry) => {
+          const isStagingRaw =
+            this.configService.get<string>('IS_STAGING') ||
+            process.env.IS_STAGING;
+          const isStaging = String(isStagingRaw).toLowerCase() === 'true';
           // Verify Ethereum signatures when applicable (message = public-key)
           const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(
             entry['public-key'],
           );
-          if (isEthereumAddress) {
+          if (isEthereumAddress && !isStaging) {
             try {
               const { verifyMessage } = await import('ethers');
               const recoveredAddress = verifyMessage(

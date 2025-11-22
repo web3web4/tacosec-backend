@@ -69,7 +69,7 @@ export class AuthService {
     telegramInitData?: string,
   ): Promise<LoginResponse | any> {
     try {
-      // If loginDto contains an Ethereum-style publicAddress and signature, verify it first
+      // If loginDto contains an Ethereum-style publicAddress and signature, verify it first (unless IS_STAGING=true)
       if (loginDto && loginDto.publicAddress) {
         if (!loginDto.signature || loginDto.signature.trim() === '') {
           throw new HttpException(
@@ -84,11 +84,15 @@ export class AuthService {
       }
 
       if (loginDto && loginDto.publicAddress && loginDto.signature) {
+        const isStagingRaw =
+          this.configService.get<string>('IS_STAGING') ||
+          process.env.IS_STAGING;
+        const isStaging = String(isStagingRaw).toLowerCase() === 'true';
         const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(
           loginDto.publicAddress,
         );
 
-        if (isEthereumAddress) {
+        if (isEthereumAddress && !isStaging) {
           const messageToVerify = loginDto.publicAddress;
           let recoveredAddress = '';
           try {

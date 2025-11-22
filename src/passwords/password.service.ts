@@ -1932,7 +1932,7 @@ export class PasswordService {
                     reason:
                       'Telegram unavailable: recipient has no Telegram ID',
                     subject: 'Secret Shared With You',
-                    tagname: 'shared',
+                    tabName : 'shared',
                     relatedEntityType: 'password',
                     relatedEntityId: passwordUser._id as Types.ObjectId,
                     parentId: undefined,
@@ -2118,7 +2118,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
               senderUsername: childUser.username,
               reason: 'Telegram unavailable: parent owner has no Telegram ID',
               subject: 'Child Secret Response',
-              tagname: 'mydata',
+              tabName : 'mydata',
               relatedEntityType: 'password',
               relatedEntityId: new Types.ObjectId(childSecretId),
               parentId: new Types.ObjectId(parentSecretId),
@@ -2370,7 +2370,7 @@ You can view the response in your secrets list 📋.`;
                   reason:
                     'Telegram unavailable: shared user has no Telegram ID',
                   subject: 'Reply to Shared Secret',
-                  tagname: 'shared',
+                  tabName : 'shared',
                   relatedEntityType: 'password',
                   relatedEntityId: new Types.ObjectId(childSecretId),
                   parentId: new Types.ObjectId(parentSecretId),

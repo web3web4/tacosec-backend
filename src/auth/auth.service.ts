@@ -71,7 +71,8 @@ export class AuthService {
     try {
       // If loginDto contains an Ethereum-style publicAddress and signature, verify it first (unless IS_STAGING=true)
       if (loginDto && loginDto.publicAddress) {
-        const isStagingRaw = this.configService.get<string>('IS_STAGING') ?? 'true';
+        const isStagingRaw =
+          this.configService.get<string>('IS_STAGING') ?? 'true';
         const isStaging = ['true', '1', 'yes', 'y', 'on'].includes(
           String(isStagingRaw).trim().toLowerCase(),
         );
@@ -93,7 +94,7 @@ export class AuthService {
 
       if (loginDto && loginDto.publicAddress && loginDto.signature) {
         const isStagingRaw =
-        this.configService.get<string>('IS_STAGING') ?? 'true';
+          this.configService.get<string>('IS_STAGING') ?? 'true';
         const isStaging = ['true', '1', 'yes', 'y', 'on'].includes(
           String(isStagingRaw).trim().toLowerCase(),
         );
@@ -581,8 +582,6 @@ export class AuthService {
     }
   }
 
-
-
   /**
    * Update secrets that contain sharedWith with the same public address
    * to include username and userId along with the existing public address
@@ -653,11 +652,7 @@ export class AuthService {
 
         if (updated) {
           await this.passwordModel
-            .findByIdAndUpdate(
-              password._id,
-              { sharedWith },
-              { new: true },
-            )
+            .findByIdAndUpdate(password._id, { sharedWith }, { new: true })
             .exec();
         }
       }
@@ -666,8 +661,6 @@ export class AuthService {
       // Don't throw error to avoid breaking the login flow
     }
   }
-
-
 
   /**
    * Generate access and refresh tokens for a user

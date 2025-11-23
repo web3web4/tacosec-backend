@@ -47,7 +47,7 @@ export class CreateNotificationDto {
 
   @IsOptional()
   @IsString()
-  tabName ?: string;
+  tabName?: string;
 
   @IsOptional()
   @IsMongoId()

@@ -25,7 +25,7 @@ export interface NotificationLogData {
   parentId?: Types.ObjectId;
   telegramChatId?: string;
   telegramMessageId?: number;
-  tabName ?: string;
+  tabName?: string;
   metadata?: Record<string, any>;
 }
 

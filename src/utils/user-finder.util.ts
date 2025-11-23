@@ -109,4 +109,48 @@ export class UserFinderUtil {
       return null;
     }
   }
+
+  static async findUsersByPublicAddress(
+    publicAddress: string,
+    userModel: Model<UserDocument>,
+    publicAddressModel: Model<PublicAddressDocument>,
+  ): Promise<UserFoundInfo[]> {
+    try {
+      const record = await publicAddressModel
+        .findOne({ publicKey: publicAddress })
+        .populate('userIds')
+        .exec();
+
+      if (
+        !record ||
+        !record.userIds ||
+        (record.userIds as any[]).length === 0
+      ) {
+        return [];
+      }
+
+      const users = (record.userIds as unknown as UserDocument[]).filter(
+        (u) => u && u.isActive,
+      );
+
+      const results = await Promise.all(
+        users.map(async (u) => {
+          const latest = await publicAddressModel
+            .findOne({ userIds: u._id })
+            .sort({ updatedAt: -1 })
+            .exec();
+          return {
+            userId: u._id ? String(u._id) : '',
+            username: u.username || '',
+            telegramId: u.telegramId || '',
+            publicAddress: latest?.publicKey || publicAddress,
+          } as UserFoundInfo;
+        }),
+      );
+
+      return results;
+    } catch {
+      return [];
+    }
+  }
 }

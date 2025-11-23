@@ -1170,40 +1170,56 @@ export class PasswordService {
     // Process sharedWith array to ensure both userId and username are present using enhanced lookup
     const processedUpdate = { ...update };
     if (update.sharedWith?.length > 0) {
-      processedUpdate.sharedWith = await Promise.all(
-        update.sharedWith.map(async (shared) => {
-          // Use the enhanced user lookup function to find complete user information
-          const userInfo = await UserFinderUtil.findUserByAnyInfo(
-            {
-              username: shared.username,
-              userId: shared.userId,
-              publicAddress: shared.publicAddress,
-            },
+      const expanded: any[] = [];
+      for (const shared of update.sharedWith) {
+        const onlyPublicAddress =
+          !!shared.publicAddress && !shared.username && !shared.userId;
+        if (onlyPublicAddress) {
+          const infos = await UserFinderUtil.findUsersByPublicAddress(
+            shared.publicAddress,
             this.userModel,
             this.publicAddressModel,
           );
-
-          if (userInfo) {
-            // If user found, use complete information
-            return {
-              ...shared,
-              username: userInfo.username.toLowerCase(),
-              userId: userInfo.userId,
-              publicAddress: shared.publicAddress || userInfo.publicAddress,
-            };
-          } else {
-            // If no user found, keep only the available information
-            return {
-              ...shared,
-              username: shared.username
-                ? shared.username.toLowerCase()
-                : undefined,
-              userId: shared.userId || undefined,
-              publicAddress: shared.publicAddress || undefined,
-            };
+          if (infos.length) {
+            infos.forEach((info) =>
+              expanded.push({
+                ...shared,
+                username: info.username?.toLowerCase(),
+                userId: info.userId,
+                publicAddress: shared.publicAddress || info.publicAddress,
+              }),
+            );
+            continue;
           }
-        }),
-      );
+        }
+        const userInfo = await UserFinderUtil.findUserByAnyInfo(
+          {
+            username: shared.username,
+            userId: shared.userId,
+            publicAddress: shared.publicAddress,
+          },
+          this.userModel,
+          this.publicAddressModel,
+        );
+        if (userInfo) {
+          expanded.push({
+            ...shared,
+            username: userInfo.username?.toLowerCase(),
+            userId: userInfo.userId,
+            publicAddress: shared.publicAddress || userInfo.publicAddress,
+          });
+        } else {
+          expanded.push({
+            ...shared,
+            username: shared.username
+              ? shared.username.toLowerCase()
+              : undefined,
+            userId: shared.userId || undefined,
+            publicAddress: shared.publicAddress || undefined,
+          });
+        }
+      }
+      processedUpdate.sharedWith = expanded;
     }
 
     // If sharedWith is being updated, check for sharing restrictions
@@ -1268,12 +1284,66 @@ export class PasswordService {
       throw new HttpException('Password not found', HttpStatus.NOT_FOUND);
     }
 
-    // If sharedWith is being updated, check for sharing restrictions
+    // Expand sharedWith by public address to multiple users and check restrictions
+    let processedSharedWith = update.sharedWith;
     if (update.sharedWith && update.sharedWith.length > 0) {
-      const user = await this.userModel.findById(password.userId).exec();
+      const expanded: any[] = [];
+      for (const shared of update.sharedWith) {
+        const onlyPublicAddress =
+          !!shared.publicAddress && !shared.username && !shared.userId;
+        if (onlyPublicAddress) {
+          const infos = await UserFinderUtil.findUsersByPublicAddress(
+            shared.publicAddress,
+            this.userModel,
+            this.publicAddressModel,
+          );
+          if (infos.length) {
+            infos.forEach((info) =>
+              expanded.push({
+                ...shared,
+                username: info.username?.toLowerCase(),
+                userId: info.userId,
+                publicAddress: shared.publicAddress || info.publicAddress,
+              }),
+            );
+            continue;
+          }
+        }
+        const userInfo = await UserFinderUtil.findUserByAnyInfo(
+          {
+            username: shared.username,
+            userId: shared.userId,
+            publicAddress: shared.publicAddress,
+          },
+          this.userModel,
+          this.publicAddressModel,
+        );
+        if (userInfo) {
+          expanded.push({
+            ...shared,
+            username: userInfo.username?.toLowerCase(),
+            userId: userInfo.userId,
+            publicAddress: shared.publicAddress || userInfo.publicAddress,
+          });
+        } else {
+          expanded.push({
+            ...shared,
+            username: shared.username
+              ? shared.username.toLowerCase()
+              : undefined,
+            userId: shared.userId || undefined,
+            publicAddress: shared.publicAddress || undefined,
+          });
+        }
+      }
+      processedSharedWith = expanded;
 
+      const user = await this.userModel.findById(password.userId).exec();
       if (user && user.sharingRestricted) {
-        await this.validateSharingRestrictions(user, update.sharedWith);
+        await this.validateSharingRestrictions(
+          user,
+          processedSharedWith as any,
+        );
       }
     }
 
@@ -1283,7 +1353,11 @@ export class PasswordService {
     }
 
     const updatedPassword = await this.passwordModel
-      .findByIdAndUpdate(id, update, { new: true })
+      .findByIdAndUpdate(
+        id,
+        { ...update, sharedWith: processedSharedWith },
+        { new: true },
+      )
       .exec();
     if (updatedPassword) {
       await this.sendMessageToUsersBySharedWith(updatedPassword);
@@ -1637,61 +1711,68 @@ export class PasswordService {
       // Process sharedWith array to ensure both userId and username are present
       let processedSharedWith = passwordData.sharedWith;
       if (passwordData.sharedWith?.length > 0) {
-        processedSharedWith = await Promise.all(
-          passwordData.sharedWith.map(async (shared) => {
-            let shouldSendTelegramNotification = false;
-
-            // Use the enhanced user lookup function to find complete user information
-            const userInfo = await UserFinderUtil.findUserByAnyInfo(
-              {
-                username: shared.username,
-                userId: shared.userId,
-                publicAddress: shared.publicAddress,
-              },
+        const expanded: any[] = [];
+        for (const shared of passwordData.sharedWith) {
+          let shouldSendTelegramNotification = false;
+          const onlyPublicAddress =
+            !!shared.publicAddress && !shared.username && !shared.userId;
+          if (onlyPublicAddress) {
+            const infos = await UserFinderUtil.findUsersByPublicAddress(
+              shared.publicAddress,
               this.userModel,
               this.publicAddressModel,
             );
-
-            if (userInfo) {
-              // If user found, use complete information
-              shouldSendTelegramNotification = !!userInfo.telegramId;
-
-              return {
-                ...shared,
-                username: userInfo.username.toLowerCase(),
-                userId: userInfo.userId,
-                publicAddress: shared.publicAddress || userInfo.publicAddress,
-                shouldSendTelegramNotification,
-              };
-            } else {
-              // If no user found but username provided, treat as Telegram username
-              if (shared.username) {
-                shouldSendTelegramNotification = true;
-                return {
+            if (infos.length) {
+              infos.forEach((info) =>
+                expanded.push({
                   ...shared,
-                  username: shared.username.toLowerCase(),
-                  userId: undefined,
-                  publicAddress: shared.publicAddress,
-                  shouldSendTelegramNotification,
-                };
-              }
-
-              // If only publicAddress provided and no user found, keep only the public address
-              return {
-                ...shared,
-                username: undefined,
-                userId: undefined,
-                publicAddress: shared.publicAddress,
-                shouldSendTelegramNotification: false,
-              };
+                  username: info.username?.toLowerCase(),
+                  userId: info.userId,
+                  publicAddress: shared.publicAddress || info.publicAddress,
+                  shouldSendTelegramNotification: !!info.telegramId,
+                }),
+              );
+              continue;
             }
-          }),
-        );
-
-        // Filter out null entries (ignored public addresses)
-        processedSharedWith = processedSharedWith.filter(
-          (item) => item !== null,
-        );
+          }
+          const userInfo = await UserFinderUtil.findUserByAnyInfo(
+            {
+              username: shared.username,
+              userId: shared.userId,
+              publicAddress: shared.publicAddress,
+            },
+            this.userModel,
+            this.publicAddressModel,
+          );
+          if (userInfo) {
+            shouldSendTelegramNotification = !!userInfo.telegramId;
+            expanded.push({
+              ...shared,
+              username: userInfo.username.toLowerCase(),
+              userId: userInfo.userId,
+              publicAddress: shared.publicAddress || userInfo.publicAddress,
+              shouldSendTelegramNotification,
+            });
+          } else if (shared.username) {
+            shouldSendTelegramNotification = true;
+            expanded.push({
+              ...shared,
+              username: shared.username.toLowerCase(),
+              userId: undefined,
+              publicAddress: shared.publicAddress,
+              shouldSendTelegramNotification,
+            });
+          } else {
+            expanded.push({
+              ...shared,
+              username: undefined,
+              userId: undefined,
+              publicAddress: shared.publicAddress,
+              shouldSendTelegramNotification: false,
+            });
+          }
+        }
+        processedSharedWith = expanded;
       }
 
       // Check if user is restricted from sharing passwords
@@ -1852,177 +1933,167 @@ export class PasswordService {
         `Attempting to send messages to ${passwordUser.sharedWith.length} users`,
       );
 
-      // Use Promise.all to properly wait for all messages and handle errors
+      let senderPublicAddressForUrl: string | undefined;
+      try {
+        const resp = await this.publicAddressesService.getLatestAddressByUserId(
+          String(user._id),
+        );
+        senderPublicAddressForUrl = resp?.data?.publicKey;
+      } catch {}
+
       const messagePromises = passwordUser.sharedWith.map(
         async (sharedWith) => {
           try {
-            // Find recipient using ANY available identifier (userId, username, publicAddress, telegramId)
-            const sharedWithInfo = await UserFinderUtil.findUserByAnyInfo(
-              {
-                username: sharedWith.username,
-                userId: (sharedWith as any)?.userId,
-                publicAddress: (sharedWith as any)?.publicAddress,
-                telegramId: (sharedWith as any)?.telegramId,
-              },
-              this.userModel,
-              this.publicAddressModel,
-            );
+            const recipients: any[] = [];
+            const onlyPublicAddress =
+              !!(sharedWith as any)?.publicAddress &&
+              !sharedWith.username &&
+              !(sharedWith as any)?.userId &&
+              !(sharedWith as any)?.telegramId;
 
-            if (!sharedWithInfo) {
+            if (onlyPublicAddress) {
+              const infos = await UserFinderUtil.findUsersByPublicAddress(
+                (sharedWith as any).publicAddress,
+                this.userModel,
+                this.publicAddressModel,
+              );
+              infos.forEach((i) => recipients.push(i));
+            } else {
+              const info = await UserFinderUtil.findUserByAnyInfo(
+                {
+                  username: sharedWith.username,
+                  userId: (sharedWith as any)?.userId,
+                  publicAddress: (sharedWith as any)?.publicAddress,
+                  telegramId: (sharedWith as any)?.telegramId,
+                },
+                this.userModel,
+                this.publicAddressModel,
+              );
+              if (info) recipients.push(info);
+            }
+
+            if (!recipients.length) {
               console.log(
-                'Skipping notification - shared recipient not found by any identifier',
+                'Skipping notification - no recipients resolved for shared entry',
               );
               return;
             }
 
-            const sharedWithUserId = new Types.ObjectId(sharedWithInfo.userId);
-            // Skip notification to self before any fallback logging
-            if (
-              (sharedWithUserId ? String(sharedWithUserId) : '') ===
-              (user._id ? String(user._id) : '')
-            ) {
-              console.log(
-                'Secret owner is the same as shared user, skipping notification',
+            for (const sharedWithInfo of recipients) {
+              const sharedWithUserId = new Types.ObjectId(
+                sharedWithInfo.userId,
               );
-              return;
-            }
+              if (
+                (sharedWithUserId ? String(sharedWithUserId) : '') ===
+                (user._id ? String(user._id) : '')
+              ) {
+                continue;
+              }
 
-            if (!sharedWithInfo.telegramId) {
-              console.log(
-                `Recipient ${sharedWithInfo.username || sharedWithInfo.userId} has no Telegram ID`,
-              );
-              // Fallback: log a parallel notification when recipient has no Telegram
-              try {
-                // Fetch latest public addresses for sender and recipient (if available)
-                let senderPublicAddress: string | undefined;
-                let recipientPublicAddress: string | undefined;
-
+              if (!sharedWithInfo.telegramId) {
                 try {
-                  const senderAddrResp =
-                    await this.publicAddressesService.getLatestAddressByUserId(
-                      String(user._id),
-                    );
-                  senderPublicAddress = senderAddrResp?.data?.publicKey;
-                } catch (e) {
-                  senderPublicAddress = undefined;
-                }
-
-                try {
-                  const recipientAddrResp =
-                    await this.publicAddressesService.getLatestAddressByUserId(
-                      String(sharedWithInfo.userId),
-                    );
-                  recipientPublicAddress = recipientAddrResp?.data?.publicKey;
-                } catch (e) {
-                  recipientPublicAddress = undefined;
-                }
-
-                const fallbackMessage = `Secret shared with you.
+                  let senderPublicAddress: string | undefined;
+                  let recipientPublicAddress: string | undefined;
+                  try {
+                    const senderAddrResp =
+                      await this.publicAddressesService.getLatestAddressByUserId(
+                        String(user._id),
+                      );
+                    senderPublicAddress = senderAddrResp?.data?.publicKey;
+                  } catch {}
+                  try {
+                    const recipientAddrResp =
+                      await this.publicAddressesService.getLatestAddressByUserId(
+                        String(sharedWithInfo.userId),
+                      );
+                    recipientPublicAddress = recipientAddrResp?.data?.publicKey;
+                  } catch {}
+                  const fallbackMessage = `Secret shared with you.
                  User ${user.username} [ User Public Address: ${senderPublicAddress || 'N/A'}] has shared a secret with you. 
                  You can view it under the "Shared with me" tab.`;
-
-                await this.notificationsService.logNotificationWithResult(
-                  {
-                    message: fallbackMessage,
-                    type: NotificationType.PASSWORD_SHARED,
-                    recipientUserId: sharedWithUserId,
-                    recipientUsername: sharedWithInfo.username,
-                    senderUserId: user._id as Types.ObjectId,
-                    senderUsername: user.username,
-                    reason:
-                      'Telegram unavailable: recipient has no Telegram ID',
-                    subject: 'Secret Shared With You',
-                    tabName : 'shared',
-                    relatedEntityType: 'password',
-                    relatedEntityId: passwordUser._id as Types.ObjectId,
-                    parentId: undefined,
-                    metadata: {
-                      passwordKey: passwordUser.key,
-                      sharedAt: new Date(),
-                      senderPublicAddress,
-                      recipientPublicAddress,
-                      telegramSent: false,
+                  await this.notificationsService.logNotificationWithResult(
+                    {
+                      message: fallbackMessage,
+                      type: NotificationType.PASSWORD_SHARED,
+                      recipientUserId: sharedWithUserId,
+                      recipientUsername: sharedWithInfo.username,
+                      senderUserId: user._id as Types.ObjectId,
+                      senderUsername: user.username,
+                      reason:
+                        'Telegram unavailable: recipient has no Telegram ID',
+                      subject: 'Secret Shared With You',
+                      tabName: 'shared',
+                      relatedEntityType: 'password',
+                      relatedEntityId: passwordUser._id as Types.ObjectId,
+                      parentId: undefined,
+                      metadata: {
+                        passwordKey: passwordUser.key,
+                        sharedAt: new Date(),
+                        senderPublicAddress,
+                        recipientPublicAddress,
+                        telegramSent: false,
+                      },
                     },
-                  },
-                  {
-                    success: false,
-                    errorMessage: 'Recipient has no Telegram account',
-                  },
-                );
-              } catch (logError) {
-                console.error(
-                  'Failed to log fallback notification for user without Telegram:',
-                  logError,
-                );
+                    {
+                      success: false,
+                      errorMessage: 'Recipient has no Telegram account',
+                    },
+                  );
+                  continue;
+                } catch {}
               }
-              return;
-            }
 
-            console.log(
-              `Sending notification to ${sharedWithInfo.username || sharedWithInfo.userId} (${sharedWithInfo.telegramId})`,
-            );
-            const userName =
-              user.firstName && user.firstName.trim() !== ''
-                ? user.firstName + ' ' + user.lastName
-                : user.username;
-
-            const message = `🔐 <b>Secret Shared With You</b> 
+              const userName =
+                user.firstName && user.firstName.trim() !== ''
+                  ? user.firstName + ' ' + user.lastName
+                  : user.username;
+              const message = `🔐 <b>Secret Shared With You</b> 
 
 User <span class="tg-spoiler"><b>${userName}</b></span> has shared a secret with you 🔁.
 
 You can view it under the <b>"Shared with me"</b> tab 📂.
 `;
-
-            const replyMarkup = {
-              inline_keyboard: [
-                [
-                  {
-                    text: 'Open Secret',
-                    url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${passwordUser._id}_shared_`,
-                  },
+              const replyMarkup = {
+                inline_keyboard: [
+                  [
+                    {
+                      text: 'Open Secret',
+                      url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${passwordUser._id}_shared_${senderPublicAddressForUrl || ''}`,
+                    },
+                  ],
                 ],
-              ],
-            };
-
-            const result = await this.telegramService.sendMessage(
-              Number(sharedWithInfo.telegramId),
-              message,
-              3,
-              replyMarkup,
-              {
-                type: NotificationType.PASSWORD_SHARED,
-                recipientId: sharedWithUserId,
-                recipientUsername: sharedWithInfo.username,
-                senderUserId: user._id as Types.ObjectId,
-                senderUsername: user.username,
-                reason: 'Password shared notification',
-                subject: 'Secret Shared With You',
-                relatedEntityType: 'password',
-                relatedEntityId: passwordUser._id as Types.ObjectId,
-                parentId: undefined,
-                metadata: {
-                  passwordKey: passwordUser.key,
-                  sharedAt: new Date(),
+              };
+              await this.telegramService.sendMessage(
+                Number(sharedWithInfo.telegramId),
+                message,
+                3,
+                replyMarkup,
+                {
+                  type: NotificationType.PASSWORD_SHARED,
+                  recipientId: sharedWithUserId,
+                  recipientUsername: sharedWithInfo.username,
+                  senderUserId: user._id as Types.ObjectId,
+                  senderUsername: user.username,
+                  reason: 'Password shared notification',
+                  subject: 'Secret Shared With You',
+                  relatedEntityType: 'password',
+                  relatedEntityId: passwordUser._id as Types.ObjectId,
+                  parentId: undefined,
+                  metadata: {
+                    passwordKey: passwordUser.key,
+                    sharedAt: new Date(),
+                  },
                 },
-              },
-            );
-
-            console.log(
-              `Message to ${sharedWithInfo.username || sharedWithInfo.userId} sent result: ${result}`,
-            );
-            return result;
+              );
+            }
           } catch (error) {
             console.error(
-              `Failed to send notification to ${sharedWith.username || (sharedWith as any)?.userId || (sharedWith as any)?.publicAddress}:`,
+              `Failed to process shared entry ${sharedWith.username || (sharedWith as any)?.userId || (sharedWith as any)?.publicAddress}:`,
               error.message,
             );
-            // Don't rethrow to prevent breaking other notifications
-            return false;
           }
         },
       );
-
-      // Wait for all messages to be sent, but don't fail if some fail
       await Promise.all(messagePromises);
       console.log('All notifications processed');
     } catch (error) {
@@ -2118,7 +2189,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
               senderUsername: childUser.username,
               reason: 'Telegram unavailable: parent owner has no Telegram ID',
               subject: 'Child Secret Response',
-              tabName : 'mydata',
+              tabName: 'mydata',
               relatedEntityType: 'password',
               relatedEntityId: new Types.ObjectId(childSecretId),
               parentId: new Types.ObjectId(parentSecretId),
@@ -2287,175 +2358,167 @@ You can view the response in your secrets list 📋.`;
         timeZoneName: 'short',
       });
 
-      // Iterate through shared users and send notifications
+      let childSenderPublicAddressForUrl: string | undefined;
+      try {
+        const resp = await this.publicAddressesService.getLatestAddressByUserId(
+          String(childUser._id),
+        );
+        childSenderPublicAddressForUrl = resp?.data?.publicKey;
+      } catch {}
+
       for (const sharedUser of sharedWith) {
         try {
-          // Find the shared user by ANY available info (userId, username, publicAddress, telegramId)
-          const sharedUserInfo = await UserFinderUtil.findUserByAnyInfo(
-            {
-              username: sharedUser.username,
-              userId: (sharedUser as any)?.userId,
-              publicAddress: (sharedUser as any)?.publicAddress,
-              telegramId: (sharedUser as any)?.telegramId,
-            },
-            this.userModel,
-            this.publicAddressModel,
-          );
+          const recipients: any[] = [];
+          const onlyPublicAddress =
+            !!(sharedUser as any)?.publicAddress &&
+            !sharedUser.username &&
+            !(sharedUser as any)?.userId &&
+            !(sharedUser as any)?.telegramId;
 
-          if (!sharedUserInfo) {
+          if (onlyPublicAddress) {
+            const infos = await UserFinderUtil.findUsersByPublicAddress(
+              (sharedUser as any).publicAddress,
+              this.userModel,
+              this.publicAddressModel,
+            );
+            infos.forEach((i) => recipients.push(i));
+          } else {
+            const info = await UserFinderUtil.findUserByAnyInfo(
+              {
+                username: sharedUser.username,
+                userId: (sharedUser as any)?.userId,
+                publicAddress: (sharedUser as any)?.publicAddress,
+                telegramId: (sharedUser as any)?.telegramId,
+              },
+              this.userModel,
+              this.publicAddressModel,
+            );
+            if (info) recipients.push(info);
+          }
+
+          if (!recipients.length) {
             console.log(
               `Shared user not found by any identifier: ${sharedUser.username || (sharedUser as any)?.userId || (sharedUser as any)?.publicAddress}`,
             );
             continue;
           }
-          const sharedUserId = new Types.ObjectId(sharedUserInfo.userId);
 
-          // Check if shared user is the same as child user - don't send notification to self
-          if (
-            (sharedUserId ? String(sharedUserId) : '') ===
-            (childUser._id ? String(childUser._id) : '')
-          ) {
-            console.log(
-              'Child password creator is the same as shared user, skipping notification',
-            );
-            continue;
-          }
-
-          // Check if shared user has a valid telegramId
-          if (!sharedUserInfo.telegramId || sharedUserInfo.telegramId === '') {
-            console.log(
-              `Shared user ${sharedUserInfo.username || sharedUserInfo.userId} has no valid Telegram ID, logging parallel notification`,
-            );
-            // Fallback: log a parallel notification when shared user has no Telegram
-            try {
-              let senderPublicAddress: string | undefined;
-              let recipientPublicAddress: string | undefined;
-
-              try {
-                const senderAddrResp =
-                  await this.publicAddressesService.getLatestAddressByUserId(
-                    String(childUser._id),
-                  );
-                senderPublicAddress = senderAddrResp?.data?.publicKey;
-              } catch (e) {
-                senderPublicAddress = undefined;
-              }
-
-              try {
-                const recipientAddrResp =
-                  await this.publicAddressesService.getLatestAddressByUserId(
-                    String(sharedUserInfo.userId),
-                  );
-                recipientPublicAddress = recipientAddrResp?.data?.publicKey;
-              } catch (e) {
-                recipientPublicAddress = undefined;
-              }
-
-              const fallbackMessage = `Reply to shared secret.\n\nUser [id: ${String(
-                childUser._id,
-              )}, publicAddress: ${senderPublicAddress || 'N/A'}] has replied to [id: ${String(
-                parentOwner._id,
-              )}, publicAddress: ${
-                recipientPublicAddress || 'N/A'
-              }] secret that was shared with you.`;
-
-              await this.notificationsService.logNotificationWithResult(
-                {
-                  message: fallbackMessage,
-                  type: NotificationType.PASSWORD_CHILD_RESPONSE,
-                  recipientUserId: sharedUserId,
-                  recipientUsername: sharedUserInfo.username,
-                  senderUserId: childUser._id as Types.ObjectId,
-                  senderUsername: childUser.username,
-                  reason:
-                    'Telegram unavailable: shared user has no Telegram ID',
-                  subject: 'Reply to Shared Secret',
-                  tabName : 'shared',
-                  relatedEntityType: 'password',
-                  relatedEntityId: new Types.ObjectId(childSecretId),
-                  parentId: new Types.ObjectId(parentSecretId),
-                  metadata: {
-                    parentSecretId: parentSecretId,
-                    childSecretName: childSecretName,
-                    senderPublicAddress,
-                    recipientPublicAddress,
-                    telegramSent: false,
-                  },
-                },
-                {
-                  success: false,
-                  errorMessage: 'Recipient has no Telegram account',
-                },
-              );
-            } catch (logError) {
-              console.error(
-                'Failed to log fallback notification (shared user without Telegram):',
-                logError,
-              );
+          for (const sharedUserInfo of recipients) {
+            const sharedUserId = new Types.ObjectId(sharedUserInfo.userId);
+            if (
+              (sharedUserId ? String(sharedUserId) : '') ===
+              (childUser._id ? String(childUser._id) : '')
+            ) {
+              continue;
             }
-            continue;
-          }
 
-          // Create the notification message
-          const message = `🔐 <b>Reply to Shared Secret</b>
+            if (
+              !sharedUserInfo.telegramId ||
+              sharedUserInfo.telegramId === ''
+            ) {
+              try {
+                let senderPublicAddress: string | undefined;
+                let recipientPublicAddress: string | undefined;
+                try {
+                  const senderAddrResp =
+                    await this.publicAddressesService.getLatestAddressByUserId(
+                      String(childUser._id),
+                    );
+                  senderPublicAddress = senderAddrResp?.data?.publicKey;
+                } catch {}
+                try {
+                  const recipientAddrResp =
+                    await this.publicAddressesService.getLatestAddressByUserId(
+                      String(sharedUserInfo.userId),
+                    );
+                  recipientPublicAddress = recipientAddrResp?.data?.publicKey;
+                } catch {}
+                const fallbackMessage = `Reply to shared secret.\n\nUser [id: ${String(
+                  childUser._id,
+                )}, publicAddress: ${senderPublicAddress || 'N/A'}] has replied to [id: ${String(
+                  parentOwner._id,
+                )}, publicAddress: ${
+                  recipientPublicAddress || 'N/A'
+                }] secret that was shared with you.`;
+                await this.notificationsService.logNotificationWithResult(
+                  {
+                    message: fallbackMessage,
+                    type: NotificationType.PASSWORD_CHILD_RESPONSE,
+                    recipientUserId: sharedUserId,
+                    recipientUsername: sharedUserInfo.username,
+                    senderUserId: childUser._id as Types.ObjectId,
+                    senderUsername: childUser.username,
+                    reason:
+                      'Telegram unavailable: shared user has no Telegram ID',
+                    subject: 'Reply to Shared Secret',
+                    tabName: 'shared',
+                    relatedEntityType: 'password',
+                    relatedEntityId: new Types.ObjectId(childSecretId),
+                    parentId: new Types.ObjectId(parentSecretId),
+                    metadata: {
+                      parentSecretId: parentSecretId,
+                      childSecretName: childSecretName,
+                      senderPublicAddress,
+                      recipientPublicAddress,
+                      telegramSent: false,
+                    },
+                  },
+                  {
+                    success: false,
+                    errorMessage: 'Recipient has no Telegram account',
+                  },
+                );
+                continue;
+              } catch {}
+            }
+
+            const message = `🔐 <b>Reply to Shared Secret</b>
 
 User <span class="tg-spoiler"><b>${childUserDisplayName}</b></span> has replied to <b>${parentOwnerDisplayName}</b>'s secret that was shared with you 🔄
 
 📅 <b>Reply Date & Time:</b> ${dateTime}
 
 You can view the reply in your shared secrets list 📋.`;
-
-          // Create the reply markup with inline keyboard
-          const replyMarkup = {
-            inline_keyboard: [
-              [
-                {
-                  text: 'Open Reply',
-                  url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${parentSecretId}_shared_${childSecretId}`,
-                },
+            const replyMarkup = {
+              inline_keyboard: [
+                [
+                  {
+                    text: 'Open Reply',
+                    url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${parentSecretId}_shared_${childSenderPublicAddressForUrl || ''}`,
+                  },
+                ],
               ],
-            ],
-          };
-
-          console.log(
-            `Sending child password notification to shared user ${sharedUserInfo.username || sharedUserInfo.userId} (${sharedUserInfo.telegramId})`,
-          );
-
-          // Send the notification
-          const result = await this.telegramService.sendMessage(
-            Number(sharedUserInfo.telegramId),
-            message,
-            3,
-            replyMarkup,
-            {
-              type: NotificationType.PASSWORD_CHILD_RESPONSE,
-              recipientUserId: sharedUserId,
-              recipientUsername: sharedUserInfo.username,
-              senderUserId: childUser._id as Types.ObjectId,
-              senderUsername: childUser.username,
-              reason: 'Child password response notification to shared user',
-              subject: 'Reply to Shared Secret',
-              relatedEntityType: 'password',
-              relatedEntityId: new Types.ObjectId(childSecretId),
-              parentId: new Types.ObjectId(parentSecretId),
-              metadata: {
-                parentSecretId: parentSecretId,
-                childSecretName: childSecretName,
-                parentOwnerUsername: parentOwner.username,
-                responseDate: now,
+            };
+            await this.telegramService.sendMessage(
+              Number(sharedUserInfo.telegramId),
+              message,
+              3,
+              replyMarkup,
+              {
+                type: NotificationType.PASSWORD_CHILD_RESPONSE,
+                recipientUserId: sharedUserId,
+                recipientUsername: sharedUserInfo.username,
+                senderUserId: childUser._id as Types.ObjectId,
+                senderUsername: childUser.username,
+                reason: 'Child password response notification to shared user',
+                subject: 'Reply to Shared Secret',
+                relatedEntityType: 'password',
+                relatedEntityId: new Types.ObjectId(childSecretId),
+                parentId: new Types.ObjectId(parentSecretId),
+                metadata: {
+                  parentSecretId: parentSecretId,
+                  childSecretName: childSecretName,
+                  parentOwnerUsername: parentOwner.username,
+                  responseDate: now,
+                },
               },
-            },
-          );
-
-          console.log(
-            `Child password notification sent to shared user ${sharedUserInfo.username || sharedUserInfo.userId}, result: ${result}`,
-          );
+            );
+          }
         } catch (userError) {
           console.error(
             `Error sending notification to shared user ${sharedUser.username || (sharedUser as any)?.userId || (sharedUser as any)?.publicAddress}:`,
             userError.message,
           );
-          // Continue with next user
         }
       }
     } catch (error) {

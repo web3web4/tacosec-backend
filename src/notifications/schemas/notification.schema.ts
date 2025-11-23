@@ -99,7 +99,7 @@ export class Notification {
 
   // Additional information that can be stored as JSON
   @Prop()
-  tabName : string;
+  tabName: string;
 
   @Prop({ type: Object })
   metadata: Record<string, any>;

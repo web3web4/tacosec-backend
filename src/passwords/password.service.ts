@@ -2058,7 +2058,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
                   [
                     {
                       text: 'Open Secret',
-                      url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${passwordUser._id}_shared_${senderPublicAddressForUrl || ''}`,
+                      url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${passwordUser._id}_shared`,
                     },
                   ],
                 ],
@@ -2484,7 +2484,7 @@ You can view the reply in your shared secrets list 📋.`;
                 [
                   {
                     text: 'Open Reply',
-                    url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${parentSecretId}_shared_${childSenderPublicAddressForUrl || ''}`,
+                    url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${parentSecretId}_shared_${childSecretId}`,
                   },
                 ],
               ],

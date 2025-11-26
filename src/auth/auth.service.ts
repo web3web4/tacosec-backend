@@ -166,20 +166,23 @@ export class AuthService {
         }
       }
 
-      // If no telegramInitData, loginDto is required
-      if (!loginDto) {
+      // If no telegramInitData and body is empty or missing publicAddress, return 400 with clear message
+      if (
+        !telegramInitData &&
+        (!loginDto || !String(loginDto.publicAddress || '').trim())
+      ) {
         throw new HttpException(
           {
             success: false,
             message:
-              'Login data is required when not using Telegram authentication',
+              'Missing credentials: provide Telegram init data header or a valid publicAddress in body',
             error: 'Bad Request',
           },
           HttpStatus.BAD_REQUEST,
         );
       }
 
-      const { publicAddress } = loginDto;
+      const { publicAddress } = loginDto || {};
       // If signature exists, it has been verified above when applicable
 
       // Find the public address in the database

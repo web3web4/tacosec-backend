@@ -1,7 +1,7 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import {
   PublicAddress,
@@ -230,7 +230,32 @@ export class AuthService {
           userIds: [savedUser._id],
         });
 
-        await newAddressRecord.save();
+        try {
+          await newAddressRecord.save();
+        } catch (e) {
+          if (
+            (e as any)?.name === 'MongoServerError' &&
+            (e as any)?.code === 11000
+          ) {
+            // Duplicate key (publicKey) — fetch existing and link user if needed
+            const existing = await this.publicAddressModel
+              .findOne({ publicKey: publicAddress })
+              .exec();
+            if (existing) {
+              const ids = existing.userIds as unknown as Types.ObjectId[];
+              const exists = ids.some(
+                (id) => id.toString() === savedUser._id.toString(),
+              );
+              if (!exists) {
+                ids.push(savedUser._id as Types.ObjectId);
+                existing.userIds = ids as any;
+                await existing.save();
+              }
+            }
+          } else {
+            throw e;
+          }
+        }
 
         // Update shared secrets that contain this public address
         await this.updateSharedSecretsForNewUser(
@@ -282,9 +307,34 @@ export class AuthService {
       // Generate JWT tokens
       return await this.generateTokens(payload, user);
     } catch (error) {
+      try {
+        await this.loggerService.saveSystemLog({
+          event: LogEvent.All,
+          eventName: 'login_failed',
+          message: 'Login failed',
+          cause: (error as any)?.message,
+          stack: (error as any)?.stack,
+        });
+      } catch {}
+
       if (error instanceof HttpException) {
         throw error;
       }
+
+      if (
+        (error as any)?.name === 'MongoServerError' &&
+        (error as any)?.code === 11000
+      ) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Duplicate public address record',
+            error: 'Conflict',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
       throw new HttpException(
         {
           success: false,

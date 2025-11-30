@@ -2079,6 +2079,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
                   relatedEntityType: 'password',
                   relatedEntityId: passwordUser._id as Types.ObjectId,
                   parentId: undefined,
+                  tabName: 'shared',
                   metadata: {
                     passwordKey: passwordUser.key,
                     sharedAt: new Date(),
@@ -2280,6 +2281,7 @@ You can view the response in your secrets list 📋.`;
           relatedEntityType: 'password',
           relatedEntityId: new Types.ObjectId(childSecretId),
           parentId: new Types.ObjectId(parentSecretId),
+          tabName: 'mydata',
           metadata: {
             parentSecretId: parentSecretId,
             childSecretName: childSecretName,
@@ -2505,6 +2507,7 @@ You can view the reply in your shared secrets list 📋.`;
                 relatedEntityType: 'password',
                 relatedEntityId: new Types.ObjectId(childSecretId),
                 parentId: new Types.ObjectId(parentSecretId),
+                tabName: 'shared',
                 metadata: {
                   parentSecretId: parentSecretId,
                   childSecretName: childSecretName,

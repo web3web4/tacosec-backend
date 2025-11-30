@@ -103,6 +103,7 @@ export class TelegramService {
       relatedEntityType?: string;
       parentId?: Types.ObjectId;
       metadata?: Record<string, any>;
+      tabName?: string;
     },
   ): Promise<boolean> {
     const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
@@ -151,6 +152,7 @@ export class TelegramService {
       parentId: notificationData?.parentId,
       telegramChatId: String(userId),
       telegramMessageId: undefined, // Will be set after successful send
+      tabName: notificationData?.tabName,
     };
 
     for (let attempt = 1; attempt <= retries; attempt++) {

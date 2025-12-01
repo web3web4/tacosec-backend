@@ -1979,6 +1979,19 @@ export class PasswordService {
               return;
             }
 
+            // Get latest address for the sender (user)
+            let senderPublicAddress: string | undefined;
+            try {
+              const senderAddrResp =
+                await this.publicAddressesService.getLatestAddressByUserId(
+                  String(user._id),
+                );
+              senderPublicAddress = senderAddrResp?.data?.publicKey;
+            } catch {}
+            const formattedSenderAddress = senderPublicAddress
+              ? `${senderPublicAddress.slice(0, 6)}...${senderPublicAddress.slice(-4)}`
+              : 'N/A';
+
             for (const sharedWithInfo of recipients) {
               const sharedWithUserId = new Types.ObjectId(
                 sharedWithInfo.userId,
@@ -1992,15 +2005,7 @@ export class PasswordService {
 
               if (!sharedWithInfo.telegramId) {
                 try {
-                  let senderPublicAddress: string | undefined;
                   let recipientPublicAddress: string | undefined;
-                  try {
-                    const senderAddrResp =
-                      await this.publicAddressesService.getLatestAddressByUserId(
-                        String(user._id),
-                      );
-                    senderPublicAddress = senderAddrResp?.data?.publicKey;
-                  } catch {}
                   try {
                     const recipientAddrResp =
                       await this.publicAddressesService.getLatestAddressByUserId(
@@ -2009,7 +2014,7 @@ export class PasswordService {
                     recipientPublicAddress = recipientAddrResp?.data?.publicKey;
                   } catch {}
                   const fallbackMessage = `Secret shared with you.
-                 User ${user.username} [ User Public Address: ${senderPublicAddress || 'N/A'}] has shared a secret with you. 
+                 User ${user.username} (user public address : ${formattedSenderAddress}) has shared a secret with you. 
                  You can view it under the "Shared with me" tab.`;
                   await this.notificationsService.logNotificationWithResult(
                     {
@@ -2049,7 +2054,7 @@ export class PasswordService {
                   : user.username;
               const message = `🔐 <b>Secret Shared With You</b> 
 
-User <span class="tg-spoiler"><b>${userName}</b></span> has shared a secret with you 🔁.
+User <span class="tg-spoiler"><b>${userName}</b></span> (user public address : ${formattedSenderAddress}) has shared a secret with you 🔁.
 
 You can view it under the <b>"Shared with me"</b> tab 📂.
 `;
@@ -2166,6 +2171,9 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
           } catch (e) {
             senderPublicAddress = undefined;
           }
+          const formattedSenderAddress = senderPublicAddress
+            ? `${senderPublicAddress.slice(0, 6)}...${senderPublicAddress.slice(-4)}`
+            : 'N/A';
 
           try {
             const recipientAddrResp =
@@ -2178,7 +2186,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
           }
 
           const fallbackMessage = `Child secret response.
-          User ${childUser.username} [ User Public Address: ${senderPublicAddress || 'N/A'}] has responded to your secret with a new secret.`;
+          User ${childUser.username} (user public address : ${formattedSenderAddress}) has responded to your secret with a new secret.`;
 
           await this.notificationsService.logNotificationWithResult(
             {
@@ -2222,6 +2230,21 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
           ? `${childUser.firstName} ${childUser.lastName || ''}`.trim()
           : childUser.username;
 
+      // Get latest address for the sender (childUser) if not already fetched in fallback scope
+      // Note: senderPublicAddress and formattedSenderAddress are scoped inside the if block above.
+      // We need to fetch it here for the Telegram notification path.
+      let telegramSenderAddress: string | undefined;
+      try {
+        const senderAddrResp =
+          await this.publicAddressesService.getLatestAddressByUserId(
+            String(childUser._id),
+          );
+        telegramSenderAddress = senderAddrResp?.data?.publicKey;
+      } catch {}
+      const formattedTelegramSenderAddress = telegramSenderAddress
+        ? `${telegramSenderAddress.slice(0, 6)}...${telegramSenderAddress.slice(-4)}`
+        : 'N/A';
+
       // Get current date and time
       const now = new Date();
       const dateTime = now.toLocaleString('en-US', {
@@ -2236,7 +2259,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
       // Create the notification message
       const message = `🔐 <b>Child Secret Response</b>
 
-User <span class="tg-spoiler"><b>${childUserDisplayName}</b></span> has responded to your secret with a new secret " 🔄
+User <span class="tg-spoiler"><b>${childUserDisplayName}</b></span> (user public address : ${formattedTelegramSenderAddress}) has responded to your secret with a new secret 🔄
 
 📅 <b>Response Date & Time:</b> ${dateTime}
 
@@ -2367,6 +2390,9 @@ You can view the response in your secrets list 📋.`;
         );
         childSenderPublicAddressForUrl = resp?.data?.publicKey;
       } catch {}
+      const formattedChildAddress = childSenderPublicAddressForUrl
+        ? `${childSenderPublicAddressForUrl.slice(0, 6)}...${childSenderPublicAddressForUrl.slice(-4)}`
+        : 'N/A';
 
       for (const sharedUser of sharedWith) {
         try {
@@ -2434,15 +2460,9 @@ You can view the response in your secrets list 📋.`;
                       String(sharedUserInfo.userId),
                     );
                   recipientPublicAddress = recipientAddrResp?.data?.publicKey;
-                } catch {}
-                const fallbackMessage = `Reply to shared secret.\n\nUser [id: ${String(
-                  childUser._id,
-                )}, publicAddress: ${senderPublicAddress || 'N/A'}] has replied to [id: ${String(
-                  parentOwner._id,
-                )}, publicAddress: ${
-                  recipientPublicAddress || 'N/A'
-                }] secret that was shared with you.`;
-                await this.notificationsService.logNotificationWithResult(
+          } catch {}
+          const fallbackMessage = `Reply to shared secret.\n\nUser ${childUser.username} (user public address : ${formattedChildAddress}) has replied to secret that was shared with you.`;
+          await this.notificationsService.logNotificationWithResult(
                   {
                     message: fallbackMessage,
                     type: NotificationType.PASSWORD_CHILD_RESPONSE,
@@ -2476,7 +2496,7 @@ You can view the response in your secrets list 📋.`;
 
             const message = `🔐 <b>Reply to Shared Secret</b>
 
-User <span class="tg-spoiler"><b>${childUserDisplayName}</b></span> has replied to <b>${parentOwnerDisplayName}</b>'s secret that was shared with you 🔄
+User <span class="tg-spoiler"><b>${childUserDisplayName}</b></span> (user public address : ${formattedChildAddress}) has replied to <b>${parentOwnerDisplayName}</b>'s secret that was shared with you 🔄
 
 📅 <b>Reply Date & Time:</b> ${dateTime}
 

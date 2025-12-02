@@ -2394,6 +2394,17 @@ You can view the response in your secrets list 📋.`;
         ? `${childSenderPublicAddressForUrl.slice(0, 6)}...${childSenderPublicAddressForUrl.slice(-4)}`
         : 'N/A';
 
+      let parentOwnerPublicAddressForUrl: string | undefined;
+      try {
+        const resp = await this.publicAddressesService.getLatestAddressByUserId(
+          String(parentOwner._id),
+        );
+        parentOwnerPublicAddressForUrl = resp?.data?.publicKey;
+      } catch {}
+      const formattedParentOwnerAddress = parentOwnerPublicAddressForUrl
+        ? `${parentOwnerPublicAddressForUrl.slice(0, 6)}...${parentOwnerPublicAddressForUrl.slice(-4)}`
+        : 'N/A';
+
       for (const sharedUser of sharedWith) {
         try {
           const recipients: any[] = [];
@@ -2460,9 +2471,9 @@ You can view the response in your secrets list 📋.`;
                       String(sharedUserInfo.userId),
                     );
                   recipientPublicAddress = recipientAddrResp?.data?.publicKey;
-          } catch {}
-          const fallbackMessage = `Reply to shared secret.\n\nUser ${childUser.username} (user public address : ${formattedChildAddress}) has replied to secret that was shared with you.`;
-          await this.notificationsService.logNotificationWithResult(
+                } catch {}
+                const fallbackMessage = `Reply to Shared Secret. User ${childUser.username} (user public address: ${formattedChildAddress}) has replied to ${parentOwner.username}'s secret (user public address: ${formattedParentOwnerAddress}) that was previously shared with you.`;
+                await this.notificationsService.logNotificationWithResult(
                   {
                     message: fallbackMessage,
                     type: NotificationType.PASSWORD_CHILD_RESPONSE,
@@ -2496,7 +2507,7 @@ You can view the response in your secrets list 📋.`;
 
             const message = `🔐 <b>Reply to Shared Secret</b>
 
-User <span class="tg-spoiler"><b>${childUserDisplayName}</b></span> (user public address : ${formattedChildAddress}) has replied to <b>${parentOwnerDisplayName}</b>'s secret that was shared with you 🔄
+User <b>${childUserDisplayName}</b> (user public address: ${formattedChildAddress}) has replied to <b>${parentOwnerDisplayName}</b>'s secret (user public address: ${formattedParentOwnerAddress}) that was previously shared with you 🔄
 
 📅 <b>Reply Date & Time:</b> ${dateTime}
 

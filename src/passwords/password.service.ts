@@ -2452,6 +2452,13 @@ You can view the response in your secrets list 📋.`;
             }
 
             if (
+              (sharedUserId ? String(sharedUserId) : '') ===
+              (parentOwner._id ? String(parentOwner._id) : '')
+            ) {
+              continue;
+            }
+
+            if (
               !sharedUserInfo.telegramId ||
               sharedUserInfo.telegramId === ''
             ) {

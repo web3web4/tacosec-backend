@@ -754,8 +754,54 @@ export class PasswordService {
         });
       }
 
-      // Sort the combined results by creation date (newest first)
-      const sharedPasswords = allSharedPasswords.sort(
+      let latestPublicAddress = publicAddress;
+      if (!latestPublicAddress) {
+        try {
+          if (currentUserTelegramId) {
+            const byTg =
+              await this.publicAddressesService.getLatestAddressByTelegramId(
+                currentUserTelegramId,
+              );
+            if (byTg.success && byTg.data) {
+              latestPublicAddress = byTg.data.publicKey;
+            }
+          }
+          if (!latestPublicAddress && userId) {
+            const byUser =
+              await this.publicAddressesService.getLatestAddressByUserId(
+                String(userId),
+              );
+            if (byUser.success && byUser.data) {
+              latestPublicAddress = byUser.data.publicKey;
+            }
+          }
+        } catch {}
+      }
+
+      const filteredShared = allSharedPasswords.filter((password) => {
+        const entries = (password.sharedWith || []).filter((sw: any) => {
+          const matchesUserId =
+            userId && sw.userId && String(sw.userId) === String(userId);
+          const matchesUsername =
+            username &&
+            sw.username &&
+            sw.username.toLowerCase() === String(username).toLowerCase();
+          const matchesLatestAddress =
+            latestPublicAddress && sw.publicAddress === latestPublicAddress;
+          return matchesUserId || matchesUsername || matchesLatestAddress;
+        });
+        if (!entries.length) return false;
+        for (const sw of entries) {
+          if (sw.publicAddress) {
+            if (!latestPublicAddress) return false;
+            if (sw.publicAddress !== latestPublicAddress) return false;
+          }
+        }
+        return true;
+      });
+
+      // Sort the filtered results by creation date (newest first)
+      const sharedPasswords = filteredShared.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
@@ -3599,10 +3645,17 @@ You can view the reply in your shared secrets list 📋.`;
 
       const filteredSharedPasswords = allSharedPasswords.filter((password) => {
         const entries = (password.sharedWith || []).filter((sw: any) => {
-          const matchesUserId = userId && sw.userId && String(sw.userId) === String(userId);
+          const matchesUserId =
+            userId && sw.userId && String(sw.userId) === String(userId);
           const matchesUsername =
-            username && sw.username && sw.username.toLowerCase() === String(username).toLowerCase();
-          return matchesUserId || matchesUsername || (latestPublicAddress && sw.publicAddress === latestPublicAddress);
+            username &&
+            sw.username &&
+            sw.username.toLowerCase() === String(username).toLowerCase();
+          return (
+            matchesUserId ||
+            matchesUsername ||
+            (latestPublicAddress && sw.publicAddress === latestPublicAddress)
+          );
         });
         if (!entries.length) return false;
         for (const sw of entries) {

@@ -3394,13 +3394,26 @@ You can view the reply in your shared secrets list 📋.`;
         if (user) {
           currentUserTelegramId = user.telegramId;
           currentUserPrivacyMode = user.privacyMode || false;
-          // Get user's public address if available
-          const userPublicAddress = await this.publicAddressModel
-            .findOne({ userId: user._id })
-            .exec();
-          if (userPublicAddress) {
-            publicAddress = userPublicAddress.publicKey;
-          }
+          try {
+            if (user.telegramId) {
+              const respByTelegram =
+                await this.publicAddressesService.getLatestAddressByTelegramId(
+                  user.telegramId,
+                );
+              if (respByTelegram.success && respByTelegram.data) {
+                publicAddress = respByTelegram.data.publicKey;
+              }
+            }
+            if (!publicAddress) {
+              const respByUser =
+                await this.publicAddressesService.getLatestAddressByUserId(
+                  String(user._id),
+                );
+              if (respByUser.success && respByUser.data) {
+                publicAddress = respByUser.data.publicKey;
+              }
+            }
+          } catch {}
         }
       } else if (req?.headers?.['x-telegram-init-data']) {
         const headerInitData = req.headers['x-telegram-init-data'] as string;
@@ -3419,13 +3432,26 @@ You can view the reply in your shared secrets list 📋.`;
           if (user) {
             userId = user._id ? String(user._id) : '';
             currentUserPrivacyMode = user.privacyMode || false;
-            // Get user's public address if available
-            const userPublicAddress = await this.publicAddressModel
-              .findOne({ userId: user._id })
-              .exec();
-            if (userPublicAddress) {
-              publicAddress = userPublicAddress.publicKey;
-            }
+            try {
+              if (user.telegramId) {
+                const respByTelegram =
+                  await this.publicAddressesService.getLatestAddressByTelegramId(
+                    user.telegramId,
+                  );
+                if (respByTelegram.success && respByTelegram.data) {
+                  publicAddress = respByTelegram.data.publicKey;
+                }
+              }
+              if (!publicAddress) {
+                const respByUser =
+                  await this.publicAddressesService.getLatestAddressByUserId(
+                    String(user._id),
+                  );
+                if (respByUser.success && respByUser.data) {
+                  publicAddress = respByUser.data.publicKey;
+                }
+              }
+            } catch {}
           }
         }
       } else {
@@ -3569,15 +3595,34 @@ You can view the reply in your shared secrets list 📋.`;
         );
       }
 
-      // Sort the combined results by creation date (newest first)
-      allSharedPasswords.sort(
+      const latestPublicAddress = publicAddress;
+
+      const filteredSharedPasswords = allSharedPasswords.filter((password) => {
+        const entries = (password.sharedWith || []).filter((sw: any) => {
+          const matchesUserId = userId && sw.userId && String(sw.userId) === String(userId);
+          const matchesUsername =
+            username && sw.username && sw.username.toLowerCase() === String(username).toLowerCase();
+          return matchesUserId || matchesUsername || (latestPublicAddress && sw.publicAddress === latestPublicAddress);
+        });
+        if (!entries.length) return false;
+        for (const sw of entries) {
+          if (sw.publicAddress) {
+            if (!latestPublicAddress) return false;
+            if (sw.publicAddress !== latestPublicAddress) return false;
+          }
+        }
+        return true;
+      });
+
+      // Sort the filtered results by creation date (newest first)
+      filteredSharedPasswords.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
 
-      // Apply pagination to the combined results
-      const totalCount = allSharedPasswords.length;
-      const sharedPasswords = allSharedPasswords.slice(skip, skip + limit);
+      // Apply pagination to the filtered results
+      const totalCount = filteredSharedPasswords.length;
+      const sharedPasswords = filteredSharedPasswords.slice(skip, skip + limit);
 
       // If no results found and no search criteria available, return empty result
       if (totalCount === 0 && !username && !publicAddress) {

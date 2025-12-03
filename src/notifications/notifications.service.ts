@@ -336,6 +336,18 @@ export class NotificationsService {
         });
       }
 
+      conditions.push({
+        $or: [
+          { type: { $ne: NotificationType.REPORT_NOTIFICATION } },
+          {
+            $and: [
+              { type: NotificationType.REPORT_NOTIFICATION },
+              { recipientUserId: userIdObj },
+            ],
+          },
+        ],
+      });
+
       // Other filters
       if (recipientTelegramId) conditions.push({ recipientTelegramId });
       if (recipientUsername)

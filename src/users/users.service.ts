@@ -436,6 +436,8 @@ As a result:
       firstName?: string;
       lastName?: string;
       username?: string;
+      phone?: string;
+      email?: string;
       isActive: boolean;
       role?: string;
       privacyMode?: boolean;
@@ -493,6 +495,8 @@ As a result:
           firstName: user.firstName,
           lastName: user.lastName,
           username: user.username,
+          phone: user.phone,
+          email: user.email,
           isActive: user.isActive,
           role: user.role,
           privacyMode: user.privacyMode,
@@ -1096,6 +1100,7 @@ As a result:
           username: userObj.username,
           Name,
           phone,
+          email: userObj.email,
           telegramId: userObj.telegramId,
           photoUrl: userObj.photoUrl,
           authDate: userObj.authDate,

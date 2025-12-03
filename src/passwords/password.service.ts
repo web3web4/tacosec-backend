@@ -1266,6 +1266,40 @@ export class PasswordService {
         }
       }
       processedUpdate.sharedWith = expanded;
+      const creatorUsername = (user.username || '').toLowerCase();
+      const creatorUserIdStr = String((user as UserDocument)._id);
+      let creatorPublicAddress: string | undefined;
+      try {
+        const resp = await this.publicAddressesService.getLatestAddressByUserId(
+          String((user as UserDocument)._id),
+        );
+        creatorPublicAddress = resp?.data?.publicKey;
+      } catch {}
+      processedUpdate.sharedWith = processedUpdate.sharedWith.filter(
+        (shared) => {
+          const sharedUsername = (shared?.username || '').toLowerCase();
+          const sharedUserIdStr = shared?.userId ? String(shared.userId) : '';
+          const sharedPublicAddress = shared?.publicAddress || '';
+          if (
+            sharedUsername &&
+            creatorUsername &&
+            sharedUsername === creatorUsername
+          ) {
+            return false;
+          }
+          if (sharedUserIdStr && sharedUserIdStr === creatorUserIdStr) {
+            return false;
+          }
+          if (
+            creatorPublicAddress &&
+            sharedPublicAddress &&
+            sharedPublicAddress === creatorPublicAddress
+          ) {
+            return false;
+          }
+          return true;
+        },
+      );
     }
 
     // If sharedWith is being updated, check for sharing restrictions
@@ -1383,7 +1417,39 @@ export class PasswordService {
         }
       }
       processedSharedWith = expanded;
-
+      const ownerUsername = (password.initData?.username || '').toLowerCase();
+      const ownerUserIdStr = password.userId ? String(password.userId) : '';
+      let ownerPublicAddress: string | undefined;
+      try {
+        const resp =
+          await this.publicAddressesService.getLatestAddressByUserId(
+            ownerUserIdStr,
+          );
+        ownerPublicAddress = resp?.data?.publicKey;
+      } catch {}
+      processedSharedWith = (processedSharedWith || []).filter((shared) => {
+        const sharedUsername = (shared?.username || '').toLowerCase();
+        const sharedUserIdStr = shared?.userId ? String(shared.userId) : '';
+        const sharedPublicAddress = shared?.publicAddress || '';
+        if (
+          sharedUsername &&
+          ownerUsername &&
+          sharedUsername === ownerUsername
+        ) {
+          return false;
+        }
+        if (sharedUserIdStr && sharedUserIdStr === ownerUserIdStr) {
+          return false;
+        }
+        if (
+          ownerPublicAddress &&
+          sharedPublicAddress &&
+          sharedPublicAddress === ownerPublicAddress
+        ) {
+          return false;
+        }
+        return true;
+      });
       const user = await this.userModel.findById(password.userId).exec();
       if (user && user.sharingRestricted) {
         await this.validateSharingRestrictions(
@@ -1819,6 +1885,35 @@ export class PasswordService {
           }
         }
         processedSharedWith = expanded;
+        const creatorUsername = (user.username || '').toLowerCase();
+        const creatorUserIdStr = String((user as UserDocument)._id);
+        const creatorPublicAddress =
+          (req?.user?.publicAddress as string) ||
+          latestPublicAddress ||
+          undefined;
+        processedSharedWith = processedSharedWith.filter((shared) => {
+          const sharedUsername = (shared?.username || '').toLowerCase();
+          const sharedUserIdStr = shared?.userId ? String(shared.userId) : '';
+          const sharedPublicAddress = shared?.publicAddress || '';
+          if (
+            sharedUsername &&
+            creatorUsername &&
+            sharedUsername === creatorUsername
+          ) {
+            return false;
+          }
+          if (sharedUserIdStr && sharedUserIdStr === creatorUserIdStr) {
+            return false;
+          }
+          if (
+            creatorPublicAddress &&
+            sharedPublicAddress &&
+            sharedPublicAddress === creatorPublicAddress
+          ) {
+            return false;
+          }
+          return true;
+        });
       }
 
       // Check if user is restricted from sharing passwords

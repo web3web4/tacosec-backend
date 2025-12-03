@@ -112,9 +112,13 @@ export class NotificationsService {
       const mergedMetadata = {
         ...(processedData as any).metadata,
         senderPublicAddress:
-          senderLatestPublicAddress ?? (processedData as any).metadata?.senderPublicAddress ?? '',
+          senderLatestPublicAddress ??
+          (processedData as any).metadata?.senderPublicAddress ??
+          '',
         recipientPublicAddress:
-          recipientLatestPublicAddress ?? (processedData as any).metadata?.recipientPublicAddress ?? '',
+          recipientLatestPublicAddress ??
+          (processedData as any).metadata?.recipientPublicAddress ??
+          '',
       };
 
       const notification = new this.notificationModel({
@@ -182,7 +186,9 @@ export class NotificationsService {
       const recipientIdStr = data.recipientUserId
         ? String(data.recipientUserId)
         : undefined;
-      const senderIdStr = data.senderUserId ? String(data.senderUserId) : undefined;
+      const senderIdStr = data.senderUserId
+        ? String(data.senderUserId)
+        : undefined;
       let recipientLatestPublicAddress: string | undefined;
       let senderLatestPublicAddress: string | undefined;
       if (recipientIdStr) {
@@ -209,9 +215,13 @@ export class NotificationsService {
       const mergedMetadata = {
         ...(data as any).metadata,
         senderPublicAddress:
-          senderLatestPublicAddress ?? (data as any).metadata?.senderPublicAddress ?? '',
+          senderLatestPublicAddress ??
+          (data as any).metadata?.senderPublicAddress ??
+          '',
         recipientPublicAddress:
-          recipientLatestPublicAddress ?? (data as any).metadata?.recipientPublicAddress ?? '',
+          recipientLatestPublicAddress ??
+          (data as any).metadata?.recipientPublicAddress ??
+          '',
       };
 
       const notification = new this.notificationModel({
@@ -511,7 +521,8 @@ export class NotificationsService {
           ? String(n.recipientUserId)
           : undefined;
         const meta = n.metadata || {};
-        const metaSenderAddr = meta.senderPublicAddress ?? meta.reporterPublicAddress;
+        const metaSenderAddr =
+          meta.senderPublicAddress ?? meta.reporterPublicAddress;
         const metaRecipientAddr =
           meta.recipientPublicAddress ?? meta.reportedUserPublicAddress;
         if (filterChoice === 'sender') {
@@ -521,7 +532,9 @@ export class NotificationsService {
         } else if (filterChoice === 'recipient') {
           if (!recipientId) return false;
           const latest = latestMap.get(recipientId);
-          return !!metaRecipientAddr && !!latest && metaRecipientAddr === latest;
+          return (
+            !!metaRecipientAddr && !!latest && metaRecipientAddr === latest
+          );
         } else {
           const currentIdStr = String(userIdObj);
           const roleSender = senderId && String(senderId) === currentIdStr;
@@ -533,7 +546,9 @@ export class NotificationsService {
           }
           if (roleRecipient) {
             const latest = recipientId ? latestMap.get(recipientId) : undefined;
-            return !!metaRecipientAddr && !!latest && metaRecipientAddr === latest;
+            return (
+              !!metaRecipientAddr && !!latest && metaRecipientAddr === latest
+            );
           }
           return false;
         }

@@ -861,7 +861,7 @@ As a result:
     // Execute search without pagination first to sort properly
     const allUsers = await this.userModel
       .find(searchFilter)
-      .select('username firstName lastName telegramId -_id')
+      .select('username firstName lastName telegramId')
       .exec();
 
     // Separate users into previously shared and new contacts
@@ -872,18 +872,32 @@ As a result:
     for (const user of allUsers) {
       let latestPublicAddress: string | undefined;
 
-      try {
-        // Get the latest public address for this user
-        const addressResponse =
-          await this.publicAddressesService.getLatestAddressByTelegramId(
-            user.telegramId,
-          );
-        if (addressResponse.success && addressResponse.data) {
-          latestPublicAddress = addressResponse.data.publicKey;
-        }
-      } catch (error) {
-        // If no address found or error, latestPublicAddress remains undefined
-        latestPublicAddress = undefined;
+      if (user.telegramId) {
+        try {
+          const addressByTelegram =
+            await this.publicAddressesService.getLatestAddressByTelegramId(
+              user.telegramId,
+            );
+          if (addressByTelegram.success && addressByTelegram.data?.publicKey) {
+            latestPublicAddress = addressByTelegram.data.publicKey;
+          }
+        } catch {}
+      }
+
+      if (!latestPublicAddress && (user as any)._id) {
+        try {
+          const addressByUser =
+            await this.publicAddressesService.getLatestAddressByUserId(
+              String((user as any)._id),
+            );
+          if (addressByUser.success && addressByUser.data?.publicKey) {
+            latestPublicAddress = addressByUser.data.publicKey;
+          }
+        } catch {}
+      }
+
+      if (!latestPublicAddress) {
+        continue;
       }
 
       const userObj = {

@@ -671,8 +671,7 @@ As a result:
       AddressDetectorUtil.isPublicAddress(searchQuery);
 
     if (isPublicAddressQuery) {
-      // Handle public address search
-      return this.searchByPublicAddress(searchQuery, currentUser, true);
+      return this.searchByPublicAddress(searchQuery, currentUser, false);
     } else {
       // Handle username search (existing logic)
       return this.searchByUsername(

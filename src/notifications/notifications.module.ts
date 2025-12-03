@@ -10,12 +10,17 @@ import { TelegramModule } from '../telegram/telegram.module';
 import { SharedJwtModule } from '../shared/jwt.module';
 import { UsersModule } from '../users/users.module';
 import { User, UserSchema } from '../users/schemas/user.schema';
+import {
+  PublicAddress,
+  PublicAddressSchema,
+} from '../public-addresses/schemas/public-address.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Notification.name, schema: NotificationSchema },
       { name: User.name, schema: UserSchema },
+      { name: PublicAddress.name, schema: PublicAddressSchema },
     ]),
     forwardRef(() => TelegramModule),
     SharedJwtModule,

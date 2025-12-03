@@ -8,6 +8,10 @@ import {
   NotificationStatus,
 } from './schemas/notification.schema';
 import { CreateNotificationDto, GetNotificationsDto } from './dto';
+import {
+  PublicAddress,
+  PublicAddressDocument,
+} from '../public-addresses/schemas/public-address.schema';
 
 export interface NotificationLogData {
   message: string;
@@ -44,6 +48,8 @@ export class NotificationsService {
   constructor(
     @InjectModel(Notification.name)
     private notificationModel: Model<NotificationDocument>,
+    @InjectModel(PublicAddress.name)
+    private publicAddressModel: Model<PublicAddressDocument>,
   ) {}
 
   /**
@@ -74,10 +80,48 @@ export class NotificationsService {
             : data.parentId,
       };
 
+      const recipientIdStr = processedData.recipientUserId
+        ? String(processedData.recipientUserId)
+        : undefined;
+      const senderIdStr = processedData.senderUserId
+        ? String(processedData.senderUserId)
+        : undefined;
+      let recipientLatestPublicAddress: string | undefined;
+      let senderLatestPublicAddress: string | undefined;
+      if (recipientIdStr) {
+        try {
+          const latestRecipient = await this.publicAddressModel
+            .findOne({ userIds: recipientIdStr })
+            .sort({ updatedAt: -1 })
+            .lean()
+            .exec();
+          recipientLatestPublicAddress = latestRecipient?.publicKey;
+        } catch {}
+      }
+      if (senderIdStr) {
+        try {
+          const latestSender = await this.publicAddressModel
+            .findOne({ userIds: senderIdStr })
+            .sort({ updatedAt: -1 })
+            .lean()
+            .exec();
+          senderLatestPublicAddress = latestSender?.publicKey;
+        } catch {}
+      }
+
+      const mergedMetadata = {
+        ...(processedData as any).metadata,
+        senderPublicAddress:
+          senderLatestPublicAddress ?? (processedData as any).metadata?.senderPublicAddress ?? '',
+        recipientPublicAddress:
+          recipientLatestPublicAddress ?? (processedData as any).metadata?.recipientPublicAddress ?? '',
+      };
+
       const notification = new this.notificationModel({
         ...processedData,
         telegramStatus: NotificationStatus.PENDING,
         retryCount: 0,
+        metadata: mergedMetadata,
       });
 
       const savedNotification = await notification.save();
@@ -135,6 +179,41 @@ export class NotificationsService {
     result: NotificationResult,
   ): Promise<NotificationDocument> {
     try {
+      const recipientIdStr = data.recipientUserId
+        ? String(data.recipientUserId)
+        : undefined;
+      const senderIdStr = data.senderUserId ? String(data.senderUserId) : undefined;
+      let recipientLatestPublicAddress: string | undefined;
+      let senderLatestPublicAddress: string | undefined;
+      if (recipientIdStr) {
+        try {
+          const latestRecipient = await this.publicAddressModel
+            .findOne({ userIds: recipientIdStr })
+            .sort({ updatedAt: -1 })
+            .lean()
+            .exec();
+          recipientLatestPublicAddress = latestRecipient?.publicKey;
+        } catch {}
+      }
+      if (senderIdStr) {
+        try {
+          const latestSender = await this.publicAddressModel
+            .findOne({ userIds: senderIdStr })
+            .sort({ updatedAt: -1 })
+            .lean()
+            .exec();
+          senderLatestPublicAddress = latestSender?.publicKey;
+        } catch {}
+      }
+
+      const mergedMetadata = {
+        ...(data as any).metadata,
+        senderPublicAddress:
+          senderLatestPublicAddress ?? (data as any).metadata?.senderPublicAddress ?? '',
+        recipientPublicAddress:
+          recipientLatestPublicAddress ?? (data as any).metadata?.recipientPublicAddress ?? '',
+      };
+
       const notification = new this.notificationModel({
         ...data,
         telegramStatus: result.success
@@ -146,6 +225,7 @@ export class NotificationsService {
         sentAt: result.success ? new Date() : undefined,
         failedAt: !result.success ? new Date() : undefined,
         retryCount: result.success ? 0 : 1,
+        metadata: mergedMetadata,
       });
 
       const savedNotification = await notification.save();
@@ -244,7 +324,6 @@ export class NotificationsService {
       const sortOptions: any = {};
       sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-      // Execute query
       const [notifications, total] = await Promise.all([
         this.notificationModel
           .find(filter)
@@ -256,7 +335,6 @@ export class NotificationsService {
         this.notificationModel.countDocuments(filter).exec(),
       ]);
 
-      // Calculate pagination information
       const totalPages = Math.ceil(total / limit);
       const hasNextPage = page < totalPages;
       const hasPrevPage = page > 1;
@@ -401,21 +479,71 @@ export class NotificationsService {
       const sortOptions: any = {};
       sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-      // Execute query
-      const [notifications, total] = await Promise.all([
-        this.notificationModel
-          .find(filter)
-          .sort(sortOptions)
-          .skip(skip)
-          .limit(limit)
-          .lean()
-          .exec(),
-        this.notificationModel.countDocuments(filter).exec(),
-      ]);
+      const allNotifications = await this.notificationModel
+        .find(filter)
+        .sort(sortOptions)
+        .lean()
+        .exec();
 
-      // Enrich with currentUserRole
+      const userIdsSet = new Set<string>();
+      for (const n of allNotifications) {
+        if (n.senderUserId) userIdsSet.add(String(n.senderUserId));
+        if (n.recipientUserId) userIdsSet.add(String(n.recipientUserId));
+      }
+      const userIds = Array.from(userIdsSet);
+      const latestMap = new Map<string, string>();
+      await Promise.all(
+        userIds.map(async (uid) => {
+          const latest = await this.publicAddressModel
+            .findOne({ userIds: uid })
+            .sort({ updatedAt: -1 })
+            .lean()
+            .exec();
+          if (latest && latest.publicKey) {
+            latestMap.set(uid, latest.publicKey);
+          }
+        }),
+      );
+
+      const filtered = allNotifications.filter((n: any) => {
+        const senderId = n.senderUserId ? String(n.senderUserId) : undefined;
+        const recipientId = n.recipientUserId
+          ? String(n.recipientUserId)
+          : undefined;
+        const meta = n.metadata || {};
+        const metaSenderAddr = meta.senderPublicAddress ?? meta.reporterPublicAddress;
+        const metaRecipientAddr =
+          meta.recipientPublicAddress ?? meta.reportedUserPublicAddress;
+        if (filterChoice === 'sender') {
+          if (!senderId) return false;
+          const latest = latestMap.get(senderId);
+          return !!metaSenderAddr && !!latest && metaSenderAddr === latest;
+        } else if (filterChoice === 'recipient') {
+          if (!recipientId) return false;
+          const latest = latestMap.get(recipientId);
+          return !!metaRecipientAddr && !!latest && metaRecipientAddr === latest;
+        } else {
+          const currentIdStr = String(userIdObj);
+          const roleSender = senderId && String(senderId) === currentIdStr;
+          const roleRecipient =
+            recipientId && String(recipientId) === currentIdStr;
+          if (roleSender) {
+            const latest = senderId ? latestMap.get(senderId) : undefined;
+            return !!metaSenderAddr && !!latest && metaSenderAddr === latest;
+          }
+          if (roleRecipient) {
+            const latest = recipientId ? latestMap.get(recipientId) : undefined;
+            return !!metaRecipientAddr && !!latest && metaRecipientAddr === latest;
+          }
+          return false;
+        }
+      });
+
+      const total = filtered.length;
+      const pageSlice = filtered.slice(skip, skip + limit);
+
       const currentIdStr = String(userIdObj);
-      const enriched = (notifications || []).map((n: any) => {
+      const enriched = (pageSlice || []).map((n: any) => {
         const senderIdStr = n.senderUserId ? String(n.senderUserId) : undefined;
         const recipientIdStr = n.recipientUserId
           ? String(n.recipientUserId)
@@ -427,7 +555,6 @@ export class NotificationsService {
         return { ...n, currentUserRole: role };
       });
 
-      // Pagination info
       const totalPages = Math.ceil(total / limit);
       const hasNextPage = page < totalPages;
       const hasPrevPage = page > 1;

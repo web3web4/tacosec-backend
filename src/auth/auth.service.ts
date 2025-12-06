@@ -307,6 +307,16 @@ export class AuthService {
         publicAddress: publicAddress, // Add publicAddress to JWT payload
       };
 
+      // Update updatedAt for existing public address to match login time
+      try {
+        await this.publicAddressModel
+          .updateOne(
+            { publicKey: publicAddress },
+            { $set: { updatedAt: new Date() } },
+          )
+          .exec();
+      } catch {}
+
       // Generate JWT tokens
       return await this.generateTokens(payload, user);
     } catch (error) {
@@ -563,6 +573,19 @@ export class AuthService {
           addressRecord.userIds.push(user._id);
           await addressRecord.save();
         }
+
+        // Update updatedAt to match login time from Telegram authDate
+        try {
+          const telegramData =
+            this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
+          const loginTime = new Date(telegramData.authDate * 1000);
+          await this.publicAddressModel
+            .updateOne(
+              { publicKey: publicAddress },
+              { $set: { updatedAt: loginTime } },
+            )
+            .exec();
+        } catch {}
       } else if (hasValidPublicAddress && !addressRecord) {
         // Create new address record
         const newAddressRecord = new this.publicAddressModel({

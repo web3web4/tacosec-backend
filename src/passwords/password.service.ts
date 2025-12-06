@@ -2176,7 +2176,8 @@ export class PasswordService {
                   } catch {}
                   const fallbackMessage = `Secret shared with you.
                  User ${user.username} (user public address : ${formattedSenderAddress}) has shared a secret with you. 
-                 You can view it under the "Shared with me" tab.`;
+                 You can view it under the "Shared with me" tab.
+                 Note: If you have public address, you can view the secret.`;
                   await this.notificationsService.logNotificationWithResult(
                     {
                       message: fallbackMessage,
@@ -2220,7 +2221,7 @@ export class PasswordService {
 User <span class="tg-spoiler"><b>${userName}</b></span> (user public address : ${formattedSenderAddress}) has shared a secret with you 🔁.
 
 You can view it under the <b>"Shared with me"</b> tab 📂.
-`;
+<i>Note: If you have  public address, you can view the secret.</i>`;
               const replyMarkup = {
                 inline_keyboard: [
                   [
@@ -2665,7 +2666,7 @@ You can view the response in your secrets list 📋.`;
                     );
                   recipientPublicAddress = recipientAddrResp?.data?.publicKey;
                 } catch {}
-                const fallbackMessage = `Reply to Shared Secret. User ${childUser.username} (user public address: ${formattedChildAddress}) has replied to ${parentOwner.username}'s secret (user public address: ${formattedParentOwnerAddress}) that was previously shared with you.`;
+                const fallbackMessage = `Reply to Shared Secret. User ${childUser.username} (user public address: ${formattedChildAddress}) has replied to ${parentOwner.username}'s secret (user public address: ${formattedParentOwnerAddress}) that was previously shared with you. Note: If you have public address, you can view the secret.`;
                 await this.notificationsService.logNotificationWithResult(
                   {
                     message: fallbackMessage,
@@ -2706,7 +2707,8 @@ User <b>${childUserDisplayName}</b> (user public address: ${formattedChildAddres
 
 📅 <b>Reply Date & Time:</b> ${dateTime}
 
-You can view the reply in your shared secrets list 📋.`;
+You can view the reply in your shared secrets list 📋.
+<i>Note: If you have public address, you can view the secret.</i>`;
             const replyMarkup = {
               inline_keyboard: [
                 [

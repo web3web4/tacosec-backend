@@ -2134,12 +2134,32 @@ export class PasswordService {
               : 'N/A';
 
             for (const sharedWithInfo of recipients) {
-              const sharedWithUserId = new Types.ObjectId(
-                sharedWithInfo.userId,
+              const actorIdStr = user._id ? String(user._id) : '';
+              const actorUsername = (user.username || '').toLowerCase();
+              const actorTelegramId = String(user.telegramId || '');
+              const recipientIdStr = sharedWithInfo.userId
+                ? String(sharedWithInfo.userId)
+                : '';
+              const recipientUsername = (
+                sharedWithInfo.username || ''
+              ).toLowerCase();
+              const recipientTelegramId = String(
+                (sharedWithInfo as any).telegramId || '',
               );
+              if (recipientIdStr && recipientIdStr === actorIdStr) {
+                continue;
+              }
               if (
-                (sharedWithUserId ? String(sharedWithUserId) : '') ===
-                (user._id ? String(user._id) : '')
+                recipientUsername &&
+                actorUsername &&
+                recipientUsername === actorUsername
+              ) {
+                continue;
+              }
+              if (
+                recipientTelegramId &&
+                actorTelegramId &&
+                recipientTelegramId === actorTelegramId
               ) {
                 continue;
               }
@@ -2161,7 +2181,9 @@ export class PasswordService {
                     {
                       message: fallbackMessage,
                       type: NotificationType.PASSWORD_SHARED,
-                      recipientUserId: sharedWithUserId,
+                      recipientUserId: new Types.ObjectId(
+                        String(sharedWithInfo.userId),
+                      ),
                       recipientUsername: sharedWithInfo.username,
                       senderUserId: user._id as Types.ObjectId,
                       senderUsername: user.username,
@@ -2216,7 +2238,9 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
                 replyMarkup,
                 {
                   type: NotificationType.PASSWORD_SHARED,
-                  recipientId: sharedWithUserId,
+                  recipientId: new Types.ObjectId(
+                    String(sharedWithInfo.userId),
+                  ),
                   recipientUsername: sharedWithInfo.username,
                   senderUserId: user._id as Types.ObjectId,
                   senderUsername: user.username,
@@ -2584,17 +2608,38 @@ You can view the response in your secrets list 📋.`;
           }
 
           for (const sharedUserInfo of recipients) {
-            const sharedUserId = new Types.ObjectId(sharedUserInfo.userId);
+            const actorIdStr = childUser._id ? String(childUser._id) : '';
+            const ownerIdStr = parentOwner._id ? String(parentOwner._id) : '';
+            const recipientIdStr = sharedUserInfo.userId
+              ? String(sharedUserInfo.userId)
+              : '';
+            const actorUsername = (childUser.username || '').toLowerCase();
+            const ownerUsername = (parentOwner.username || '').toLowerCase();
+            const recipientUsername = (
+              sharedUserInfo.username || ''
+            ).toLowerCase();
+            const actorTelegramId = String(childUser.telegramId || '');
+            const ownerTelegramId = String(parentOwner.telegramId || '');
+            const recipientTelegramId = String(
+              (sharedUserInfo as any).telegramId || '',
+            );
             if (
-              (sharedUserId ? String(sharedUserId) : '') ===
-              (childUser._id ? String(childUser._id) : '')
+              recipientIdStr &&
+              (recipientIdStr === actorIdStr || recipientIdStr === ownerIdStr)
             ) {
               continue;
             }
-
             if (
-              (sharedUserId ? String(sharedUserId) : '') ===
-              (parentOwner._id ? String(parentOwner._id) : '')
+              recipientUsername &&
+              ((actorUsername && recipientUsername === actorUsername) ||
+                (ownerUsername && recipientUsername === ownerUsername))
+            ) {
+              continue;
+            }
+            if (
+              recipientTelegramId &&
+              ((actorTelegramId && recipientTelegramId === actorTelegramId) ||
+                (ownerTelegramId && recipientTelegramId === ownerTelegramId))
             ) {
               continue;
             }
@@ -2625,7 +2670,9 @@ You can view the response in your secrets list 📋.`;
                   {
                     message: fallbackMessage,
                     type: NotificationType.PASSWORD_CHILD_RESPONSE,
-                    recipientUserId: sharedUserId,
+                    recipientUserId: new Types.ObjectId(
+                      String(sharedUserInfo.userId),
+                    ),
                     recipientUsername: sharedUserInfo.username,
                     senderUserId: childUser._id as Types.ObjectId,
                     senderUsername: childUser.username,
@@ -2677,7 +2724,9 @@ You can view the reply in your shared secrets list 📋.`;
               replyMarkup,
               {
                 type: NotificationType.PASSWORD_CHILD_RESPONSE,
-                recipientUserId: sharedUserId,
+                recipientUserId: new Types.ObjectId(
+                  String(sharedUserInfo.userId),
+                ),
                 recipientUsername: sharedUserInfo.username,
                 senderUserId: childUser._id as Types.ObjectId,
                 senderUsername: childUser.username,

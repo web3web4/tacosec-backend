@@ -137,6 +137,14 @@ export class TelegramService {
       );
     }
 
+    if (
+      notificationData?.senderUserId &&
+      recipientUser?._id &&
+      String(notificationData.senderUserId) === String(recipientUser._id)
+    ) {
+      return true;
+    }
+
     // Prepare notification log data
     const logData: NotificationLogData = {
       message: originalMessage,

@@ -645,6 +645,7 @@ As a result:
     skip: number = 0,
   ): Promise<{
     data: {
+      userId: string;
       username: string;
       firstName?: string;
       lastName?: string;
@@ -698,6 +699,7 @@ As a result:
     allowCurrentUser: boolean = false,
   ): Promise<{
     data: {
+      userId: string;
       username: string;
       firstName?: string;
       lastName?: string;
@@ -770,6 +772,7 @@ As a result:
         });
 
         results.push({
+          userId: user._id.toString(),
           username: displayUsername,
           firstName: user.firstName,
           lastName: user.lastName,
@@ -809,6 +812,7 @@ As a result:
     skip: number,
   ): Promise<{
     data: {
+      userId: string;
       username: string;
       firstName?: string;
       lastName?: string;
@@ -904,6 +908,7 @@ As a result:
       }
 
       const userObj = {
+        userId: (user as any)._id?.toString?.() || String((user as any)._id),
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,

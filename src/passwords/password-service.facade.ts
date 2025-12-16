@@ -478,8 +478,15 @@ export class PasswordServiceFacade {
       const passwordObj = (password as PasswordDocument).toObject();
       const { userId: _, ...passwordWithId } = passwordObj;
 
+      console.log('[FACADE addPassword] Password created:', {
+        _id: passwordObj._id,
+        hasParentSecret: !!passwordData.parent_secret_id,
+        sharedWithCount: processedSharedWith.length,
+      });
+
       // Send notifications for child password
       if (passwordData.parent_secret_id) {
+        console.log('[FACADE addPassword] Sending child password notifications');
         await this.notificationService.sendChildPasswordNotificationToParentOwner(
           passwordData.parent_secret_id,
           user,
@@ -493,6 +500,16 @@ export class PasswordServiceFacade {
           passwordData.key,
           String(passwordObj._id),
         );
+      }
+
+      // Send notifications to shared users (if not a child password)
+      if (!passwordData.parent_secret_id && processedSharedWith.length > 0) {
+        console.log('[FACADE addPassword] Sending shared notifications to', processedSharedWith.length, 'users');
+        await this.notificationService.sendMessageToUsersBySharedWith(
+          password as PasswordDocument,
+        );
+      } else if (!passwordData.parent_secret_id) {
+        console.log('[FACADE addPassword] No sharedWith users, skipping notifications');
       }
 
       return passwordWithId;

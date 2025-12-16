@@ -53,7 +53,13 @@ export class PasswordNotificationService extends PasswordBaseService {
    */
   async sendMessageToUsersBySharedWith(passwordUser: Password): Promise<void> {
     try {
-      console.log('Sending message to users by shared with internally');
+      console.log('='.repeat(80));
+      console.log('[NOTIFICATION SERVICE] sendMessageToUsersBySharedWith called!');
+      console.log('[NOTIFICATION SERVICE] passwordUser._id:', passwordUser._id);
+      console.log('[NOTIFICATION SERVICE] passwordUser.userId:', passwordUser.userId);
+      console.log('[NOTIFICATION SERVICE] passwordUser.sharedWith length:', passwordUser.sharedWith?.length || 0);
+      console.log('[NOTIFICATION SERVICE] passwordUser.parent_secret_id:', passwordUser.parent_secret_id);
+      console.log('='.repeat(80));
 
       // Skip for child secrets
       if (passwordUser.parent_secret_id) {
@@ -101,11 +107,17 @@ export class PasswordNotificationService extends PasswordBaseService {
             }
 
             for (const recipientInfo of recipients) {
+              console.log(
+                `[DEBUG] Processing recipient: ${recipientInfo.username} (telegramId: ${recipientInfo.telegramId})`,
+              );
+
               if (this.isSameUser(user, recipientInfo)) {
+                console.log('[DEBUG] Skipping - same user');
                 continue;
               }
 
               if (!recipientInfo.telegramId) {
+                console.log('[DEBUG] No telegram ID - sending fallback');
                 await this.sendFallbackNotification(
                   user,
                   recipientInfo,
@@ -116,6 +128,7 @@ export class PasswordNotificationService extends PasswordBaseService {
                 continue;
               }
 
+              console.log('[DEBUG] Has telegram ID - sending telegram notification');
               await this.sendTelegramShareNotification(
                 user,
                 recipientInfo,
@@ -401,6 +414,13 @@ You can view the reply in your shared secrets list 📋.
   // ============================================
 
   private async resolveRecipients(sharedWith: any): Promise<any[]> {
+    console.log(`[DEBUG] resolveRecipients called with:`, {
+      username: sharedWith.username,
+      userId: sharedWith?.userId,
+      publicAddress: sharedWith?.publicAddress,
+      telegramId: sharedWith?.telegramId,
+    });
+
     const recipients: any[] = [];
     const onlyPublicAddress =
       !!sharedWith?.publicAddress &&
@@ -428,6 +448,8 @@ You can view the reply in your shared secrets list 📋.
       );
       if (info) recipients.push(info);
     }
+
+    console.log(`[DEBUG] resolveRecipients found ${recipients.length} recipient(s)`);
 
     return recipients;
   }
@@ -525,6 +547,10 @@ Note: If you have public address, you can view the secret.`;
     password: Password,
     formattedSenderAddress: string,
   ): Promise<void> {
+    console.log(
+      `[DEBUG] sendTelegramShareNotification called for recipient: ${recipient.username} (${recipient.telegramId})`,
+    );
+
     const userName = this.getUserDisplayName(sender);
 
     const message = `🔐 <b>Secret Shared With You</b>
@@ -544,6 +570,10 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         ],
       ],
     };
+
+    console.log(
+      `[DEBUG] Calling telegramService.sendMessage to ${recipient.telegramId}`,
+    );
 
     await this.telegramService.sendMessage(
       Number(recipient.telegramId),

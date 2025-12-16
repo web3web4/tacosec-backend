@@ -9,7 +9,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
-import { PasswordService } from '../passwords/password.service';
+import { PasswordServiceFacade } from '../passwords/password-service.facade';
 import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
 import {
   Password,
@@ -39,7 +39,7 @@ import { LogEvent } from '../logger/dto/log-event.enum';
 export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
-    private passwordService: PasswordService,
+    private passwordService: PasswordServiceFacade,
     @InjectModel(Password.name) private passwordModel: Model<PasswordDocument>,
     @InjectModel(PublicAddress.name)
     private publicAddressModel: Model<PublicAddressDocument>,

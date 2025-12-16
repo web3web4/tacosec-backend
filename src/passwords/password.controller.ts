@@ -10,7 +10,8 @@ import {
   Request,
 } from '@nestjs/common';
 
-import { PasswordService, AuthenticatedRequest } from './password.service';
+import { PasswordServiceFacade } from './password-service.facade';
+import { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
 // import { CreatePasswordDto } from './dto/create-password.dto';
 import { CreatePasswordRequestDto } from './dto/create-password-request.dto';
 import { AdminSecretsFilterDto } from './dto/admin-secrets-filter.dto';
@@ -27,7 +28,7 @@ import { Password } from './schemas/password.schema';
 @Controller('passwords')
 export class PasswordController {
   constructor(
-    private readonly passwordService: PasswordService,
+    private readonly passwordService: PasswordServiceFacade,
     // private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
     // private readonly telegramService: TelegramService,
     // private readonly publicAddressesService: PublicAddressesService,
@@ -223,7 +224,7 @@ export class PasswordController {
   @Roles(Role.ADMIN)
   async getAllSecretsForAdmin(
     @Query() filters: AdminSecretsFilterDto,
-    @Request() req: AuthenticatedRequest,
+    @Request() _req: AuthenticatedRequest,
   ) {
     return this.passwordService.getAllSecretsForAdmin(filters);
   }

@@ -21,7 +21,7 @@ import { TelegramUserExistsPipe } from './pipes/telegram-user-exists.pipe';
 import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { Roles, Role } from '../decorators/roles.decorator';
-import { AuthenticatedRequest } from '../passwords/password.service';
+import { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
 import {
   Pagination,
   PaginationParams,

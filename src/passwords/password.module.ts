@@ -20,6 +20,14 @@ import { PublicAddressesModule } from '../public-addresses/public-addresses.modu
 import { NotificationsModule } from '../notifications/notifications.module';
 import { LoggerModule } from '../logger/logger.module';
 
+// Sub-services for better code organization
+import { PasswordCrudService } from './services/password-crud.service';
+import { PasswordQueryService } from './services/password-query.service';
+import { PasswordSharingService } from './services/password-sharing.service';
+import { PasswordNotificationService } from './services/password-notification.service';
+import { PasswordViewsService } from './services/password-views.service';
+import { PasswordServiceFacade } from './password-service.facade';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -39,7 +47,28 @@ import { LoggerModule } from '../logger/logger.module';
     forwardRef(() => LoggerModule),
   ],
   controllers: [PasswordController],
-  providers: [PasswordService, TelegramDtoAuthGuard],
-  exports: [PasswordService],
+  providers: [
+    // Original service (maintained for backward compatibility)
+    PasswordService,
+    TelegramDtoAuthGuard,
+
+    // New sub-services for better code organization
+    PasswordCrudService,
+    PasswordQueryService,
+    PasswordSharingService,
+    PasswordNotificationService,
+    PasswordViewsService,
+    PasswordServiceFacade,
+  ],
+  exports: [
+    PasswordService,
+    // Export sub-services for direct use if needed
+    PasswordCrudService,
+    PasswordQueryService,
+    PasswordSharingService,
+    PasswordNotificationService,
+    PasswordViewsService,
+    PasswordServiceFacade,
+  ],
 })
 export class PasswordModule {}

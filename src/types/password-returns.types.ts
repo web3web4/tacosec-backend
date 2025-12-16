@@ -26,4 +26,6 @@ export type passwordReturns = {
   reports: PasswordReportInfo[]; // Array of unresolved reports for this password
   firstName?: string; // First name of the password owner
   lastName?: string; // Last name of the password owner
+  viewsCount?: number; // Number of secret views
+  secretViews?: any[]; // Array of secret view records
 };

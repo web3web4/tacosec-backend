@@ -12,7 +12,6 @@ import {
 } from '@nestjs/common';
 import { Request as ExpressRequest } from 'express';
 import { UsersService } from './users.service';
-import { PasswordService } from '../passwords/password.service';
 import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
 import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
@@ -36,7 +35,6 @@ import { UpdateUserActiveStatusDto } from './dto/update-user-active-status.dto';
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly passwordService: PasswordService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
     private readonly telegramService: TelegramService,
     private readonly httpService: HttpService,

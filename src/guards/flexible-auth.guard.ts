@@ -4,43 +4,27 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { JwtService } from '@nestjs/jwt';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { TelegramValidatorService } from '../telegram/telegram-validator.service';
-import { User, UserDocument } from '../users/schemas/user.schema';
-import { TelegramDtoAuthGuard } from './telegram-dto-auth.guard';
+import { AuthContextService } from '../common/services/auth-context.service';
 
 @Injectable()
 export class FlexibleAuthGuard implements CanActivate {
-  constructor(
-    private telegramValidator: TelegramValidatorService,
-    private jwtService: JwtService,
-    @InjectModel(User.name) private userModel: Model<UserDocument>,
-    private reflector: Reflector,
-    private telegramDtoAuthGuard: TelegramDtoAuthGuard,
-  ) {}
+  constructor(private readonly authContextService: AuthContextService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
 
-    // Priority 1: Check for JWT token in Authorization header
     const authHeader = request.headers.authorization;
+    const telegramInitData = request.headers['x-telegram-init-data'] as
+      | string
+      | undefined;
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       try {
-        // Verify JWT token
-        const payload = this.jwtService.verify(token);
+        const { user, payload } =
+          await this.authContextService.getJwtUserAndPayload(token);
 
-        // Check if user exists in database
-        const user = await this.userModel.findById(payload.sub).exec();
-        if (!user || !user.isActive) {
-          throw new UnauthorizedException('User not found or inactive');
-        }
-
-        // Store user data in request for later use
         (request as any).user = {
           id: user._id.toString(),
           telegramId: user.telegramId || '',
@@ -48,9 +32,9 @@ export class FlexibleAuthGuard implements CanActivate {
           firstName: user.firstName || '',
           lastName: user.lastName || '',
           publicAddress: payload.publicAddress || '',
+          role: user.role,
         };
 
-        // Store authentication method for reference
         (request as any).authMethod = 'jwt';
 
         return true;
@@ -62,24 +46,13 @@ export class FlexibleAuthGuard implements CanActivate {
       }
     }
 
-    // Priority 2: Check for Telegram init data in header
-    const telegramInitData = request.headers['x-telegram-init-data'] as string;
     if (telegramInitData) {
       try {
-        // Validate Telegram init data
-        const isValid =
-          this.telegramValidator.validateTelegramInitData(telegramInitData);
-        if (!isValid) {
-          throw new UnauthorizedException(
-            'Invalid Telegram authentication data',
-          );
-        }
-
-        // Parse Telegram data
         const telegramData =
-          this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
+          this.authContextService.getTelegramAuthDataFromInitData(
+            telegramInitData,
+          );
 
-        // Store telegram data in request for later use
         (request as any).telegramData = telegramData;
         (request as any).authMethod = 'telegram';
 
@@ -94,7 +67,6 @@ export class FlexibleAuthGuard implements CanActivate {
       }
     }
 
-    // No valid authentication method found
     throw new UnauthorizedException(
       'Authentication required: provide either JWT token or Telegram init data',
     );

@@ -7,7 +7,7 @@ import {
   NotificationType,
   NotificationStatus,
 } from './schemas/notification.schema';
-import { CreateNotificationDto, GetNotificationsDto } from './dto';
+import { GetNotificationsDto } from './dto';
 import {
   PublicAddress,
   PublicAddressDocument,

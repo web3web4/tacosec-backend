@@ -1,43 +1,32 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from '../../src/auth/auth.controller';
 import { AuthService } from '../../src/auth/auth.service';
-import { JwtService } from '@nestjs/jwt';
-import { getModelToken } from '@nestjs/mongoose';
-import { PublicAddress } from '../../src/public-addresses/schemas/public-address.schema';
-import { User } from '../../src/users/schemas/user.schema';
+import { LoggerService } from '../../src/logger/logger.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
   let service: AuthService;
 
-  const mockPublicAddressModel = {
-    findOne: jest.fn(),
+  const mockAuthService = {
+    login: jest.fn(),
+    refreshToken: jest.fn(),
   };
 
-  const mockUserModel = {
-    findById: jest.fn(),
-  };
-
-  const mockJwtService = {
-    sign: jest.fn(),
+  const mockLoggerService = {
+    logException: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
-        AuthService,
         {
-          provide: getModelToken(PublicAddress.name),
-          useValue: mockPublicAddressModel,
+          provide: AuthService,
+          useValue: mockAuthService,
         },
         {
-          provide: getModelToken(User.name),
-          useValue: mockUserModel,
-        },
-        {
-          provide: JwtService,
-          useValue: mockJwtService,
+          provide: LoggerService,
+          useValue: mockLoggerService,
         },
       ],
     }).compile();
@@ -66,7 +55,7 @@ describe('AuthController', () => {
       const result = await controller.login(loginDto);
 
       expect(result).toEqual(expectedResponse);
-      expect(service.login).toHaveBeenCalledWith(loginDto);
+      expect(service.login).toHaveBeenCalledWith(loginDto, undefined);
     });
   });
 });

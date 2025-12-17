@@ -157,9 +157,7 @@ export class LoggerService {
         telegramId = auth.telegramId;
         username = auth.username;
       }
-    } catch (_) {
-      // ignore auth extraction failure
-    }
+    } catch {}
 
     const isHttp = err instanceof HttpException;
     const status = isHttp ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
@@ -248,7 +246,7 @@ export class LoggerService {
       });
       const savedLog = await errorLog.save();
       return savedLog;
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to save system log',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -521,7 +519,7 @@ export class LoggerService {
           hasPrevPage: page > 1,
         },
       };
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to fetch logs for admin',
         HttpStatus.INTERNAL_SERVER_ERROR,

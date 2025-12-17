@@ -476,7 +476,8 @@ export class PasswordServiceFacade {
       });
 
       const passwordObj = (password as PasswordDocument).toObject();
-      const { userId: _, ...passwordWithId } = passwordObj;
+      const { userId, ...passwordWithId } = passwordObj;
+      void userId;
 
       console.log('[FACADE addPassword] Password created:', {
         _id: passwordObj._id,
@@ -763,7 +764,7 @@ export class PasswordServiceFacade {
     username?: string,
     userId?: string,
     publicAddress?: string,
-  ): Promise<Password | {}> {
+  ): Promise<Password | Record<string, never>> {
     return this.viewsService.recordSecretView(
       secretId,
       telegramId,

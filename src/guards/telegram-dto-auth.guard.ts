@@ -6,13 +6,10 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { JwtService } from '@nestjs/jwt';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
 import { TelegramValidatorService } from '../telegram/telegram-validator.service';
-import { User, UserDocument } from '../users/schemas/user.schema';
 import { SKIP_TELEGRAM_VALIDATION } from '../decorators/telegram-auth.decorator';
+import { AuthContextService } from '../common/services/auth-context.service';
 
 export interface TelegramUser {
   id: number;
@@ -28,8 +25,7 @@ export interface TelegramUser {
 export class TelegramDtoAuthGuard implements CanActivate {
   constructor(
     private telegramValidator: TelegramValidatorService,
-    private jwtService: JwtService,
-    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private readonly authContextService: AuthContextService,
     private reflector: Reflector,
   ) {}
 
@@ -47,14 +43,8 @@ export class TelegramDtoAuthGuard implements CanActivate {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       try {
-        // Verify JWT token
-        const payload = this.jwtService.verify(token);
-
-        // Check if user exists in database
-        const user = await this.userModel.findById(payload.sub).exec();
-        if (!user || !user.isActive) {
-          throw new UnauthorizedException('User not found or inactive');
-        }
+        const { user, payload } =
+          await this.authContextService.getJwtUserAndPayload(token);
 
         // If skipTelegramValidation is true, don't check telegramId
         if (!skipTelegramValidation) {

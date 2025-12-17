@@ -5,13 +5,22 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { User, UserDocument } from '../../users/schemas/user.schema';
 import { TelegramValidatorService } from '../../telegram/telegram-validator.service';
-import { TelegramDtoAuthGuard } from '../../guards/telegram-dto-auth.guard';
 import {
   AuthenticatedRequest,
   AuthenticatedUser,
   TelegramAuthData,
 } from '../interfaces/authenticated-request.interface';
 import { ERROR_MESSAGES } from '../constants/error-messages.constant';
+
+type TelegramUser = {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date?: number;
+  hash?: string;
+};
 
 /**
  * Auth Context Service
@@ -26,8 +35,50 @@ export class AuthContextService {
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly jwtService: JwtService,
     private readonly telegramValidator: TelegramValidatorService,
-    private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
   ) {}
+
+  async getJwtUserAndPayload(token: string): Promise<{
+    user: UserDocument;
+    payload: any;
+  }> {
+    try {
+      const payload = this.jwtService.verify(token);
+      const user = await this.userModel.findById(payload.sub).exec();
+
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('User not found or inactive');
+      }
+
+      return { user, payload };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException(ERROR_MESSAGES.AUTH.INVALID_TOKEN);
+    }
+  }
+
+  getTelegramAuthDataFromInitData(telegramInitData: string): TelegramAuthData {
+    const isValid =
+      this.telegramValidator.validateTelegramInitData(telegramInitData);
+    if (!isValid) {
+      throw new UnauthorizedException(
+        ERROR_MESSAGES.AUTH.INVALID_TELEGRAM_DATA,
+      );
+    }
+
+    const telegramData = this.parseTelegramInitData(telegramInitData);
+
+    return {
+      telegramId: telegramData.telegramId,
+      username: telegramData.username,
+      firstName: telegramData.firstName,
+      lastName: telegramData.lastName,
+      photoUrl: telegramData.photoUrl,
+      authDate: telegramData.authDate,
+      hash: telegramData.hash,
+    };
+  }
 
   /**
    * Extract authenticated user from request
@@ -158,8 +209,7 @@ export class AuthContextService {
       }
 
       // Parse Telegram data
-      const telegramData =
-        this.telegramDtoAuthGuard.parseTelegramInitData(telegramInitData);
+      const telegramData = this.parseTelegramInitData(telegramInitData);
 
       // Find user by Telegram ID
       const user = await this.userModel
@@ -182,6 +232,38 @@ export class AuthContextService {
         ERROR_MESSAGES.AUTH.INVALID_TELEGRAM_DATA,
       );
     }
+  }
+
+  private parseTelegramInitData(initData: string): {
+    telegramId: string;
+    firstName: string;
+    lastName?: string;
+    username?: string;
+    photoUrl?: string;
+    authDate: number;
+    hash: string;
+  } {
+    const params = new URLSearchParams(initData);
+    const userJson = params.get('user');
+    let user: TelegramUser = {} as TelegramUser;
+
+    try {
+      if (userJson) {
+        user = JSON.parse(decodeURIComponent(userJson));
+      }
+    } catch (e) {
+      console.error('Field To Get User Data:', e);
+    }
+
+    return {
+      telegramId: user.id ? user.id.toString() : '',
+      firstName: user.first_name || '',
+      lastName: user.last_name || '',
+      username: user.username || '',
+      photoUrl: user.photo_url,
+      authDate: parseInt(params.get('auth_date') || '0'),
+      hash: params.get('hash') || '',
+    };
   }
 
   /**

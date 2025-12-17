@@ -19,7 +19,7 @@ export class AllExceptionsLoggerFilter implements ExceptionFilter {
 
     try {
       await this.loggerService.logException(exception, req as any);
-    } catch (_) {}
+    } catch {}
 
     const isHttp = exception instanceof HttpException;
     const status = isHttp

@@ -4,7 +4,6 @@ import {
   IsDateString,
   IsNumberString,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
 
 export class GetLogsDto {
   @IsOptional()

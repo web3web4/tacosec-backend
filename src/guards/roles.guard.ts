@@ -32,6 +32,11 @@ export class RolesGuard implements CanActivate {
     if ((request as any).authMethod === 'jwt') {
       // JWT authentication - user data is already in request.user
       const userData = (request as any).user;
+
+      if (userData?.role) {
+        return requiredRoles.some((role) => userData.role === role);
+      }
+
       if (userData) {
         // First try to find by telegramId if available
         if (userData.telegramId) {
@@ -44,19 +49,21 @@ export class RolesGuard implements CanActivate {
       }
     } else {
       // Telegram authentication - extract from telegram init data
-      const telegramId = request.headers['x-telegram-init-data']
-        ? new URLSearchParams(request.headers['x-telegram-init-data']).get(
-            'user',
-          )
-          ? JSON.parse(
-              decodeURIComponent(
-                new URLSearchParams(
-                  request.headers['x-telegram-init-data'],
-                ).get('user'),
-              ),
-            ).id
-          : null
-        : null;
+      const telegramId =
+        (request as any).telegramData?.telegramId ||
+        (request.headers['x-telegram-init-data']
+          ? new URLSearchParams(request.headers['x-telegram-init-data']).get(
+              'user',
+            )
+            ? JSON.parse(
+                decodeURIComponent(
+                  new URLSearchParams(
+                    request.headers['x-telegram-init-data'],
+                  ).get('user'),
+                ),
+              ).id
+            : null
+          : null);
 
       if (!telegramId) {
         throw new UnauthorizedException('User not authenticated');

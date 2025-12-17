@@ -35,7 +35,7 @@ export class NotificationsController {
   async getNotifications(@Query() query: GetNotificationsDto) {
     try {
       return await this.notificationsService.getNotifications(query);
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to retrieve notifications',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -52,7 +52,7 @@ export class NotificationsController {
   async getNotificationStats(@Query('userId') userId?: string) {
     try {
       return await this.notificationsService.getNotificationStats(userId);
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to retrieve notification statistics',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -72,7 +72,7 @@ export class NotificationsController {
       return await this.notificationsService.getFailedNotificationsForRetry(
         max,
       );
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to retrieve failed notifications',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -127,7 +127,7 @@ export class NotificationsController {
     try {
       const searchQuery = { ...query, senderUserId };
       return await this.notificationsService.getNotifications(searchQuery);
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to retrieve notifications by sender',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -148,7 +148,7 @@ export class NotificationsController {
     try {
       const searchQuery = { ...query, recipientUserId };
       return await this.notificationsService.getNotifications(searchQuery);
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to retrieve notifications by recipient',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -169,7 +169,7 @@ export class NotificationsController {
     try {
       const searchQuery = { ...query, type: type as any };
       return await this.notificationsService.getNotifications(searchQuery);
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to retrieve notifications by type',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -190,7 +190,7 @@ export class NotificationsController {
     try {
       const searchQuery = { ...query, telegramStatus: telegramStatus as any };
       return await this.notificationsService.getNotifications(searchQuery);
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to retrieve notifications by telegram status',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -222,7 +222,7 @@ export class NotificationsController {
         senderOrrecipient,
         query,
       );
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to retrieve my notifications',
         HttpStatus.INTERNAL_SERVER_ERROR,

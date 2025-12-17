@@ -3512,8 +3512,9 @@ You can view the reply in your shared secrets list 📋.
         .select('sharedWith -_id')
         .exec();
 
-      const sharedWithData =
-        sharedWith.length > 0 ? sharedWith[0].sharedWith : [];
+      const sharedWithData = Array.isArray(sharedWith?.[0]?.sharedWith)
+        ? sharedWith[0].sharedWith
+        : [];
 
       // Apply pagination to sharedWith array
       const skip = (page - 1) * limit;
@@ -4005,8 +4006,9 @@ You can view the reply in your shared secrets list 📋.
         .select('sharedWith -_id')
         .exec();
 
-      const sharedWithData =
-        sharedWith.length > 0 ? sharedWith[0].sharedWith : [];
+      const sharedWithData = Array.isArray(sharedWith?.[0]?.sharedWith)
+        ? sharedWith[0].sharedWith
+        : [];
 
       // Apply pagination to sharedWith array
       const skip = (page - 1) * limit;

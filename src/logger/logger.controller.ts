@@ -144,8 +144,8 @@ export class LoggerController {
     logsThisWeek: number;
     averagePerDay: number;
   }> {
-    // This is a placeholder for future implementation
-    // You can implement this method in the service if needed
+    void days;
+    void req;
     return {
       totalLogs: 0,
       logsToday: 0,

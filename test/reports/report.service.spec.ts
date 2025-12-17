@@ -5,6 +5,11 @@ import { User } from '../../src/users/schemas/user.schema';
 import { Report } from '../../src/reports/schemas/report.schema';
 import { Password } from '../../src/passwords/schemas/password.schema';
 import { AppConfigService } from '../../src/common/config/app-config.service';
+import { PublicAddress } from '../../src/public-addresses/schemas/public-address.schema';
+import { PublicAddressesService } from '../../src/public-addresses/public-addresses.service';
+import { TelegramService } from '../../src/telegram/telegram.service';
+import { NotificationsService } from '../../src/notifications/notifications.service';
+import { LoggerService } from '../../src/logger/logger.service';
 
 describe('ReportService', () => {
   let service: ReportService;
@@ -43,10 +48,46 @@ describe('ReportService', () => {
           },
         },
         {
+          provide: getModelToken(PublicAddress.name),
+          useValue: {
+            findOne: jest.fn(),
+            find: jest.fn(),
+            findById: jest.fn(),
+            countDocuments: jest.fn(),
+            distinct: jest.fn(),
+          },
+        },
+        {
           provide: AppConfigService,
           useValue: {
             maxReportsBeforeBan: 10,
             maxPercentageOfReportsRequiredForBan: 0.5,
+          },
+        },
+        {
+          provide: PublicAddressesService,
+          useValue: {
+            getLatestAddressByTelegramId: jest.fn(),
+            getLatestAddressByUserId: jest.fn(),
+          },
+        },
+        {
+          provide: TelegramService,
+          useValue: {
+            sendMessage: jest.fn(),
+          },
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            createNotification: jest.fn(),
+          },
+        },
+        {
+          provide: LoggerService,
+          useValue: {
+            saveSystemLog: jest.fn(),
+            logException: jest.fn(),
           },
         },
       ],

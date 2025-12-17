@@ -3,7 +3,7 @@ import { UsersService } from '../../src/users/users.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../src/users/schemas/user.schema';
-import { PasswordService } from '../../src/passwords/password.service';
+import { PasswordServiceFacade } from '../../src/passwords/password-service.facade';
 import {
   Password,
   // PasswordDocument,
@@ -17,6 +17,9 @@ import { of } from 'rxjs';
 import { AxiosResponse } from 'axios';
 import { TelegramService } from '../../src/telegram/telegram.service';
 import { PublicAddressesService } from '../../src/public-addresses/public-addresses.service';
+import { PublicAddress } from '../../src/public-addresses/schemas/public-address.schema';
+import { NotificationsService } from '../../src/notifications/notifications.service';
+import { LoggerService } from '../../src/logger/logger.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -80,7 +83,13 @@ describe('UsersService', () => {
     module = await Test.createTestingModule({
       providers: [
         UsersService,
-        PasswordService,
+        {
+          provide: PasswordServiceFacade,
+          useValue: {
+            findOne: jest.fn(),
+            findByIdAndUpdate: jest.fn(),
+          },
+        },
         {
           provide: getModelToken(User.name),
           useValue: userModelMock,
@@ -91,6 +100,13 @@ describe('UsersService', () => {
             findOne: jest.fn(),
             find: jest.fn(),
             save: jest.fn(),
+          },
+        },
+        {
+          provide: getModelToken(PublicAddress.name),
+          useValue: {
+            findOne: jest.fn(),
+            find: jest.fn(),
           },
         },
         {
@@ -133,6 +149,18 @@ describe('UsersService', () => {
                 publicKey: 'mock-public-address',
               },
             }),
+          },
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            createNotification: jest.fn(),
+          },
+        },
+        {
+          provide: LoggerService,
+          useValue: {
+            saveSystemLog: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -222,7 +250,10 @@ describe('UsersService', () => {
       // Verify the Telegram message was sent
       expect(telegramServiceMock.sendMessage).toHaveBeenCalledWith(
         Number(existingUser.telegramId),
-        expect.stringContaining('🔄 Username Changed'),
+        expect.stringContaining('Username Changed'),
+        0,
+        undefined,
+        expect.any(Object),
       );
 
       // Verify update was called with correct parameters
@@ -322,8 +353,15 @@ describe('UsersService', () => {
         config: { url: 'https://t.me/johndoe' } as any,
       };
 
+      (userModel.findOne as jest.Mock).mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+
       const result = await service.getTelegramProfile('johndoe');
-      expect(result).toEqual(mockHttpResponse.data);
+      expect(result).toEqual({
+        existsInPlatform: false,
+        profile: mockHttpResponse.data,
+      });
     });
   });
 });

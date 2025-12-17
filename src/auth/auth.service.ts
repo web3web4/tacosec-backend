@@ -104,7 +104,7 @@ export class AuthService {
               messageToVerify,
               loginDto.signature,
             );
-          } catch (e) {
+          } catch {
             throw new HttpException(
               {
                 success: false,
@@ -447,8 +447,7 @@ export class AuthService {
             latestPublicAddress = addressResponse.data.publicKey;
           }
         }
-      } catch (error) {
-        // If address retrieval fails, latestPublicAddress remains undefined
+      } catch {
         latestPublicAddress = undefined;
       }
 
@@ -618,7 +617,7 @@ export class AuthService {
             latestPublicAddress = addressResponse.data.publicKey;
           }
         }
-      } catch (error) {
+      } catch {
         latestPublicAddress = undefined;
       }
 
@@ -783,9 +782,7 @@ export class AuthService {
             updatedPayload.publicAddress = addressResponse.data.publicKey;
           }
         }
-      } catch (error) {
-        // Keep original payload publicAddress if fetching fails
-      }
+      } catch {}
     }
 
     // Generate access token with configurable expiration using updated payload
@@ -915,7 +912,7 @@ export class AuthService {
             latestPublicAddress = addressResponse.data.publicKey;
           }
         }
-      } catch (error) {
+      } catch {
         latestPublicAddress = undefined;
       }
 

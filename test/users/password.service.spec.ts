@@ -16,6 +16,13 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { SharedWithMeResponse } from '../../src/types/share-with-me-pass.types';
 import { TelegramService } from '../../src/telegram/telegram.service';
 import { Type } from '../../src/passwords/enums/type.enum';
+import { PublicAddress } from '../../src/public-addresses/schemas/public-address.schema';
+import { TelegramDtoAuthGuard } from '../../src/guards/telegram-dto-auth.guard';
+import { AppConfigService } from '../../src/common/config/app-config.service';
+import { PublicAddressesService } from '../../src/public-addresses/public-addresses.service';
+import { NotificationsService } from '../../src/notifications/notifications.service';
+import { LoggerService } from '../../src/logger/logger.service';
+import { UserFinderUtil } from '../../src/utils/user-finder.util';
 
 describe('PasswordService', () => {
   let service: PasswordService;
@@ -60,6 +67,13 @@ describe('PasswordService', () => {
             findOne: jest.fn().mockReturnValue({
               exec: jest.fn(),
             }),
+            findById: jest.fn().mockReturnValue({
+              exec: jest.fn().mockResolvedValue({
+                _id: mockUser._id,
+                telegramId: mockUser.telegramId,
+                privacyMode: false,
+              }),
+            }),
             find: jest.fn().mockReturnValue({
               select: jest.fn().mockReturnValue({
                 skip: jest.fn().mockReturnThis(),
@@ -81,6 +95,11 @@ describe('PasswordService', () => {
                 exec: jest.fn(),
               }),
             }),
+            findById: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnThis(),
+              lean: jest.fn().mockReturnThis(),
+              exec: jest.fn(),
+            }),
             findByIdAndUpdate: jest.fn().mockReturnValue({
               exec: jest.fn(),
             }),
@@ -88,6 +107,20 @@ describe('PasswordService', () => {
               exec: jest.fn(),
             }),
             save: jest.fn(),
+          },
+        },
+        {
+          provide: getModelToken(PublicAddress.name),
+          useValue: {
+            findOne: jest.fn().mockReturnValue({
+              populate: jest.fn().mockReturnThis(),
+              sort: jest.fn().mockReturnThis(),
+              exec: jest.fn().mockResolvedValue(null),
+            }),
+            find: jest.fn().mockReturnValue({
+              sort: jest.fn().mockReturnThis(),
+              exec: jest.fn().mockResolvedValue([]),
+            }),
           },
         },
         {
@@ -101,6 +134,35 @@ describe('PasswordService', () => {
         {
           provide: TelegramService,
           useValue: telegramServiceMock,
+        },
+        {
+          provide: TelegramDtoAuthGuard,
+          useValue: {
+            parseTelegramInitData: jest.fn(),
+          },
+        },
+        {
+          provide: AppConfigService,
+          useValue: {},
+        },
+        {
+          provide: PublicAddressesService,
+          useValue: {
+            getLatestAddressByTelegramId: jest.fn(),
+            getLatestAddressByUserId: jest.fn(),
+          },
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            createNotification: jest.fn(),
+          },
+        },
+        {
+          provide: LoggerService,
+          useValue: {
+            saveSystemLog: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();
@@ -148,7 +210,9 @@ describe('PasswordService', () => {
       } as any);
       jest.spyOn(passwordModel, 'find').mockReturnValue({
         select: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(mockPasswordsWithId),
+          sort: jest.fn().mockReturnValue({
+            exec: jest.fn().mockResolvedValue(mockPasswordsWithId),
+          }),
         }),
       } as any);
       jest.spyOn(reportModel, 'find').mockReturnValue({
@@ -224,9 +288,11 @@ describe('PasswordService', () => {
       } as any);
       jest.spyOn(passwordModel, 'find').mockReturnValue({
         select: jest.fn().mockReturnValue({
-          skip: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockReturnThis(),
-          exec: jest.fn().mockResolvedValue(mockPasswordsWithId),
+          sort: jest.fn().mockReturnValue({
+            skip: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockReturnThis(),
+            exec: jest.fn().mockResolvedValue(mockPasswordsWithId),
+          }),
         }),
       } as any);
       jest.spyOn(passwordModel, 'countDocuments').mockReturnValue({
@@ -301,7 +367,9 @@ describe('PasswordService', () => {
       } as any);
       jest.spyOn(passwordModel, 'find').mockReturnValue({
         select: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(mockPasswordsWithId),
+          sort: jest.fn().mockReturnValue({
+            exec: jest.fn().mockResolvedValue(mockPasswordsWithId),
+          }),
         }),
       } as any);
       jest.spyOn(reportModel, 'find').mockReturnValue({
@@ -373,7 +441,13 @@ describe('PasswordService', () => {
       const result = await service.findPasswordsSharedWithMe('testuser');
 
       expect(result).toEqual(mockSharedPasswords);
-      expect(service.getSharedWithMe).toHaveBeenCalledWith('testuser');
+      expect(service.getSharedWithMe).toHaveBeenCalledWith(
+        'testuser',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
     });
 
     /**
@@ -385,7 +459,10 @@ describe('PasswordService', () => {
      */
     it('should throw error if username is not provided', async () => {
       await expect(service.findPasswordsSharedWithMe('')).rejects.toThrow(
-        new HttpException('Username is required', HttpStatus.BAD_REQUEST),
+        new HttpException(
+          'Username, userId, or publicAddress is required',
+          HttpStatus.BAD_REQUEST,
+        ),
       );
     });
   });
@@ -401,23 +478,43 @@ describe('PasswordService', () => {
     it('should return paginated passwords shared with user with valid pagination parameters', async () => {
       const mockPassword = {
         _id: 'password123',
+        userId: 'ownerUserId',
         key: 'shared_key',
         value: 'shared_value',
         description: 'test description',
         initData: { username: 'owner' },
+        sharedWith: [{ userId: 'testuser' }],
       };
       const page = 1;
       const limit = 10;
+
+      jest.spyOn(UserFinderUtil, 'findUserByAnyInfo').mockResolvedValue({
+        user: {
+          username: 'owner',
+          telegramId: null,
+          privacyMode: false,
+        } as any,
+        publicAddress: null,
+      } as any);
 
       jest.spyOn(passwordModel, 'countDocuments').mockReturnValue({
         exec: jest.fn().mockResolvedValue(1),
       } as any);
       jest.spyOn(passwordModel, 'find').mockReturnValue({
         select: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
         lean: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue([mockPassword]),
+      } as any);
+
+      jest.spyOn(passwordModel, 'findById').mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockReturnThis(),
+        exec: jest
+          .fn()
+          .mockResolvedValue({ createdAt: undefined, secretViews: [] }),
       } as any);
 
       const result = await service.findPasswordsSharedWithMeWithPagination(
@@ -433,10 +530,18 @@ describe('PasswordService', () => {
             key: 'shared_key',
             value: 'shared_value',
             description: 'test description',
-            sharedBy: 'owner',
+            sharedBy: {
+              userId: 'ownerUserId',
+              username: 'owner',
+              telegramId: null,
+              PublicAddress: null,
+            },
             createdAt: undefined,
+            viewsCount: 0,
+            secretViews: [],
             updatedAt: undefined,
-            sharedWith: [],
+            sharedWith: [{ userId: 'testuser' }],
+            reports: [],
           },
         ],
         pagination: {
@@ -486,7 +591,13 @@ describe('PasswordService', () => {
       );
 
       expect(result).toEqual(mockSharedPasswords);
-      expect(service.getSharedWithMe).toHaveBeenCalledWith('testuser');
+      expect(service.getSharedWithMe).toHaveBeenCalledWith(
+        'testuser',
+        'testuser',
+        '123456',
+        false,
+        undefined,
+      );
     });
 
     /**
@@ -497,12 +608,6 @@ describe('PasswordService', () => {
      * 3. Verify error is thrown
      */
     it('should throw error if username is not provided', async () => {
-      jest
-        .spyOn(service, 'getSharedWithMe')
-        .mockRejectedValue(
-          new HttpException('Username is required', HttpStatus.BAD_REQUEST),
-        );
-
       await expect(
         service.findPasswordsSharedWithMeWithPagination(
           { user: { id: '', username: '' } } as any,
@@ -510,7 +615,10 @@ describe('PasswordService', () => {
           10,
         ),
       ).rejects.toThrow(
-        new HttpException('Username is required', HttpStatus.BAD_REQUEST),
+        new HttpException(
+          'No authentication data provided',
+          HttpStatus.BAD_REQUEST,
+        ),
       );
     });
   });
@@ -531,9 +639,10 @@ describe('PasswordService', () => {
       const page = 1;
       const limit = 10;
 
-      jest.spyOn(userModel, 'findOne').mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockUser),
-      } as any);
+      jest.spyOn(userModel, 'findOne').mockResolvedValue(mockUser as any);
+      jest
+        .spyOn(passwordModel, 'findOne')
+        .mockResolvedValue(mockPassword as any);
       jest.spyOn(passwordModel, 'find').mockReturnValue({
         select: jest.fn().mockReturnValue({
           skip: jest.fn().mockReturnThis(),
@@ -581,9 +690,10 @@ describe('PasswordService', () => {
       const mockPasswords = [mockPassword];
       const mockSharedUsers = [{ username: 'shareduser' }];
 
-      jest.spyOn(userModel, 'findOne').mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockUser),
-      } as any);
+      jest.spyOn(userModel, 'findOne').mockResolvedValue(mockUser as any);
+      jest
+        .spyOn(passwordModel, 'findOne')
+        .mockResolvedValue(mockPassword as any);
       jest.spyOn(passwordModel, 'find').mockReturnValue({
         select: jest.fn().mockReturnValue({
           exec: jest.fn().mockResolvedValue(mockPasswords),
@@ -613,9 +723,7 @@ describe('PasswordService', () => {
      * 3. Verify error is thrown
      */
     it('should throw error for invalid telegramId', async () => {
-      jest.spyOn(userModel, 'findOne').mockReturnValue({
-        exec: jest.fn().mockResolvedValue(null),
-      } as any);
+      jest.spyOn(userModel, 'findOne').mockResolvedValue(null as any);
 
       await expect(
         service.findSharedWithByTelegramIdWithPagination(

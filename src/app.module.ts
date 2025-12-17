@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppConfigModule } from './common/config/app-config.module';
+import { CommonModule } from './common/common.module';
 import { UsersModule } from './users/users.module';
 import { DatabaseModule } from './common/database/database.module';
 import { PasswordModule } from './passwords/password.module';
@@ -17,6 +18,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 @Module({
   imports: [
     AppConfigModule,
+    CommonModule,
     DatabaseModule,
     UsersModule,
     PasswordModule,

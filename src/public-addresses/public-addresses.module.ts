@@ -1,6 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { SharedJwtModule } from '../shared/jwt.module';
+import { SharedJwtModule } from '../common/jwt/jwt.module';
 import {
   PublicAddress,
   PublicAddressSchema,
@@ -28,4 +28,4 @@ import { CryptoModule } from '../utils/crypto.module';
   providers: [PublicAddressesService, TelegramDtoAuthGuard],
   exports: [PublicAddressesService],
 })
-export class PublicAddressesModule {}
+export class PublicAddressesModule { }

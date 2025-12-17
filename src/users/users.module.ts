@@ -1,6 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { SharedJwtModule } from '../shared/jwt.module';
+import { SharedJwtModule } from '../common/jwt/jwt.module';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { User, UserSchema } from './schemas/user.schema';
@@ -49,4 +49,4 @@ import { LoggerModule } from '../logger/logger.module';
   ],
   exports: [UsersService, RolesGuard],
 })
-export class UsersModule {}
+export class UsersModule { }

@@ -1,5 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { SharedJwtModule } from '../shared/jwt.module';
+import { SharedJwtModule } from '../common/jwt/jwt.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -32,4 +32,4 @@ import { LoggerModule } from '../logger/logger.module';
   providers: [AuthService, TelegramDtoAuthGuard],
   exports: [AuthService, SharedJwtModule],
 })
-export class AuthModule {}
+export class AuthModule { }

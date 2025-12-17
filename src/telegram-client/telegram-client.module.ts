@@ -7,7 +7,7 @@ import { ContactsService } from './services/contacts.service';
 import { AuthService } from './services/auth.service';
 import { TelegramModule } from '../telegram/telegram.module';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
-import { SharedJwtModule } from '../shared/jwt.module';
+import { SharedJwtModule } from '../common/jwt/jwt.module';
 import { User, UserSchema } from '../users/schemas/user.schema';
 
 /**
@@ -37,4 +37,4 @@ import { User, UserSchema } from '../users/schemas/user.schema';
     TelegramDtoAuthGuard,
   ],
 })
-export class TelegramClientModule {}
+export class TelegramClientModule { }

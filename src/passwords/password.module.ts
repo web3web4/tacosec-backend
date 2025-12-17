@@ -1,6 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { SharedJwtModule } from '../shared/jwt.module';
+import { SharedJwtModule } from '../common/jwt/jwt.module';
 import { PasswordService } from './password.service';
 import { PasswordController } from './password.controller';
 import { User, UserSchema } from '../users/schemas/user.schema';
@@ -69,4 +69,4 @@ import { PasswordServiceFacade } from './password-service.facade';
     PasswordServiceFacade,
   ],
 })
-export class PasswordModule {}
+export class PasswordModule { }

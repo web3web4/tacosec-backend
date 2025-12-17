@@ -1,6 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { SharedJwtModule } from '../shared/jwt.module';
+import { SharedJwtModule } from '../common/jwt/jwt.module';
 import { Report, ReportSchema } from './schemas/report.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { ReportService } from './report.service';
@@ -37,4 +37,4 @@ import { LoggerModule } from '../logger/logger.module';
   providers: [ReportService, TelegramDtoAuthGuard, RolesGuard],
   exports: [ReportService],
 })
-export class ReportsModule {}
+export class ReportsModule { }

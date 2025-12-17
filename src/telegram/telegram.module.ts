@@ -1,6 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { SharedJwtModule } from '../shared/jwt.module';
+import { SharedJwtModule } from '../common/jwt/jwt.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TelegramController } from './telegram.controller';
 import { TelegramService } from './telegram.service';
@@ -24,4 +24,4 @@ import { NotificationsModule } from '../notifications/notifications.module';
   providers: [TelegramService, TelegramValidatorService, TelegramDtoAuthGuard],
   exports: [TelegramService, TelegramValidatorService, TelegramDtoAuthGuard],
 })
-export class TelegramModule {}
+export class TelegramModule { }

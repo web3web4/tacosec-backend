@@ -7,7 +7,7 @@ import {
   NotificationSchema,
 } from './schemas/notification.schema';
 import { TelegramModule } from '../telegram/telegram.module';
-import { SharedJwtModule } from '../shared/jwt.module';
+import { SharedJwtModule } from '../common/jwt/jwt.module';
 import { UsersModule } from '../users/users.module';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import {
@@ -30,4 +30,4 @@ import {
   providers: [NotificationsService],
   exports: [NotificationsService],
 })
-export class NotificationsModule {}
+export class NotificationsModule { }

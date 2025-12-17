@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { MongoClient, Db, ServerApiVersion } from 'mongodb';
-import { AppConfigService } from '../common/config/app-config.service';
+import { AppConfigService } from '../config/app-config.service';
 
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;

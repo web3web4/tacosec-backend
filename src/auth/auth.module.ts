@@ -32,4 +32,4 @@ import { LoggerModule } from '../logger/logger.module';
   providers: [AuthService, TelegramDtoAuthGuard],
   exports: [AuthService, SharedJwtModule],
 })
-export class AuthModule { }
+export class AuthModule {}

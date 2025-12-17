@@ -49,4 +49,4 @@ import { LoggerModule } from '../logger/logger.module';
   ],
   exports: [UsersService, RolesGuard],
 })
-export class UsersModule { }
+export class UsersModule {}

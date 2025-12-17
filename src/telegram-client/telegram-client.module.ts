@@ -37,4 +37,4 @@ import { User, UserSchema } from '../users/schemas/user.schema';
     TelegramDtoAuthGuard,
   ],
 })
-export class TelegramClientModule { }
+export class TelegramClientModule {}

@@ -37,4 +37,4 @@ import { LoggerModule } from '../logger/logger.module';
   providers: [ReportService, TelegramDtoAuthGuard, RolesGuard],
   exports: [ReportService],
 })
-export class ReportsModule { }
+export class ReportsModule {}

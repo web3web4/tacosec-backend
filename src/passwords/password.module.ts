@@ -69,4 +69,4 @@ import { PasswordServiceFacade } from './password-service.facade';
     PasswordServiceFacade,
   ],
 })
-export class PasswordModule { }
+export class PasswordModule {}

@@ -28,4 +28,4 @@ import { CryptoModule } from '../utils/crypto.module';
   providers: [PublicAddressesService, TelegramDtoAuthGuard],
   exports: [PublicAddressesService],
 })
-export class PublicAddressesModule { }
+export class PublicAddressesModule {}

@@ -24,4 +24,4 @@ import { NotificationsModule } from '../notifications/notifications.module';
   providers: [TelegramService, TelegramValidatorService, TelegramDtoAuthGuard],
   exports: [TelegramService, TelegramValidatorService, TelegramDtoAuthGuard],
 })
-export class TelegramModule { }
+export class TelegramModule {}

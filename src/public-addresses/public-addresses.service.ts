@@ -20,7 +20,7 @@ import {
 // import { v4 as uuidv4 } from 'uuid';
 import { UserDocument } from '../users/schemas/user.schema';
 import { CryptoUtil } from '../utils/crypto.util';
-import { ConfigService } from '@nestjs/config';
+import { AppConfigService } from '../common/config/app-config.service';
 
 // Interface for the response that includes telegram_id
 export interface PublicAddressResponse {
@@ -50,7 +50,7 @@ export class PublicAddressesService {
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     private readonly cryptoUtil: CryptoUtil,
-    private readonly configService: ConfigService,
+    private readonly appConfig: AppConfigService,
   ) {}
 
   /**
@@ -95,11 +95,7 @@ export class PublicAddressesService {
       }
 
       // Require signature only when not in staging
-      const isStagingRaw =
-        this.configService.get<string>('IS_STAGING') ?? 'true';
-      const isStaging = ['true', '1', 'yes', 'y', 'on'].includes(
-        String(isStagingRaw).trim().toLowerCase(),
-      );
+      const isStaging = this.appConfig.isStaging;
       console.log('isStaging :', isStaging);
       if (!isStaging && !createDto.signature?.trim()) {
         throw new HttpException(
@@ -289,11 +285,7 @@ export class PublicAddressesService {
   ): Promise<ApiResponse<PublicAddressResponse[]>> {
     try {
       // Determine staging mode once
-      const isStagingRaw =
-        this.configService.get<string>('IS_STAGING') ?? 'true';
-      const isStaging = ['true', '1', 'yes', 'y', 'on'].includes(
-        String(isStagingRaw).trim().toLowerCase(),
-      );
+      const isStaging = this.appConfig.isStaging;
       console.log('isStaging :', isStaging);
       // Extract user from telegram init data
       const user = await this.usersService.getUserFromTelegramInitData(

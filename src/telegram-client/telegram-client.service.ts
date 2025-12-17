@@ -4,10 +4,10 @@ import {
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 // import { Api } from 'telegram/tl';
+import { AppConfigService } from '../common/config/app-config.service';
 
 /**
  * Telegram Client Service
@@ -22,11 +22,9 @@ export class TelegramClientService implements OnModuleInit, OnModuleDestroy {
   private readonly apiHash: string;
   private readonly sessions = new Map<number, string>(); // userId -> session string
 
-  constructor(private readonly configService: ConfigService) {
-    this.apiId = parseInt(
-      this.configService.get<string>('TELEGRAM_API_ID') || '0',
-    );
-    this.apiHash = this.configService.get<string>('TELEGRAM_API_HASH') || '';
+  constructor(private readonly appConfig: AppConfigService) {
+    this.apiId = this.appConfig.telegramApiId || 0;
+    this.apiHash = this.appConfig.telegramApiHash || '';
 
     if (!this.apiId || !this.apiHash) {
       this.logger.error(

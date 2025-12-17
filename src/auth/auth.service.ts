@@ -2,7 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { ConfigService } from '@nestjs/config';
+import { AppConfigService } from '../common/config/app-config.service';
 import {
   PublicAddress,
   PublicAddressDocument,
@@ -59,7 +59,7 @@ export class AuthService {
     private telegramValidator: TelegramValidatorService,
     private telegramDtoAuthGuard: TelegramDtoAuthGuard,
     private usersService: UsersService,
-    private configService: ConfigService,
+    private appConfig: AppConfigService,
     private publicAddressesService: PublicAddressesService,
     private readonly loggerService: LoggerService,
   ) {}
@@ -71,11 +71,7 @@ export class AuthService {
     try {
       // If loginDto contains an Ethereum-style publicAddress and signature, verify it first (unless IS_STAGING=true)
       if (loginDto && loginDto.publicAddress) {
-        const isStagingRaw =
-          this.configService.get<string>('IS_STAGING') ?? 'true';
-        const isStaging = ['true', '1', 'yes', 'y', 'on'].includes(
-          String(isStagingRaw).trim().toLowerCase(),
-        );
+        const isStaging = this.appConfig.isStaging;
         console.log('isStaging :', isStaging);
         if (
           !isStaging &&
@@ -93,11 +89,7 @@ export class AuthService {
       }
 
       if (loginDto && loginDto.publicAddress && loginDto.signature) {
-        const isStagingRaw =
-          this.configService.get<string>('IS_STAGING') ?? 'true';
-        const isStaging = ['true', '1', 'yes', 'y', 'on'].includes(
-          String(isStagingRaw).trim().toLowerCase(),
-        );
+        const isStaging = this.appConfig.isStaging;
         console.log('isStaging :', isStaging);
         const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(
           loginDto.publicAddress,
@@ -748,14 +740,8 @@ export class AuthService {
     user?: any,
   ): Promise<LoginResponse> {
     // Get token expiration times from environment variables
-    const accessTokenExpiry = this.configService.get<string>(
-      'JWT_ACCESS_TOKEN_EXPIRES_IN',
-      '15m',
-    );
-    const refreshTokenExpiry = this.configService.get<string>(
-      'JWT_REFRESH_TOKEN_EXPIRES_IN',
-      '7d',
-    );
+    const accessTokenExpiry = this.appConfig.jwtAccessTokenExpiresIn;
+    const refreshTokenExpiry = this.appConfig.jwtRefreshTokenExpiresIn;
 
     // Update user's updatedAt field when generating tokens
     if (user && user._id) {

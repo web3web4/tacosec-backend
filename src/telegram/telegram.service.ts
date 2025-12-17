@@ -5,16 +5,15 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
 import { Types } from 'mongoose';
 // import { firstValueFrom } from 'rxjs';
 // import { TelegramValidatorService } from './telegram-validator.service';
 import { UsersService } from '../users/users.service';
 import { PublicAddressesService } from '../public-addresses/public-addresses.service';
+import { AppConfigService } from '../common/config/app-config.service';
 import {
   NotificationsService,
   NotificationLogData,
-  NotificationResult,
 } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
 import axios from 'axios';
@@ -25,7 +24,7 @@ export class TelegramService {
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
+    private readonly appConfig: AppConfigService,
     // private readonly telegramValidatorService: TelegramValidatorService,
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
@@ -33,9 +32,7 @@ export class TelegramService {
     @Inject(forwardRef(() => NotificationsService))
     private readonly notificationsService: NotificationsService,
   ) {
-    this.botToken =
-      this.configService.get<string>('TELEGRAM_BOT_TOKEN') ||
-      process.env.TELEGRAM_BOT_TOKEN;
+    this.botToken = this.appConfig.telegramBotToken || '';
 
     if (!this.botToken) {
       console.error('WARNING: TELEGRAM_BOT_TOKEN is not set or invalid!');
@@ -403,8 +400,7 @@ ${message}
   ): Promise<{ success: boolean; adminTelegramId?: string }> {
     try {
       // Get the admin telegram ID from environment variables
-      const adminTelegramId =
-        this.configService.get<string>('ADMIN_TELEGRAM_ID');
+      const adminTelegramId = this.appConfig.adminTelegramId;
 
       if (!adminTelegramId) {
         console.error(
@@ -560,7 +556,7 @@ ${message}
             if (addressResponse.success && addressResponse.data) {
               senderInfo.publicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             console.log('No public address found for user:', req.user.id);
             senderInfo.publicAddress = '';
           }
@@ -583,7 +579,7 @@ ${message}
             if (addressResponse.success && addressResponse.data) {
               senderInfo.publicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             console.log(
               'No public address found for telegramId:',
               senderInfo.telegramId,
@@ -599,7 +595,7 @@ ${message}
             if (user) {
               senderInfo.username = user.username || '';
             }
-          } catch (error) {
+          } catch {
             console.log(
               'Could not find user by telegramId:',
               senderInfo.telegramId,
@@ -653,7 +649,7 @@ ${message}
             if (addressResponse.success && addressResponse.data) {
               senderInfo.publicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             console.log('No public address found for user:', req.user.id);
             senderInfo.publicAddress = '';
           }
@@ -677,7 +673,7 @@ ${message}
             if (addressResponse.success && addressResponse.data) {
               senderInfo.publicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             console.log(
               'No user or public address found for telegramId:',
               senderInfo.telegramId,

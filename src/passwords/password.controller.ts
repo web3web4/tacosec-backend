@@ -222,10 +222,7 @@ export class PasswordController {
   @Get('admin/all')
   @FlexibleAuth()
   @Roles(Role.ADMIN)
-  async getAllSecretsForAdmin(
-    @Query() filters: AdminSecretsFilterDto,
-    @Request() _req: AuthenticatedRequest,
-  ) {
+  async getAllSecretsForAdmin(@Query() filters: AdminSecretsFilterDto) {
     return this.passwordService.getAllSecretsForAdmin(filters);
   }
 }

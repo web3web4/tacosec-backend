@@ -1,5 +1,4 @@
 import * as crypto from 'crypto';
-import { ConfigService } from '@nestjs/config';
 
 /**
  * Default encryption key to use if none is provided in the environment
@@ -15,10 +14,7 @@ export class CryptoUtil {
   private readonly algorithm = 'aes-256-cbc';
   private readonly key: Buffer;
 
-  constructor(private readonly configService: ConfigService) {
-    // Get encryption key from environment or throw error
-    const encryptionKey = this.configService?.get<string>('ENCRYPTION_KEY');
-
+  constructor(encryptionKey: string) {
     if (!encryptionKey) {
       console.error('ENCRYPTION_KEY is not defined in environment variables');
       throw new Error(

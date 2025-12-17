@@ -9,7 +9,6 @@ import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
 import { RolesGuard } from '../guards/roles.guard';
-import { ConfigModule } from '@nestjs/config';
 import { Password, PasswordSchema } from '../passwords/schemas/password.schema';
 import {
   PublicAddress,
@@ -33,7 +32,6 @@ import { LoggerModule } from '../logger/logger.module';
     forwardRef(() => PublicAddressesModule),
     forwardRef(() => NotificationsModule),
     forwardRef(() => LoggerModule),
-    ConfigModule,
   ],
   controllers: [ReportController],
   providers: [ReportService, TelegramDtoAuthGuard, RolesGuard],

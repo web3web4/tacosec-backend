@@ -12,6 +12,10 @@ export default async function setup() {
       process.env.ENCRYPTION_KEY = 'test-encryption-key-for-testing';
     }
 
+    if (!process.env.JWT_SECRET) {
+      process.env.JWT_SECRET = 'test-jwt-secret';
+    }
+
     // Connect to the database - use regular connection instead of in-memory for CI
     const uri =
       process.env.MONGODB_URI || 'mongodb://localhost:27017/taco-test';

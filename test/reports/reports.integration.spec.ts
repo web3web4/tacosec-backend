@@ -13,7 +13,6 @@ import {
   ReportType,
 } from '../../src/reports/dto/report-user.dto';
 import { RolesGuard } from '../../src/guards/roles.guard';
-import { CryptoModule } from '../../src/utils/crypto.module';
 
 // Mock CryptoUtil to avoid needing the ENCRYPTION_KEY
 jest.mock('../../src/utils/crypto.util', () => {
@@ -37,8 +36,6 @@ describe('Report System', () => {
 // Skip the complex integration tests to avoid environment issues in CI
 describe.skip('ReportController (e2e)', () => {
   let app: INestApplication;
-  let telegramValidatorService: TelegramValidatorService;
-  let telegramDtoAuthGuard: TelegramDtoAuthGuard;
   let telegramServiceMock;
 
   // Mock data
@@ -155,13 +152,6 @@ describe.skip('ReportController (e2e)', () => {
 
     // Create the app
     app = moduleFixture.createNestApplication();
-
-    // Get services
-    telegramValidatorService = moduleFixture.get<TelegramValidatorService>(
-      TelegramValidatorService,
-    );
-    telegramDtoAuthGuard =
-      moduleFixture.get<TelegramDtoAuthGuard>(TelegramDtoAuthGuard);
 
     // Initialize the app
     await app.init();

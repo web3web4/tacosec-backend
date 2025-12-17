@@ -16,7 +16,6 @@ import { RolesGuard } from '../guards/roles.guard';
 import { HttpModule } from '@nestjs/axios';
 import { PasswordModule } from '../passwords/password.module';
 import { TelegramValidatorService } from '../telegram/telegram-validator.service';
-import { ConfigModule } from '@nestjs/config';
 import { TelegramModule } from '../telegram/telegram.module';
 import { ReportsModule } from '../reports/reports.module';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
@@ -32,7 +31,6 @@ import { LoggerModule } from '../logger/logger.module';
       { name: Report.name, schema: ReportSchema },
     ]),
     SharedJwtModule,
-    ConfigModule,
     HttpModule,
     forwardRef(() => PasswordModule),
     forwardRef(() => TelegramModule),

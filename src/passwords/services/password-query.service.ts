@@ -481,10 +481,20 @@ export class PasswordQueryService extends PasswordBaseService {
         ),
       );
 
+      const sanitizedPasswords = currentUserPrivacyMode
+        ? transformedPasswords.map((password) => {
+            const sanitized: any = { ...password };
+            delete sanitized.createdAt;
+            delete sanitized.viewsCount;
+            delete sanitized.secretViews;
+            return sanitized;
+          })
+        : transformedPasswords;
+
       const totalPages = Math.ceil(totalCount / limit);
 
       return {
-        passwords: transformedPasswords,
+        passwords: sanitizedPasswords,
         pagination: {
           currentPage: page,
           totalPages,
@@ -653,7 +663,7 @@ export class PasswordQueryService extends PasswordBaseService {
             if (addressResponse.success && addressResponse.data) {
               publicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             // If no address found by telegramId, try by userId
           }
         }
@@ -668,7 +678,7 @@ export class PasswordQueryService extends PasswordBaseService {
             if (addressResponse.success && addressResponse.data) {
               publicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             // If no address found, latestPublicAddress remains undefined
           }
         }
@@ -934,7 +944,7 @@ export class PasswordQueryService extends PasswordBaseService {
         try {
           const userObjectId = new Types.ObjectId(userId);
           filterQuery.userId = userObjectId;
-        } catch (error) {
+        } catch {
           // If userId is not a valid ObjectId, return empty results
           return {
             data: [],
@@ -1056,7 +1066,7 @@ export class PasswordQueryService extends PasswordBaseService {
         limit,
         totalPages,
       };
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to get secrets for admin',
         HttpStatus.INTERNAL_SERVER_ERROR,

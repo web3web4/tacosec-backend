@@ -24,5 +24,8 @@ export * from './interceptors';
 // Pipes
 export * from './pipes';
 
+// Config
+export * from './config';
+
 // Services
 export * from './services';

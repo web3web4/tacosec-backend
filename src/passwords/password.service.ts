@@ -34,13 +34,10 @@ import { PaginatedResponse } from './dto/pagination.dto';
 import { AdminSecretsFilterDto } from './dto/admin-secrets-filter.dto';
 import { TelegramService } from '../telegram/telegram.service';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
-import { ConfigService } from '@nestjs/config';
+import { AppConfigService } from '../common/config/app-config.service';
 import { PublicAddressesService } from '../public-addresses/public-addresses.service';
 import { UserFinderUtil } from '../utils/user-finder.util';
-import {
-  NotificationsService,
-  NotificationLogData,
-} from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
 import { LoggerService } from '../logger/logger.service';
 import { LogEvent } from '../logger/dto/log-event.enum';
@@ -54,7 +51,7 @@ export class PasswordService {
     private publicAddressModel: Model<PublicAddressDocument>,
     private readonly telegramService: TelegramService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
-    private readonly configService: ConfigService,
+    private readonly appConfig: AppConfigService,
     private readonly publicAddressesService: PublicAddressesService,
     private readonly notificationsService: NotificationsService,
     private readonly loggerService: LoggerService,
@@ -110,7 +107,7 @@ export class PasswordService {
             userId = user._id.toString();
           }
         }
-      } catch (error) {
+      } catch {
         // If parsing fails, continue with empty values
         telegramId = '';
         username = '';
@@ -143,7 +140,7 @@ export class PasswordService {
           publicAddress = addressResponse.data.publicKey;
         }
       }
-    } catch (error) {
+    } catch {
       // If no address found, publicAddress remains undefined
       publicAddress = undefined;
     }
@@ -1612,9 +1609,7 @@ export class PasswordService {
         if (savedPassword?.userId) {
           user = await this.userModel.findById(savedPassword.userId).exec();
         }
-      } catch (e) {
-        // ignore fetching user errors
-      }
+      } catch {}
       await this.loggerService.saveSystemLog(
         {
           event: LogEvent.SecretCreated,
@@ -2074,14 +2069,6 @@ export class PasswordService {
         `Attempting to send messages to ${passwordUser.sharedWith.length} users`,
       );
 
-      let senderPublicAddressForUrl: string | undefined;
-      try {
-        const resp = await this.publicAddressesService.getLatestAddressByUserId(
-          String(user._id),
-        );
-        senderPublicAddressForUrl = resp?.data?.publicKey;
-      } catch {}
-
       const messagePromises = passwordUser.sharedWith.map(
         async (sharedWith) => {
           try {
@@ -2227,7 +2214,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
                   [
                     {
                       text: 'Open Secret',
-                      url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${passwordUser._id}_shared`,
+                      url: `${this.appConfig.telegramBotUrl}?startapp=${passwordUser._id}_shared`,
                     },
                   ],
                 ],
@@ -2334,9 +2321,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
                 String(childUser._id),
               );
             senderPublicAddress = senderAddrResp?.data?.publicKey;
-          } catch (e) {
-            senderPublicAddress = undefined;
-          }
+          } catch {}
           const formattedSenderAddress = senderPublicAddress
             ? `${senderPublicAddress.slice(0, 6)}...${senderPublicAddress.slice(-4)}`
             : 'N/A';
@@ -2347,9 +2332,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
                 String(parentOwner._id),
               );
             recipientPublicAddress = recipientAddrResp?.data?.publicKey;
-          } catch (e) {
-            recipientPublicAddress = undefined;
-          }
+          } catch {}
 
           const fallbackMessage = `Child secret response.
           User ${childUser.username} (user public address : ${formattedSenderAddress}) has responded to your secret with a new secret.`;
@@ -2437,7 +2420,7 @@ You can view the response in your secrets list 📋.`;
           [
             {
               text: 'Open Reply',
-              url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${parentSecretId}_mydata_${childSecretId}`,
+              url: `${this.appConfig.telegramBotUrl}?startapp=${parentSecretId}_mydata_${childSecretId}`,
             },
           ],
         ],
@@ -2714,7 +2697,7 @@ You can view the reply in your shared secrets list 📋.
                 [
                   {
                     text: 'Open Reply',
-                    url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${parentSecretId}_shared_${childSecretId}`,
+                    url: `${this.appConfig.telegramBotUrl}?startapp=${parentSecretId}_shared_${childSecretId}`,
                   },
                 ],
               ],
@@ -3055,7 +3038,7 @@ You can view the reply in your shared secrets list 📋.
             if (addressResponse.success && addressResponse.data) {
               publicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             // If no address found by telegramId, try by userId
           }
         }
@@ -3070,7 +3053,7 @@ You can view the reply in your shared secrets list 📋.
             if (addressResponse.success && addressResponse.data) {
               publicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             // If no address found, latestPublicAddress remains undefined
           }
         }
@@ -4320,7 +4303,7 @@ You can view the reply in your shared secrets list 📋.
             if (addressResponse.success && addressResponse.data) {
               publicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             // If no address found by telegramId, try by userId
           }
         }
@@ -4335,7 +4318,7 @@ You can view the reply in your shared secrets list 📋.
             if (addressResponse.success && addressResponse.data) {
               publicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             // If no address found, latestPublicAddress remains undefined
           }
         }
@@ -4803,7 +4786,7 @@ You can view the reply in your shared secrets list 📋.
     username?: string,
     userId?: string,
     publicAddress?: string,
-  ): Promise<Password | {}> {
+  ): Promise<Password | Record<string, never>> {
     try {
       // Check if secret exists
       const secret = await this.passwordModel.findById(secretId).exec();
@@ -5348,7 +5331,7 @@ You can view the reply in your shared secrets list 📋.
                     latestPublicAddress = addressResponse.data.publicKey;
                   }
                 }
-              } catch (error) {
+              } catch {
                 // If address retrieval fails, latestPublicAddress remains undefined
                 latestPublicAddress = undefined;
               }
@@ -5457,7 +5440,7 @@ You can view the reply in your shared secrets list 📋.
         try {
           const userObjectId = new Types.ObjectId(userId);
           filterQuery.userId = userObjectId;
-        } catch (error) {
+        } catch {
           // If userId is not a valid ObjectId, return empty results
           return {
             data: [],
@@ -5579,7 +5562,7 @@ You can view the reply in your shared secrets list 📋.
         limit,
         totalPages,
       };
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Failed to get secrets for admin',
         HttpStatus.INTERNAL_SERVER_ERROR,

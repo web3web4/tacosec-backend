@@ -14,7 +14,6 @@ import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { HttpModule } from '@nestjs/axios';
 import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
-import { ConfigModule } from '@nestjs/config';
 import { ReportsModule } from '../reports/reports.module';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -37,7 +36,6 @@ import { PasswordServiceFacade } from './password-service.facade';
       { name: PublicAddress.name, schema: PublicAddressSchema },
     ]),
     SharedJwtModule,
-    ConfigModule,
     HttpModule,
     forwardRef(() => UsersModule),
     forwardRef(() => TelegramModule),

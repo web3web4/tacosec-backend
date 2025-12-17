@@ -1,6 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { ConfigModule } from '@nestjs/config';
 import { SharedJwtModule } from '../shared/jwt.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TelegramController } from './telegram.controller';
@@ -15,7 +14,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
   imports: [
     HttpModule,
-    ConfigModule,
     SharedJwtModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     forwardRef(() => UsersModule),

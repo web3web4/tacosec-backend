@@ -50,7 +50,7 @@ export class PasswordViewsService {
     username?: string,
     userId?: string,
     publicAddress?: string,
-  ): Promise<Password | {}> {
+  ): Promise<Password | Record<string, never>> {
     try {
       // Check if secret exists
       const secret = await this.passwordModel.findById(secretId).exec();
@@ -595,7 +595,7 @@ export class PasswordViewsService {
                     latestPublicAddress = addressResponse.data.publicKey;
                   }
                 }
-              } catch (error) {
+              } catch {
                 // If address retrieval fails, latestPublicAddress remains undefined
                 latestPublicAddress = undefined;
               }

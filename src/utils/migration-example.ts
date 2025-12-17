@@ -23,8 +23,8 @@ export class MigrationExample {
   private cryptoUtil: CryptoUtil;
 
   constructor() {
-    const configService = new MockConfigService() as any;
-    this.cryptoUtil = new CryptoUtil(configService);
+    const configService = new MockConfigService();
+    this.cryptoUtil = new CryptoUtil(configService.get('ENCRYPTION_KEY'));
   }
 
   /**

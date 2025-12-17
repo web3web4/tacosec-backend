@@ -1,27 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { TelegramClientService } from '../../src/telegram-client/telegram-client.service';
 import { TelegramClientConfig } from '../../src/telegram-client/telegram-client.config';
+import { AppConfigService } from '../../src/common/config/app-config.service';
 
 describe('TelegramClientService', () => {
   let service: TelegramClientService;
-  let configService: ConfigService;
 
-  const mockConfigService = {
-    get: jest.fn((key: string) => {
-      const config = {
-        TELEGRAM_API_ID: '12345',
-        TELEGRAM_API_HASH: 'test_hash',
-        TELEGRAM_SESSION_PATH: './test-sessions',
-        TELEGRAM_REQUEST_TIMEOUT: '30000',
-        TELEGRAM_MAX_RETRIES: '3',
-        TELEGRAM_RETRY_DELAY: '1000',
-        TELEGRAM_DEBUG: 'false',
-        TELEGRAM_CACHE_TTL: '300',
-        TELEGRAM_MAX_CONTACTS_PER_REQUEST: '1000',
-      };
-      return config[key];
-    }),
+  const mockAppConfig: Partial<AppConfigService> = {
+    telegramApiId: 12345,
+    telegramApiHash: 'test_hash',
+    telegramSessionPath: './test-sessions',
+    telegramRequestTimeoutMs: 30000,
+    telegramMaxRetries: 3,
+    telegramRetryDelayMs: 1000,
+    telegramDebug: false,
+    telegramCacheTtlSeconds: 300,
+    telegramMaxContactsPerRequest: 1000,
   };
 
   beforeEach(async () => {
@@ -30,14 +24,13 @@ describe('TelegramClientService', () => {
         TelegramClientService,
         TelegramClientConfig,
         {
-          provide: ConfigService,
-          useValue: mockConfigService,
+          provide: AppConfigService,
+          useValue: mockAppConfig,
         },
       ],
     }).compile();
 
     service = module.get<TelegramClientService>(TelegramClientService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   it('should be defined', () => {
@@ -77,7 +70,6 @@ describe('TelegramClientService', () => {
 
   describe('client connection', () => {
     it('should handle client creation', async () => {
-      const userId = 123;
       // This test would require mocking the actual Telegram client
       // For now, we just test that the method exists
       expect(service.createClient).toBeDefined();
@@ -88,10 +80,8 @@ describe('TelegramClientService', () => {
     it('should handle missing API credentials gracefully', () => {
       // Test error handling for missing credentials
       expect(() => {
-        const badConfigService = {
-          get: jest.fn(() => undefined),
-        };
-        new TelegramClientConfig(badConfigService as any);
+        const badAppConfig = {};
+        new TelegramClientConfig(badAppConfig as any);
       }).toBeDefined();
     });
   });

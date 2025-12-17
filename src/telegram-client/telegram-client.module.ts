@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TelegramClientService } from './telegram-client.service';
 import { TelegramClientController } from './telegram-client.controller';
@@ -18,7 +17,6 @@ import { User, UserSchema } from '../users/schemas/user.schema';
  */
 @Module({
   imports: [
-    ConfigModule,
     TelegramModule,
     SharedJwtModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),

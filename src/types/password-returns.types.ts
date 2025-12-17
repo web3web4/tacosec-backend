@@ -1,6 +1,5 @@
 import { SharedWithDto } from '../passwords/dto/shared-with.dto';
 import { Type } from '../passwords/enums/type.enum';
-import { ReportType } from '../reports/dto/report-user.dto';
 import { Types } from 'mongoose';
 
 // Report information for passwords

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { ConfigService } from '@nestjs/config';
+import { AppConfigService } from '../../common/config/app-config.service';
 import { Password, PasswordDocument } from '../schemas/password.schema';
 import { User, UserDocument } from '../../users/schemas/user.schema';
 import { Report, ReportDocument } from '../../reports/schemas/report.schema';
@@ -12,10 +12,7 @@ import {
 import { TelegramDtoAuthGuard } from '../../guards/telegram-dto-auth.guard';
 import { TelegramService } from '../../telegram/telegram.service';
 import { PublicAddressesService } from '../../public-addresses/public-addresses.service';
-import {
-  NotificationsService,
-  NotificationLogData,
-} from '../../notifications/notifications.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { NotificationType } from '../../notifications/schemas/notification.schema';
 import { UserFinderUtil } from '../../utils/user-finder.util';
 import { PasswordBaseService } from './password-base.service';
@@ -36,7 +33,7 @@ export class PasswordNotificationService extends PasswordBaseService {
     publicAddressesService: PublicAddressesService,
     private readonly telegramService: TelegramService,
     private readonly notificationsService: NotificationsService,
-    private readonly configService: ConfigService,
+    private readonly appConfig: AppConfigService,
   ) {
     super(
       passwordModel,
@@ -54,11 +51,22 @@ export class PasswordNotificationService extends PasswordBaseService {
   async sendMessageToUsersBySharedWith(passwordUser: Password): Promise<void> {
     try {
       console.log('='.repeat(80));
-      console.log('[NOTIFICATION SERVICE] sendMessageToUsersBySharedWith called!');
+      console.log(
+        '[NOTIFICATION SERVICE] sendMessageToUsersBySharedWith called!',
+      );
       console.log('[NOTIFICATION SERVICE] passwordUser._id:', passwordUser._id);
-      console.log('[NOTIFICATION SERVICE] passwordUser.userId:', passwordUser.userId);
-      console.log('[NOTIFICATION SERVICE] passwordUser.sharedWith length:', passwordUser.sharedWith?.length || 0);
-      console.log('[NOTIFICATION SERVICE] passwordUser.parent_secret_id:', passwordUser.parent_secret_id);
+      console.log(
+        '[NOTIFICATION SERVICE] passwordUser.userId:',
+        passwordUser.userId,
+      );
+      console.log(
+        '[NOTIFICATION SERVICE] passwordUser.sharedWith length:',
+        passwordUser.sharedWith?.length || 0,
+      );
+      console.log(
+        '[NOTIFICATION SERVICE] passwordUser.parent_secret_id:',
+        passwordUser.parent_secret_id,
+      );
       console.log('='.repeat(80));
 
       // Skip for child secrets
@@ -128,7 +136,9 @@ export class PasswordNotificationService extends PasswordBaseService {
                 continue;
               }
 
-              console.log('[DEBUG] Has telegram ID - sending telegram notification');
+              console.log(
+                '[DEBUG] Has telegram ID - sending telegram notification',
+              );
               await this.sendTelegramShareNotification(
                 user,
                 recipientInfo,
@@ -229,7 +239,7 @@ You can view the response in your secrets list 📋.`;
           [
             {
               text: 'Open Reply',
-              url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${parentSecretId}_mydata_${childSecretId}`,
+              url: `${this.appConfig.telegramBotUrl}?startapp=${parentSecretId}_mydata_${childSecretId}`,
             },
           ],
         ],
@@ -361,7 +371,7 @@ You can view the reply in your shared secrets list 📋.
                 [
                   {
                     text: 'Open Reply',
-                    url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${parentSecretId}_shared_${childSecretId}`,
+                    url: `${this.appConfig.telegramBotUrl}?startapp=${parentSecretId}_shared_${childSecretId}`,
                   },
                 ],
               ],
@@ -449,7 +459,9 @@ You can view the reply in your shared secrets list 📋.
       if (info) recipients.push(info);
     }
 
-    console.log(`[DEBUG] resolveRecipients found ${recipients.length} recipient(s)`);
+    console.log(
+      `[DEBUG] resolveRecipients found ${recipients.length} recipient(s)`,
+    );
 
     return recipients;
   }
@@ -565,7 +577,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         [
           {
             text: 'Open Secret',
-            url: `${this.configService.get<string>('TELEGRAM_BOT_URL')}?startapp=${password._id}_shared`,
+            url: `${this.appConfig.telegramBotUrl}?startapp=${password._id}_shared`,
           },
         ],
       ],

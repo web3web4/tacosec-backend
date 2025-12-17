@@ -1,21 +1,12 @@
-import { ConfigService } from '@nestjs/config';
 import { CryptoUtil } from '../../src/utils/crypto.util';
 
 describe('CryptoUtil', () => {
   let cryptoUtil: CryptoUtil;
-  let mockConfigService: jest.Mocked<ConfigService>;
 
   beforeEach(() => {
-    mockConfigService = {
-      get: jest.fn((key: string) => {
-        if (key === 'ENCRYPTION_KEY') {
-          return 'c558ad827f514a3bc6fe872b2527890f6ed7f75febd5b7110e35af76424839ac';
-        }
-        return null;
-      }),
-    } as any;
-
-    cryptoUtil = new CryptoUtil(mockConfigService);
+    cryptoUtil = new CryptoUtil(
+      'c558ad827f514a3bc6fe872b2527890f6ed7f75febd5b7110e35af76424839ac',
+    );
   });
 
   it('should be defined', () => {

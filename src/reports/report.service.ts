@@ -6,7 +6,7 @@ import { User, UserDocument } from '../users/schemas/user.schema';
 import { ReportUserDto, ReportType } from './dto/report-user.dto';
 import { ReportPriority } from './enums/report-priority.enum';
 import { ResolvedFilterEnum } from './enums/resolved-filter.enum';
-import { ConfigService } from '@nestjs/config';
+import { AppConfigService } from '../common/config/app-config.service';
 import {
   Password,
   PasswordDocument,
@@ -20,10 +20,7 @@ import { UserFinderUtil } from '../utils/user-finder.util';
 import { AddressDetectorUtil } from '../utils/address-detector.util';
 import { Types } from 'mongoose';
 import { TelegramService } from '../telegram/telegram.service';
-import {
-  NotificationsService,
-  NotificationLogData,
-} from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
 import { LoggerService } from '../logger/logger.service';
 import { LogEvent } from '../logger/dto/log-event.enum';
@@ -40,7 +37,7 @@ export class ReportService {
     private passwordModel: Model<PasswordDocument>,
     @InjectModel(PublicAddress.name)
     private publicAddressModel: Model<PublicAddressDocument>,
-    private configService: ConfigService,
+    private appConfig: AppConfigService,
     private publicAddressesService: PublicAddressesService,
     private telegramService: TelegramService,
     private notificationsService: NotificationsService,
@@ -48,19 +45,12 @@ export class ReportService {
   ) {
     // Get the maximum number of reports before ban from environment variables
     // Default to 10 if not specified
-    this.maxReportsBeforeBan = parseInt(
-      this.configService.get<string>('MAX_REPORTS_BEFORE_BAN', '10'),
-      10,
-    );
+    this.maxReportsBeforeBan = this.appConfig.maxReportsBeforeBan;
 
     // Get the maximum percentage of reports required for ban from environment variables
     // Default to 0.5 (50%) if not specified
-    this.maxPercentageOfReportsRequiredForBan = parseFloat(
-      this.configService.get<string>(
-        'MAX_PERCENTAGE_OF_REPORTS_REQUIRED_FOR_BAN',
-        '0.5',
-      ),
-    );
+    this.maxPercentageOfReportsRequiredForBan =
+      this.appConfig.maxPercentageOfReportsRequiredForBan;
   }
 
   /**
@@ -250,7 +240,7 @@ export class ReportService {
             reporterLatestPublicAddress = addressResponse.data.publicKey;
           }
         }
-      } catch (error) {
+      } catch {
         // If no address found, reporterLatestPublicAddress remains undefined
         reporterLatestPublicAddress = undefined;
       }
@@ -278,7 +268,7 @@ export class ReportService {
             reportedUserLatestPublicAddress = addressResponse.data.publicKey;
           }
         }
-      } catch (error) {
+      } catch {
         // If no address found, reportedUserLatestPublicAddress remains undefined
         reportedUserLatestPublicAddress = undefined;
       }
@@ -898,8 +888,6 @@ If you believe this report was made in error, please contact our support team.`;
             .sort({ createdAt: -1 })
             .exec();
 
-          // Count unresolved reports
-          const unresolvedReports = reports.filter((r) => !r.resolved).length;
           // If resolved filter is provided, count matching reports. If not provided, return all (count all reports).
           const reportCount = reports.length;
 

@@ -1,28 +1,17 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AppConfigService } from '../common/config/app-config.service';
 
 @Module({
   imports: [
     JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => {
-        const secret = configService.get<string>('JWT_SECRET');
-        if (!secret) {
-          throw new Error(
-            'JWT_SECRET is not configured. Please set this environment variable.',
-          );
-        }
-
-        // Get JWT expiration time from environment variable, default to '24h'
-        const expiresIn = configService.get<string>('JWT_EXPIRES_IN') || '24h';
-
+      useFactory: async (appConfig: AppConfigService) => {
         return {
-          secret,
-          signOptions: { expiresIn },
+          secret: appConfig.jwtSecret,
+          signOptions: { expiresIn: appConfig.jwtExpiresIn },
         };
       },
-      inject: [ConfigService],
+      inject: [AppConfigService],
     }),
   ],
   exports: [JwtModule],

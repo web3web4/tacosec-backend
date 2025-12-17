@@ -1,7 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AppConfigService } from '../common/config/app-config.service';
 import { LoggerController } from './logger.controller';
 import { LoggerService } from './logger.service';
 import { ErrorLog, ErrorLogSchema } from './schemas/error-log.schema';
@@ -24,14 +24,13 @@ import { UsersModule } from '../users/users.module';
     ]),
     // JWT module for token verification
     JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+      useFactory: async (appConfig: AppConfigService) => ({
+        secret: appConfig.jwtSecret,
         signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '24h'),
+          expiresIn: appConfig.jwtExpiresIn,
         },
       }),
-      inject: [ConfigService],
+      inject: [AppConfigService],
     }),
     // Import UsersModule to access UsersService for RolesGuard
     forwardRef(() => UsersModule),

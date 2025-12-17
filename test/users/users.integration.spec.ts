@@ -18,7 +18,6 @@ describe('UserController (e2e)', () => {
   let app: INestApplication;
   let telegramValidatorService: TelegramValidatorService;
   let userService: UsersService;
-  let telegramDtoAuthGuard: TelegramDtoAuthGuard;
   let telegramServiceMock;
   let telegramClientServiceMock;
 
@@ -98,8 +97,6 @@ describe('UserController (e2e)', () => {
       TelegramValidatorService,
     );
     userService = moduleFixture.get<UsersService>(UsersService);
-    telegramDtoAuthGuard =
-      moduleFixture.get<TelegramDtoAuthGuard>(TelegramDtoAuthGuard);
 
     // Initialize the app
     await app.init();

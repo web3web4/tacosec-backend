@@ -10,10 +10,7 @@ import {
 } from '../../public-addresses/schemas/public-address.schema';
 import { TelegramDtoAuthGuard } from '../../guards/telegram-dto-auth.guard';
 import { PublicAddressesService } from '../../public-addresses/public-addresses.service';
-import {
-  AuthenticatedRequest,
-  AuthenticatedUser,
-} from '../../common/interfaces/authenticated-request.interface';
+import { AuthenticatedRequest } from '../../common/interfaces/authenticated-request.interface';
 import { ERROR_MESSAGES } from '../../common/constants/error-messages.constant';
 
 /**

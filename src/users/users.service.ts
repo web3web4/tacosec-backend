@@ -603,7 +603,7 @@ As a result:
             if (addressResponse.success && addressResponse.data) {
               latestPublicAddress = addressResponse.data.publicKey;
             }
-          } catch (error) {
+          } catch {
             // If no address found, latestPublicAddress remains undefined
             latestPublicAddress = undefined;
           }

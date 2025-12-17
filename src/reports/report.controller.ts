@@ -17,7 +17,6 @@ import { ReportUserDto } from './dto/report-user.dto';
 import { GetReportedUsersQueryDto } from './dto/get-reported-users-query.dto';
 import { UsersService } from '../users/users.service';
 
-import { TelegramUserExistsPipe } from './pipes/telegram-user-exists.pipe';
 import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { Roles, Role } from '../decorators/roles.decorator';

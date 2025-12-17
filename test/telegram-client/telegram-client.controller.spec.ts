@@ -12,9 +12,6 @@ import { TelegramValidatorService } from '../../src/telegram/telegram-validator.
 
 describe('TelegramClientController', () => {
   let controller: TelegramClientController;
-  let telegramClientService: TelegramClientService;
-  let authService: AuthService;
-  let contactsService: ContactsService;
 
   const mockTelegramClientService = {
     hasUserSession: jest.fn(),
@@ -62,11 +59,6 @@ describe('TelegramClientController', () => {
     }).compile();
 
     controller = module.get<TelegramClientController>(TelegramClientController);
-    telegramClientService = module.get<TelegramClientService>(
-      TelegramClientService,
-    );
-    authService = module.get<AuthService>(AuthService);
-    contactsService = module.get<ContactsService>(ContactsService);
   });
 
   it('should be defined', () => {
@@ -214,10 +206,6 @@ describe('TelegramClientController', () => {
 
   describe('syncContacts', () => {
     it('should sync contacts successfully', async () => {
-      const contacts = [
-        { name: 'John Doe', phone: '+1234567890' },
-        { name: 'Jane Smith', phone: '+0987654321' },
-      ];
       const userId = 123;
       const expectedResult = {
         status: ContactSyncStatus.COMPLETED,

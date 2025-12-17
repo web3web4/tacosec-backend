@@ -57,16 +57,6 @@ describe('AuthController', () => {
         signature: 'test-signature',
       };
 
-      const mockUser = {
-        _id: 'user-id',
-        telegramId: '123456789',
-        firstName: 'Test',
-        lastName: 'User',
-        username: 'testuser',
-        role: 'USER',
-        isActive: true,
-      };
-
       const expectedResponse = {
         access_token: 'jwt-token',
       };

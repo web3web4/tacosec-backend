@@ -14,6 +14,7 @@ import { UsersModule } from '../users/users.module';
 import { PublicAddressesModule } from '../public-addresses/public-addresses.module';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { LoggerModule } from '../logger/logger.module';
+import { Challange, ChallangeSchema } from './schemas/challange.schema';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { LoggerModule } from '../logger/logger.module';
       { name: PublicAddress.name, schema: PublicAddressSchema },
       { name: User.name, schema: UserSchema },
       { name: Password.name, schema: PasswordSchema },
+      { name: Challange.name, schema: ChallangeSchema },
     ]),
     SharedJwtModule,
     TelegramModule,

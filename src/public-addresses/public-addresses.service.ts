@@ -409,7 +409,6 @@ export class PublicAddressesService {
         }),
       );
 
-      
       // Transform the response to include userTelegramId and exclude userId
       const responseData = createdAddresses.map((address) => {
         const addressObj = address.toObject() as any;

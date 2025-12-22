@@ -10,7 +10,7 @@ export class LoginDto {
   publicAddress?: string;
 
   /**
-   * Signature over the publicAddress (message = publicAddress)
+   * Signature over the latest challange generated for this publicAddress
    */
   @IsOptional()
   @IsString()

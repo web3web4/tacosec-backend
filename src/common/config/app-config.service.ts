@@ -9,6 +9,7 @@ export type AppConfig = {
   jwtAccessTokenExpiresIn: string;
   jwtRefreshTokenExpiresIn: string;
   encryptionKey: string;
+  authChallangeExpiresInMinutes: number;
   telegramBotToken?: string;
   telegramBotUrl?: string;
   adminTelegramId?: string;
@@ -47,6 +48,10 @@ export class AppConfigService {
         defaultValue: '7d',
       })!,
       encryptionKey: this.getRequiredString('ENCRYPTION_KEY'),
+      authChallangeExpiresInMinutes: this.getNumber(
+        'AUTH_CHALLANGE_EXPIRES_IN_MINUTES',
+        { defaultValue: 5, min: 1 },
+      )!,
       telegramBotToken: this.getString('TELEGRAM_BOT_TOKEN') || undefined,
       telegramBotUrl: this.getString('TELEGRAM_BOT_URL') || undefined,
       adminTelegramId: this.getString('ADMIN_TELEGRAM_ID') || undefined,
@@ -122,6 +127,10 @@ export class AppConfigService {
 
   get encryptionKey(): string {
     return this.cfg.encryptionKey;
+  }
+
+  get authChallangeExpiresInMinutes(): number {
+    return this.cfg.authChallangeExpiresInMinutes;
   }
 
   get telegramBotToken(): string | undefined {

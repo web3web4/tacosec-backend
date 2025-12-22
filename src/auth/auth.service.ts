@@ -1,4 +1,5 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -21,6 +22,7 @@ import { PublicAddressesService } from '../public-addresses/public-addresses.ser
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { LoggerService } from '../logger/logger.service';
 import { LogEvent } from '../logger/dto/log-event.enum';
+import { Challange, ChallangeDocument } from './schemas/challange.schema';
 
 export interface LoginResponse {
   access_token: string;
@@ -55,6 +57,8 @@ export class AuthService {
     private userModel: Model<UserDocument>,
     @InjectModel(Password.name)
     private passwordModel: Model<PasswordDocument>,
+    @InjectModel(Challange.name)
+    private challangeModel: Model<ChallangeDocument>,
     private jwtService: JwtService,
     private telegramValidator: TelegramValidatorService,
     private telegramDtoAuthGuard: TelegramDtoAuthGuard,
@@ -63,6 +67,119 @@ export class AuthService {
     private publicAddressesService: PublicAddressesService,
     private readonly loggerService: LoggerService,
   ) {}
+
+  async createChallange(publicAddressRaw: string): Promise<{
+    challange: string;
+    expiresAt: Date;
+    expiresInMinutes: number;
+  }> {
+    const publicAddress = (publicAddressRaw || '').trim();
+    if (!publicAddress) {
+      throw new HttpException(
+        {
+          success: false,
+          message: 'publicAddress is required',
+          error: 'Bad Request',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    let addressRecord = await this.publicAddressModel
+      .findOne({ publicKey: publicAddress })
+      .exec();
+
+    if (!addressRecord) {
+      const newUser = new this.userModel({
+        username: '',
+        telegramId: '',
+        firstName: '',
+        lastName: '',
+        hash: '',
+        role: Role.USER,
+        isActive: true,
+      });
+
+      const savedUser = await newUser.save();
+      try {
+        const newAddressRecord = new this.publicAddressModel({
+          publicKey: publicAddress,
+          userIds: [savedUser._id],
+        });
+        await newAddressRecord.save();
+      } catch (e) {
+        if (
+          (e as any)?.name === 'MongoServerError' &&
+          (e as any)?.code === 11000
+        ) {
+          try {
+            await this.userModel.deleteOne({ _id: savedUser._id }).exec();
+          } catch {}
+        } else {
+          throw e;
+        }
+      }
+
+      addressRecord = await this.publicAddressModel
+        .findOne({ publicKey: publicAddress })
+        .exec();
+
+      if (!addressRecord) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Failed to create public address record',
+            error: 'Internal Server Error',
+          },
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+
+      try {
+        await this.loggerService.saveSystemLog(
+          {
+            event: LogEvent.UserCreated,
+            message: 'User created via challange request',
+            publicAddress,
+          },
+          {
+            userId: String(savedUser._id),
+            telegramId: savedUser.telegramId,
+            username: savedUser.username,
+          },
+        );
+      } catch {}
+    }
+
+    const expiresInMinutes = this.appConfig.authChallangeExpiresInMinutes;
+    const issuedAt = new Date();
+    const expiresAt = new Date(issuedAt.getTime() + expiresInMinutes * 60000);
+    const nonce = randomBytes(16).toString('hex');
+
+    const challange = [
+      'Taco Authentication Challenge',
+      `Address: ${publicAddress}`,
+      `Nonce: ${nonce}`,
+      `Issued At: ${issuedAt.toISOString()}`,
+      `Expires At: ${expiresAt.toISOString()}`,
+    ].join('\n');
+
+    await this.challangeModel
+      .findOneAndUpdate(
+        { publicAddressId: addressRecord._id },
+        {
+          $set: {
+            challange,
+            expiresAt,
+            expiresInMinutes,
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      )
+      .exec();
+
+    return { challange, expiresAt, expiresInMinutes };
+  }
 
   async login(
     loginDto: LoginDto | undefined,
@@ -91,8 +208,9 @@ export class AuthService {
       if (loginDto && loginDto.publicAddress && loginDto.signature) {
         const isStaging = this.appConfig.isStaging;
         console.log('isStaging :', isStaging);
+        const publicAddressToVerify = (loginDto.publicAddress || '').trim();
         const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(
-          loginDto.publicAddress,
+          publicAddressToVerify,
         );
 
         if (isEthereumAddress && !isStaging) {

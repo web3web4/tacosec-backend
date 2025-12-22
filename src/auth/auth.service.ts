@@ -181,6 +181,45 @@ export class AuthService {
     return { challange, expiresAt, expiresInMinutes };
   }
 
+  private async getActiveChallangeOrThrow(
+    publicAddress: string,
+  ): Promise<string> {
+    const publicAddressRecord = await this.publicAddressModel
+      .findOne({ publicKey: publicAddress })
+      .select('_id')
+      .exec();
+
+    if (!publicAddressRecord) {
+      throw new HttpException(
+        {
+          success: false,
+          message:
+            'The challenge for this public address was not found or has expired. Please create a new challenge and sign it.',
+          error: 'Unauthorized',
+        },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    const challangeRecord = await this.challangeModel
+      .findOne({ publicAddressId: publicAddressRecord._id })
+      .exec();
+
+    if (!challangeRecord || challangeRecord.expiresAt.getTime() <= Date.now()) {
+      throw new HttpException(
+        {
+          success: false,
+          message:
+            'The challenge for this public address was not found or has expired. Please create a new challenge and sign it.',
+          error: 'Unauthorized',
+        },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    return challangeRecord.challange;
+  }
+
   async login(
     loginDto: LoginDto | undefined,
     telegramInitData?: string,
@@ -214,20 +253,21 @@ export class AuthService {
         );
 
         if (isEthereumAddress && !isStaging) {
-          const messageToVerify = loginDto.publicAddress;
+          const signature = loginDto.signature;
+
+          const messageToVerify = await this.getActiveChallangeOrThrow(
+            publicAddressToVerify,
+          );
+
           let recoveredAddress = '';
           try {
             const { verifyMessage } = await import('ethers');
-            recoveredAddress = verifyMessage(
-              messageToVerify,
-              loginDto.signature,
-            );
+            recoveredAddress = verifyMessage(messageToVerify, signature);
           } catch {
             throw new HttpException(
               {
                 success: false,
-                message:
-                  'Invalid signature format or verification failure for the provided message',
+                message: 'Invalid signature',
                 error: 'Unauthorized',
               },
               HttpStatus.UNAUTHORIZED,
@@ -236,13 +276,12 @@ export class AuthService {
 
           if (
             recoveredAddress.toLowerCase() !==
-            loginDto.publicAddress.toLowerCase()
+            publicAddressToVerify.toLowerCase()
           ) {
             throw new HttpException(
               {
                 success: false,
-                message:
-                  'Signature does not match the provided public address (Ethereum)',
+                message: 'Invalid signature',
                 error: 'Unauthorized',
               },
               HttpStatus.UNAUTHORIZED,

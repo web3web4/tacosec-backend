@@ -5,12 +5,14 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
   PublicAddress,
   PublicAddressDocument,
 } from './schemas/public-address.schema';
+import { Challange, ChallangeDocument } from '../auth/schemas/challange.schema';
 import { UsersService } from '../users/users.service';
 import {
   CreatePublicAddressDto,
@@ -42,16 +44,145 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
+export interface PublicAddressChallangeResponse {
+  challange: string;
+  expiresAt: Date;
+  expiresInMinutes: number;
+}
+
 @Injectable()
 export class PublicAddressesService {
   constructor(
     @InjectModel(PublicAddress.name)
     private publicAddressModel: Model<PublicAddressDocument>,
+    @InjectModel(Challange.name)
+    private challangeModel: Model<ChallangeDocument>,
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     private readonly cryptoUtil: CryptoUtil,
     private readonly appConfig: AppConfigService,
   ) {}
+
+  async createChallange(
+    publicKeyRaw: string,
+  ): Promise<ApiResponse<PublicAddressChallangeResponse>> {
+    const publicKey = (publicKeyRaw || '').trim();
+    if (!publicKey) {
+      throw new HttpException(
+        'Public key cannot be null or empty',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const expiresInMinutes = this.appConfig.authChallangeExpiresInMinutes;
+    const issuedAt = new Date();
+    const expiresAt = new Date(issuedAt.getTime() + expiresInMinutes * 60000);
+    const nonce = randomBytes(16).toString('hex');
+
+    const challange = [
+      'Taco Authentication Challenge',
+      `Address: ${publicKey}`,
+      `Nonce: ${nonce}`,
+      `Issued At: ${issuedAt.toISOString()}`,
+      `Expires At: ${expiresAt.toISOString()}`,
+    ].join('\n');
+
+    let publicAddressRecord = await this.publicAddressModel
+      .findOne({ publicKey })
+      .exec();
+
+    if (!publicAddressRecord) {
+      try {
+        publicAddressRecord = await new this.publicAddressModel({
+          publicKey,
+          userIds: [],
+          encryptedSecret: null,
+        }).save();
+      } catch (e) {
+        if (
+          (e as any)?.name === 'MongoServerError' &&
+          (e as any)?.code === 11000
+        ) {
+          publicAddressRecord = await this.publicAddressModel
+            .findOne({ publicKey })
+            .exec();
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    if (!publicAddressRecord) {
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Failed to create public address record',
+          error: 'Internal Server Error',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    await this.challangeModel
+      .findOneAndUpdate(
+        { publicAddressId: publicAddressRecord._id },
+        {
+          $set: {
+            challange,
+            expiresAt,
+            expiresInMinutes,
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      )
+      .exec();
+
+    return {
+      success: true,
+      data: {
+        challange,
+        expiresAt,
+        expiresInMinutes,
+      },
+    };
+  }
+
+  private async getActiveChallangeOrThrow(publicKey: string): Promise<string> {
+    const publicAddressRecord = await this.publicAddressModel
+      .findOne({ publicKey })
+      .select('_id')
+      .exec();
+
+    if (!publicAddressRecord) {
+      throw new HttpException(
+        {
+          success: false,
+          message:
+            'The challenge for this public address was not found or has expired. Please create a new challenge and sign it.',
+          error: 'Unauthorized',
+        },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    const challangeRecord = await this.challangeModel
+      .findOne({ publicAddressId: publicAddressRecord._id })
+      .exec();
+
+    if (!challangeRecord || challangeRecord.expiresAt.getTime() <= Date.now()) {
+      throw new HttpException(
+        {
+          success: false,
+          message:
+            'The challenge for this public address was not found or has expired. Please create a new challenge and sign it.',
+          error: 'Unauthorized',
+        },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    return challangeRecord.challange;
+  }
 
   /**
    * Adds a single public address with optional encrypted secret for a user
@@ -60,7 +191,9 @@ export class PublicAddressesService {
    */
   async addPublicAddress(
     createDto: CreatePublicAddressDto,
-  ): Promise<ApiResponse<PublicAddressResponse[]>> {
+  ): Promise<
+    ApiResponse<PublicAddressResponse[] | PublicAddressChallangeResponse>
+  > {
     try {
       let user: any;
 
@@ -94,9 +227,20 @@ export class PublicAddressesService {
         );
       }
 
+      const publicKey = createDto.publicKey.trim();
+
+      const existingAddress = await this.publicAddressModel
+        .findOne({
+          publicKey,
+        })
+        .exec();
+
+      if (!existingAddress) {
+        return this.createChallange(publicKey);
+      }
+
       // Require signature only when not in staging
       const isStaging = this.appConfig.isStaging;
-      console.log('isStaging :', isStaging);
       if (!isStaging && !createDto.signature?.trim()) {
         throw new HttpException(
           'Signature is required for adding public address',
@@ -104,23 +248,21 @@ export class PublicAddressesService {
         );
       }
 
-      // Verify Ethereum signatures when applicable (message = publicKey) unless in staging
-      const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(createDto.publicKey);
+      // Verify Ethereum signatures when applicable (message = challange) unless in staging
+      const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(publicKey);
       if (isEthereumAddress && !isStaging) {
         try {
           const { verifyMessage } = await import('ethers');
+          const challange = await this.getActiveChallangeOrThrow(publicKey);
           const recoveredAddress = verifyMessage(
-            createDto.publicKey,
-            createDto.signature,
+            challange,
+            createDto.signature!,
           );
-          if (
-            recoveredAddress.toLowerCase() !== createDto.publicKey.toLowerCase()
-          ) {
+          if (recoveredAddress.toLowerCase() !== publicKey.toLowerCase()) {
             throw new HttpException(
               {
                 success: false,
-                message:
-                  'Signature does not match the provided public address (Ethereum)',
+                message: 'Invalid signature',
                 error: 'Unauthorized',
               },
               HttpStatus.UNAUTHORIZED,
@@ -131,21 +273,13 @@ export class PublicAddressesService {
           throw new HttpException(
             {
               success: false,
-              message:
-                'Invalid signature format or verification failure for the provided message',
+              message: 'Invalid signature',
               error: 'Unauthorized',
             },
             HttpStatus.UNAUTHORIZED,
           );
         }
       }
-
-      // Check if the public key already exists in the system
-      const existingAddress = await this.publicAddressModel
-        .findOne({
-          publicKey: createDto.publicKey,
-        })
-        .exec();
 
       // If the address already exists, check ownership
       if (existingAddress) {
@@ -204,7 +338,7 @@ export class PublicAddressesService {
       // Create the new public address
       const newAddress = new this.publicAddressModel({
         userIds: [(user as UserDocument)._id as Types.ObjectId],
-        publicKey: createDto.publicKey,
+        publicKey,
         encryptedSecret: createDto.secret
           ? this.cryptoUtil.encrypt(createDto.secret)
           : null,
@@ -286,7 +420,6 @@ export class PublicAddressesService {
     try {
       // Determine staging mode once
       const isStaging = this.appConfig.isStaging;
-      console.log('isStaging :', isStaging);
       // Extract user from telegram init data
       const user = await this.usersService.getUserFromTelegramInitData(
         createDto.telegramInitData,

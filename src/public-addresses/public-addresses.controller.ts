@@ -6,6 +6,7 @@ import {
 } from './public-addresses.service';
 import { CreatePublicAddressDto } from './dto/create-public-address.dto';
 import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
+import { CreatePublicAddressChallangeDto } from './dto/create-public-address-challange.dto';
 
 @Controller('public-addresses')
 export class PublicAddressesController {
@@ -23,7 +24,7 @@ export class PublicAddressesController {
   async addPublicAddresses(
     @Request() req: Request,
     @Body() createDto: CreatePublicAddressDto,
-  ): Promise<ApiResponse<PublicAddressResponse[]>> {
+  ): Promise<ApiResponse<PublicAddressResponse[] | any>> {
     // Handle authentication data based on the auth method used
     if ((req as any).authMethod === 'jwt') {
       // For JWT authentication, use user data from token
@@ -38,6 +39,20 @@ export class PublicAddressesController {
 
     // The service now handles all error scenarios and response formatting
     return this.publicAddressesService.addPublicAddress(createDto);
+  }
+
+  @Post('challange')
+  @FlexibleAuth()
+  async createChallange(
+    @Body() createDto: CreatePublicAddressChallangeDto,
+  ): Promise<
+    ApiResponse<{
+      challange: string;
+      expiresAt: Date;
+      expiresInMinutes: number;
+    }>
+  > {
+    return this.publicAddressesService.createChallange(createDto.publicKey);
   }
 
   /**

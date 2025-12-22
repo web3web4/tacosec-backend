@@ -12,12 +12,14 @@ import { UsersModule } from '../users/users.module';
 import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { TelegramModule } from '../telegram/telegram.module';
 import { CryptoModule } from '../utils/crypto.module';
+import { Challange, ChallangeSchema } from '../auth/schemas/challange.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: PublicAddress.name, schema: PublicAddressSchema },
       { name: User.name, schema: UserSchema },
+      { name: Challange.name, schema: ChallangeSchema },
     ]),
     SharedJwtModule,
     forwardRef(() => UsersModule),

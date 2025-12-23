@@ -52,7 +52,7 @@ export class PublicAddressesController {
       expiresInMinutes: number;
     }>
   > {
-    return this.publicAddressesService.createChallange(createDto.publicKey);
+    return this.publicAddressesService.createChallange(createDto.publicAddress);
   }
 
   /**

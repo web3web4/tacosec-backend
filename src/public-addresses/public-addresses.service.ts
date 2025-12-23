@@ -184,6 +184,24 @@ export class PublicAddressesService {
     return challangeRecord.challange;
   }
 
+  private async expireChallangeForPublicKey(publicKey: string): Promise<void> {
+    try {
+      const publicAddressRecord = await this.publicAddressModel
+        .findOne({ publicKey })
+        .select('_id')
+        .exec();
+
+      if (!publicAddressRecord) return;
+
+      await this.challangeModel
+        .updateOne(
+          { publicAddressId: publicAddressRecord._id },
+          { $set: { expiresAt: new Date(0) } },
+        )
+        .exec();
+    } catch {}
+  }
+
   /**
    * Adds a single public address with optional encrypted secret for a user
    * Supports both JWT token authentication and Telegram init data authentication
@@ -259,6 +277,7 @@ export class PublicAddressesService {
             createDto.signature!,
           );
           if (recoveredAddress.toLowerCase() !== publicKey.toLowerCase()) {
+            await this.expireChallangeForPublicKey(publicKey);
             throw new HttpException(
               {
                 success: false,
@@ -270,6 +289,7 @@ export class PublicAddressesService {
           }
         } catch (e) {
           if (e instanceof HttpException) throw e;
+          await this.expireChallangeForPublicKey(publicKey);
           throw new HttpException(
             {
               success: false,

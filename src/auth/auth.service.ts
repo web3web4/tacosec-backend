@@ -220,6 +220,26 @@ export class AuthService {
     return challangeRecord.challange;
   }
 
+  private async expireChallangeForPublicAddress(
+    publicAddress: string,
+  ): Promise<void> {
+    try {
+      const publicAddressRecord = await this.publicAddressModel
+        .findOne({ publicKey: publicAddress })
+        .select('_id')
+        .exec();
+
+      if (!publicAddressRecord) return;
+
+      await this.challangeModel
+        .updateOne(
+          { publicAddressId: publicAddressRecord._id },
+          { $set: { expiresAt: new Date(0) } },
+        )
+        .exec();
+    } catch {}
+  }
+
   async login(
     loginDto: LoginDto | undefined,
     telegramInitData?: string,
@@ -264,6 +284,7 @@ export class AuthService {
             const { verifyMessage } = await import('ethers');
             recoveredAddress = verifyMessage(messageToVerify, signature);
           } catch {
+            await this.expireChallangeForPublicAddress(publicAddressToVerify);
             throw new HttpException(
               {
                 success: false,
@@ -278,6 +299,7 @@ export class AuthService {
             recoveredAddress.toLowerCase() !==
             publicAddressToVerify.toLowerCase()
           ) {
+            await this.expireChallangeForPublicAddress(publicAddressToVerify);
             throw new HttpException(
               {
                 success: false,

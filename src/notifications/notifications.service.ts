@@ -410,18 +410,58 @@ export class NotificationsService {
       // Build filter using a unified $and pipeline so totalItems is counted AFTER applying ALL filters
       const conditions: any[] = [];
 
-      // User-specific part
-      const userIdObj = Types.ObjectId.isValid(currentUserId)
-        ? new Types.ObjectId(currentUserId)
-        : currentUserId;
+      const latestCurrent = await this.publicAddressModel
+        .findOne({ userIds: String(currentUserId) })
+        .sort({ updatedAt: -1 })
+        .lean()
+        .exec();
+
+      const currentUserPublicAddress = latestCurrent?.publicKey
+        ? String(latestCurrent.publicKey)
+        : '';
+
+      if (!currentUserPublicAddress) {
+        return {
+          notifications: [],
+          pagination: {
+            currentPage: page,
+            totalPages: 0,
+            totalItems: 0,
+            itemsPerPage: limit,
+            hasNextPage: false,
+            hasPrevPage: page > 1,
+          },
+        };
+      }
+
+      const addressVariants = Array.from(
+        new Set([
+          currentUserPublicAddress,
+          currentUserPublicAddress.toLowerCase(),
+          currentUserPublicAddress.toUpperCase(),
+        ]),
+      );
+
+      const senderAddressMatch = {
+        $or: [
+          { 'metadata.senderPublicAddress': { $in: addressVariants } },
+          { 'metadata.reporterPublicAddress': { $in: addressVariants } },
+        ],
+      };
+
+      const recipientAddressMatch = {
+        $or: [
+          { 'metadata.recipientPublicAddress': { $in: addressVariants } },
+          { 'metadata.reportedUserPublicAddress': { $in: addressVariants } },
+        ],
+      };
+
       if (filterChoice === 'sender') {
-        conditions.push({ senderUserId: userIdObj });
+        conditions.push(senderAddressMatch);
       } else if (filterChoice === 'recipient') {
-        conditions.push({ recipientUserId: userIdObj });
+        conditions.push(recipientAddressMatch);
       } else {
-        conditions.push({
-          $or: [{ senderUserId: userIdObj }, { recipientUserId: userIdObj }],
-        });
+        conditions.push({ $or: [senderAddressMatch, recipientAddressMatch] });
       }
 
       conditions.push({
@@ -430,7 +470,7 @@ export class NotificationsService {
           {
             $and: [
               { type: NotificationType.REPORT_NOTIFICATION },
-              { recipientUserId: userIdObj },
+              recipientAddressMatch,
             ],
           },
         ],
@@ -489,84 +529,35 @@ export class NotificationsService {
       const sortOptions: any = {};
       sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-      const allNotifications = await this.notificationModel
-        .find(filter)
-        .sort(sortOptions)
-        .lean()
-        .exec();
+      const [notifications, total] = await Promise.all([
+        this.notificationModel
+          .find(filter)
+          .sort(sortOptions)
+          .skip(skip)
+          .limit(limit)
+          .lean()
+          .exec(),
+        this.notificationModel.countDocuments(filter).exec(),
+      ]);
 
-      const userIdsSet = new Set<string>();
-      for (const n of allNotifications) {
-        if (n.senderUserId) userIdsSet.add(String(n.senderUserId));
-        if (n.recipientUserId) userIdsSet.add(String(n.recipientUserId));
-      }
-      const userIds = Array.from(userIdsSet);
-      const latestMap = new Map<string, string>();
-      await Promise.all(
-        userIds.map(async (uid) => {
-          const latest = await this.publicAddressModel
-            .findOne({ userIds: uid })
-            .sort({ updatedAt: -1 })
-            .lean()
-            .exec();
-          if (latest && latest.publicKey) {
-            latestMap.set(uid, latest.publicKey);
-          }
-        }),
-      );
-
-      const filtered = allNotifications.filter((n: any) => {
-        const senderId = n.senderUserId ? String(n.senderUserId) : undefined;
-        const recipientId = n.recipientUserId
-          ? String(n.recipientUserId)
-          : undefined;
+      const enriched = (notifications || []).map((n: any) => {
         const meta = n.metadata || {};
         const metaSenderAddr =
           meta.senderPublicAddress ?? meta.reporterPublicAddress;
         const metaRecipientAddr =
           meta.recipientPublicAddress ?? meta.reportedUserPublicAddress;
-        if (filterChoice === 'sender') {
-          if (!senderId) return false;
-          const latest = latestMap.get(senderId);
-          return !!metaSenderAddr && !!latest && metaSenderAddr === latest;
-        } else if (filterChoice === 'recipient') {
-          if (!recipientId) return false;
-          const latest = latestMap.get(recipientId);
-          return (
-            !!metaRecipientAddr && !!latest && metaRecipientAddr === latest
-          );
-        } else {
-          const currentIdStr = String(userIdObj);
-          const roleSender = senderId && String(senderId) === currentIdStr;
-          const roleRecipient =
-            recipientId && String(recipientId) === currentIdStr;
-          if (roleSender) {
-            const latest = senderId ? latestMap.get(senderId) : undefined;
-            return !!metaSenderAddr && !!latest && metaSenderAddr === latest;
-          }
-          if (roleRecipient) {
-            const latest = recipientId ? latestMap.get(recipientId) : undefined;
-            return (
-              !!metaRecipientAddr && !!latest && metaRecipientAddr === latest
-            );
-          }
-          return false;
-        }
-      });
 
-      const total = filtered.length;
-      const pageSlice = filtered.slice(skip, skip + limit);
+        const senderMatch =
+          !!metaSenderAddr && addressVariants.includes(String(metaSenderAddr));
+        const recipientMatch =
+          !!metaRecipientAddr &&
+          addressVariants.includes(String(metaRecipientAddr));
 
-      const currentIdStr = String(userIdObj);
-      const enriched = (pageSlice || []).map((n: any) => {
-        const senderIdStr = n.senderUserId ? String(n.senderUserId) : undefined;
-        const recipientIdStr = n.recipientUserId
-          ? String(n.recipientUserId)
-          : undefined;
         let role: 'sender' | 'recipient' | undefined = undefined;
-        if (senderIdStr === currentIdStr) role = 'sender';
-        else if (recipientIdStr === currentIdStr) role = 'recipient';
-        else if (filterChoice !== 'all') role = filterChoice; // fallback
+        if (senderMatch) role = 'sender';
+        else if (recipientMatch) role = 'recipient';
+        else if (filterChoice !== 'all') role = filterChoice;
+
         return { ...n, currentUserRole: role };
       });
 

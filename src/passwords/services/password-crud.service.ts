@@ -374,88 +374,89 @@ export class PasswordCrudService extends PasswordBaseService {
     key: string,
   ): Promise<Password> {
     try {
-      let user;
-      let telegramId: string;
+      let requesterUserId = '';
 
-      // Priority 1: JWT token authentication
-      if (req?.user && req.user.id) {
-        user = await this.userModel
-          .findOne({
-            _id: req.user.id,
-            isActive: true,
-          })
+      if (req?.user?.id) {
+        const user = await this.userModel
+          .findOne({ _id: req.user.id, isActive: true })
+          .select('_id')
           .exec();
 
-        if (!user) {
+        if (!user?._id) {
           throw new HttpException('User not found', HttpStatus.NOT_FOUND);
         }
 
-        // Find the password by ID
-        console.log('Searching for password with ID:', key);
-        const password = await this.passwordModel.findById(key).exec();
-        console.log('Found password:', password ? 'Yes' : 'No');
+        requesterUserId = String(user._id);
+      } else if (req?.headers?.['x-telegram-init-data']) {
+        const headerInitData = req.headers['x-telegram-init-data'] as string;
+        const parsedData =
+          this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
+        const telegramId = parsedData.telegramId;
 
-        // Check if password exists
-        if (!password) {
-          throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
-        }
-
-        console.log(
-          'Password userId:',
-          password.userId ? String(password.userId) : '',
-        );
-        console.log('User _id:', user._id ? String(user._id) : '');
-
-        // Check if the user is the owner of the password
-        if (
-          (password.userId ? String(password.userId) : '') !==
-          (user._id ? String(user._id) : '')
-        ) {
-          throw new HttpException(
-            'You are not authorized to delete this password',
-            HttpStatus.FORBIDDEN,
-          );
-        }
-
-        console.log('User is authorized, proceeding to delete...');
-
-        // Delete the password
-        const deletedPassword = await this.passwordModel
-          .findByIdAndDelete(key)
+        const user = await this.userModel
+          .findOne({ telegramId, isActive: true })
+          .select('_id')
           .exec();
 
-        console.log(
-          'Delete operation result:',
-          deletedPassword ? 'Success' : 'Failed',
+        if (!user?._id) {
+          throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+        }
+
+        requesterUserId = String(user._id);
+      } else {
+        throw new HttpException(
+          'No authentication data provided',
+          HttpStatus.BAD_REQUEST,
         );
-
-        if (!deletedPassword) {
-          throw new HttpException(
-            'Failed to delete secret',
-            HttpStatus.INTERNAL_SERVER_ERROR,
-          );
-        }
-
-        console.log('Password deleted successfully');
-        return deletedPassword;
       }
-      // Priority 2: Telegram authentication (only if no JWT token)
-      else {
-        // Parse X-Telegram-Init-Data header directly
-        if (req?.headers?.['x-telegram-init-data']) {
-          const headerInitData = req.headers['x-telegram-init-data'] as string;
-          const parsedData =
-            this.telegramDtoAuthGuard.parseTelegramInitData(headerInitData);
-          telegramId = parsedData.telegramId;
-        } else {
-          throw new HttpException(
-            'No authentication data provided',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
 
-        return this.deletePasswordByOwner(key, telegramId);
+      const password = await this.passwordModel
+        .findById(key)
+        .select('publicAddress')
+        .exec();
+
+      if (!password) {
+        throw new HttpException('Secret not found', HttpStatus.NOT_FOUND);
       }
+
+      const secretPublicAddress = (password.publicAddress || '').trim();
+      if (!secretPublicAddress) {
+        throw new HttpException(
+          'You are not authorized to delete this password',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      const latestPublicAddress =
+        await this.getLatestPublicAddress(requesterUserId);
+
+      if (!latestPublicAddress) {
+        throw new HttpException(
+          'You are not authorized to delete this password',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      if (
+        latestPublicAddress.trim().toLowerCase() !==
+        secretPublicAddress.toLowerCase()
+      ) {
+        throw new HttpException(
+          'You are not authorized to delete this password',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      const deletedPassword = await this.passwordModel.findByIdAndDelete(key);
+
+      if (!deletedPassword) {
+        throw new HttpException(
+          'Failed to delete secret',
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+
+      return deletedPassword;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;

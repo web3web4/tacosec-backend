@@ -1,4 +1,4 @@
-# tacosec Backend
+# Tacosec Backend
 
 Tacosec backend API built with NestJS and MongoDB. It provides user identity via Telegram and/or wallet public addresses, JWT-based access for protected routes, password/secret storage features, notifications, reporting, and centralized error logging.
 

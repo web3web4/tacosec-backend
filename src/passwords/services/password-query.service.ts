@@ -434,17 +434,26 @@ export class PasswordQueryService extends PasswordBaseService {
         );
       }
 
-      const user = await this.verifyUserExists({ telegramId });
-      const userId = user._id ? String(user._id) : '';
+      const user = await this.userModel
+        .findOne({ telegramId, isActive: true })
+        .exec();
 
-      // Check access
-      const isOwner = parentPassword.userId.equals(new Types.ObjectId(userId));
-      const hasAccess = parentPassword.sharedWith?.some(
-        (shared) => shared.username === user.username,
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      const isOwner = parentPassword.userId.equals(
+        new Types.ObjectId(user._id ? String(user._id) : ''),
       );
+      const hasAccess =
+        parentPassword.sharedWith &&
+        parentPassword.sharedWith.some(
+          (shared) => shared.username === user.username,
+        );
+
       const ownsChildPassword = await this.passwordModel.exists({
         parent_secret_id: new Types.ObjectId(parentId),
-        userId: new Types.ObjectId(userId),
+        userId: new Types.ObjectId(user._id ? String(user._id) : ''),
         isActive: true,
       });
 
@@ -456,51 +465,180 @@ export class PasswordQueryService extends PasswordBaseService {
       }
 
       const skip = (page - 1) * limit;
+
       const baseQuery = {
         parent_secret_id: new Types.ObjectId(parentId),
         isActive: true,
         $or: [{ hidden: false }, { hidden: { $exists: false } }],
       };
 
-      const [totalCount, childPasswords] = await Promise.all([
-        this.passwordModel.countDocuments(baseQuery).exec(),
-        this.passwordModel
-          .find(baseQuery)
-          .select(
-            'key value description updatedAt createdAt sharedWith type hidden initData userId secretViews',
-          )
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .exec(),
-      ]);
+      const totalCount = await this.passwordModel
+        .countDocuments(baseQuery)
+        .exec();
 
-      const transformedPasswords = await Promise.all(
-        childPasswords.map((password) =>
-          this.transformPasswordWithReports(password),
+      const childPasswords = await this.passwordModel
+        .find(baseQuery)
+        .select(
+          'key value description updatedAt createdAt sharedWith type hidden initData userId secretViews',
+        )
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec();
+
+      if (totalCount === 0) {
+        throw new HttpException('There are no children', HttpStatus.NOT_FOUND);
+      }
+
+      const userIds = [
+        ...new Set(
+          childPasswords
+            .map((password) => (password.userId ? String(password.userId) : ''))
+            .filter((id) => id),
         ),
+      ];
+
+      const ownerPrivacyMap = new Map<string, boolean>();
+      const ownerInfoMap = new Map<
+        string,
+        {
+          id: string;
+          telegramId?: string;
+          firstName?: string;
+          lastName?: string;
+          publicAddress?: string;
+        }
+      >();
+
+      const owners = await this.userModel
+        .find({ _id: { $in: userIds } })
+        .select('_id privacyMode telegramId firstName lastName')
+        .exec();
+
+      for (const owner of owners) {
+        const ownerId = owner._id ? String(owner._id) : '';
+        ownerPrivacyMap.set(ownerId, owner.privacyMode || false);
+
+        let publicAddress: string | undefined;
+
+        if (owner.telegramId) {
+          try {
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByTelegramId(
+                owner.telegramId,
+              );
+            if (addressResponse.success && addressResponse.data) {
+              publicAddress = addressResponse.data.publicKey;
+            }
+          } catch {}
+        }
+
+        if (!publicAddress) {
+          try {
+            const addressResponse =
+              await this.publicAddressesService.getLatestAddressByUserId(
+                ownerId,
+              );
+            if (addressResponse.success && addressResponse.data) {
+              publicAddress = addressResponse.data.publicKey;
+            }
+          } catch {}
+        }
+
+        ownerInfoMap.set(ownerId, {
+          id: ownerId,
+          telegramId: owner.telegramId,
+          firstName: owner.firstName,
+          lastName: owner.lastName,
+          publicAddress,
+        });
+      }
+
+      const currentUserId = user._id ? String(user._id) : '';
+
+      const passwordWithReports = await Promise.all(
+        childPasswords.map(async (password) => {
+          const reports = await this.reportModel
+            .find({
+              $or: [
+                { secret_id: password._id },
+                { secret_id: password._id.toString() },
+              ],
+              resolved: false,
+            })
+            .exec();
+
+          const reportInfo: PasswordReportInfo[] = await Promise.all(
+            reports.map(async (report) => {
+              const reporter = await this.userModel
+                .findOne({ telegramId: report.reporterTelegramId })
+                .select('username')
+                .exec();
+
+              return {
+                reporterUsername: reporter ? reporter.username : 'Unknown',
+                report_type: report.report_type,
+                reason: report.reason,
+                createdAt: report.createdAt,
+              };
+            }),
+          );
+
+          const passwordUserId = password.userId ? String(password.userId) : '';
+          const ownerPrivacyMode = ownerPrivacyMap.get(passwordUserId) || false;
+          const isCurrentUserOwner = passwordUserId === currentUserId;
+
+          const ownerInfo = ownerInfoMap.get(passwordUserId) || {
+            id: passwordUserId,
+            telegramId: undefined,
+            firstName: undefined,
+            lastName: undefined,
+            publicAddress: undefined,
+          };
+
+          const passwordData: any = {
+            _id: password._id,
+            key: password.key,
+            value: password.value,
+            description: password.description,
+            type: password.type,
+            sharedWith: password.sharedWith,
+            username: password.initData?.username || 'Unknown',
+            ownerId: ownerInfo.id,
+            ownerTelegramId: ownerInfo.telegramId,
+            firstName: ownerInfo.firstName,
+            lastName: ownerInfo.lastName,
+            publicAddress: ownerInfo.publicAddress,
+            updatedAt: password.updatedAt,
+            hidden: password.hidden || false,
+            reports: reportInfo,
+          };
+
+          if (!currentUserPrivacyMode) {
+            if (!ownerPrivacyMode || isCurrentUserOwner) {
+              passwordData.createdAt = password.createdAt;
+              const secretViews = password.secretViews || [];
+              passwordData.viewsCount = secretViews.length;
+              passwordData.secretViews = secretViews;
+            }
+          }
+
+          return passwordData;
+        }),
       );
 
-      const sanitizedPasswords = currentUserPrivacyMode
-        ? transformedPasswords.map((password) => {
-            const sanitized: any = { ...password };
-            delete sanitized.createdAt;
-            delete sanitized.viewsCount;
-            delete sanitized.secretViews;
-            return sanitized;
-          })
-        : transformedPasswords;
-
       const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPreviousPage = page > 1;
 
       return {
-        passwords: sanitizedPasswords,
+        passwords: passwordWithReports,
         pagination: {
           currentPage: page,
           totalPages,
           totalCount,
-          hasNextPage: page < totalPages,
-          hasPreviousPage: page > 1,
+          hasNextPage,
+          hasPreviousPage,
         },
       };
     } catch (error) {

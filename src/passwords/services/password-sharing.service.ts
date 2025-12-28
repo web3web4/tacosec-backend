@@ -955,31 +955,41 @@ export class PasswordSharingService extends PasswordBaseService {
       if (req?.user && req.user.id) {
         userId = req.user.id;
         username = req.user.username;
+
+        const tokenPublicAddress =
+          this.extractPublicAddressFromBearerToken(req);
+        if (tokenPublicAddress !== undefined) {
+          publicAddress = tokenPublicAddress;
+        }
+
         // Get telegramId, privacyMode and publicAddress from user data
         const user = await this.userModel.findById(userId).exec();
         if (user) {
           currentUserTelegramId = user.telegramId;
           currentUserPrivacyMode = user.privacyMode || false;
-          try {
-            if (user.telegramId) {
-              const respByTelegram =
-                await this.publicAddressesService.getLatestAddressByTelegramId(
-                  user.telegramId,
-                );
-              if (respByTelegram.success && respByTelegram.data) {
-                publicAddress = respByTelegram.data.publicKey;
+
+          if (!publicAddress) {
+            try {
+              if (user.telegramId) {
+                const respByTelegram =
+                  await this.publicAddressesService.getLatestAddressByTelegramId(
+                    user.telegramId,
+                  );
+                if (respByTelegram.success && respByTelegram.data) {
+                  publicAddress = respByTelegram.data.publicKey;
+                }
               }
-            }
-            if (!publicAddress) {
-              const respByUser =
-                await this.publicAddressesService.getLatestAddressByUserId(
-                  String(user._id),
-                );
-              if (respByUser.success && respByUser.data) {
-                publicAddress = respByUser.data.publicKey;
+              if (!publicAddress) {
+                const respByUser =
+                  await this.publicAddressesService.getLatestAddressByUserId(
+                    String(user._id),
+                  );
+                if (respByUser.success && respByUser.data) {
+                  publicAddress = respByUser.data.publicKey;
+                }
               }
-            }
-          } catch {}
+            } catch {}
+          }
         }
       } else if (req?.headers?.['x-telegram-init-data']) {
         const headerInitData = req.headers['x-telegram-init-data'] as string;
@@ -1342,6 +1352,34 @@ export class PasswordSharingService extends PasswordBaseService {
     } catch (error) {
       console.log('error', error);
       throw new HttpException((error as Error).message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  private extractPublicAddressFromBearerToken(
+    req: AuthenticatedRequest,
+  ): string | undefined {
+    const authHeader = req?.headers?.authorization;
+    if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      return undefined;
+    }
+
+    const token = authHeader.substring(7);
+    const parts = token.split('.');
+    if (parts.length < 2) return undefined;
+
+    try {
+      const payloadPart = parts[1];
+      const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const json = Buffer.from(padded, 'base64').toString('utf8');
+      const payload = JSON.parse(json) as { publicAddress?: unknown };
+      const publicAddress = payload?.publicAddress;
+      if (typeof publicAddress === 'string' && publicAddress.length > 0) {
+        return publicAddress;
+      }
+      return undefined;
+    } catch {
+      return undefined;
     }
   }
 }

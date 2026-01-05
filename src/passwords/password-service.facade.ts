@@ -364,6 +364,14 @@ export class PasswordServiceFacade {
           lastName: req.user.lastName || user.lastName || '',
           authDate: Math.floor(Date.now() / 1000),
         };
+
+        // Try to get publicAddress from token
+        const tokenPublicAddress =
+          this.extractPublicAddressFromBearerToken(req) ||
+          req.user.publicAddress;
+        if (tokenPublicAddress) {
+          latestPublicAddress = tokenPublicAddress;
+        }
       }
       // Priority 2: Telegram authentication
       else {
@@ -545,6 +553,7 @@ export class PasswordServiceFacade {
 
     let user: UserDocument | null = null;
     let initData: any;
+    let newPublicAddress: string | undefined;
 
     // Priority 1: JWT token
     if (req?.user?.id) {
@@ -570,6 +579,9 @@ export class PasswordServiceFacade {
         lastName: req.user.lastName || user.lastName || '',
         authDate: Math.floor(Date.now() / 1000),
       };
+
+      newPublicAddress =
+        this.extractPublicAddressFromBearerToken(req) || req.user.publicAddress;
     }
     // Priority 2: Telegram
     else {
@@ -597,6 +609,11 @@ export class PasswordServiceFacade {
 
     // Process sharedWith
     const processedUpdate = { ...update };
+
+    if (newPublicAddress) {
+      processedUpdate.publicAddress = newPublicAddress;
+    }
+
     if (update.sharedWith && update.sharedWith.length > 0) {
       let expanded = await this.sharingService.expandSharedWith(
         update.sharedWith,
@@ -872,5 +889,34 @@ export class PasswordServiceFacade {
       page,
       limit,
     );
+  }
+
+  // Helper method to extract public address from token
+  private extractPublicAddressFromBearerToken(
+    req: AuthenticatedRequest,
+  ): string | undefined {
+    const authHeader = req?.headers?.authorization;
+    if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      return undefined;
+    }
+
+    const token = authHeader.substring(7);
+    const parts = token.split('.');
+    if (parts.length < 2) return undefined;
+
+    try {
+      const payloadPart = parts[1];
+      const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const json = Buffer.from(padded, 'base64').toString('utf8');
+      const payload = JSON.parse(json) as { publicAddress?: unknown };
+      const publicAddress = payload?.publicAddress;
+      if (typeof publicAddress === 'string' && publicAddress.length > 0) {
+        return publicAddress;
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
   }
 }

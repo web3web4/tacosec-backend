@@ -16,9 +16,10 @@ import { ApiResponseDto } from '../dto/api-response.dto';
  * that need standardized response formatting
  */
 @Injectable()
-export class TransformResponseInterceptor<T>
-  implements NestInterceptor<T, ApiResponseDto<T>>
-{
+export class TransformResponseInterceptor<T> implements NestInterceptor<
+  T,
+  ApiResponseDto<T>
+> {
   intercept(
     context: ExecutionContext,
     next: CallHandler,

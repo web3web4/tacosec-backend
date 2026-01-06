@@ -374,6 +374,7 @@ export class NotificationsService {
     currentUserId: string,
     senderOrRecipientRaw?: string,
     query: Omit<GetNotificationsDto, 'senderUserId' | 'recipientUserId'> = {},
+    overridePublicAddress?: string,
   ) {
     try {
       // Normalize filter (case-insensitive), default to 'all'.
@@ -410,15 +411,22 @@ export class NotificationsService {
       // Build filter using a unified $and pipeline so totalItems is counted AFTER applying ALL filters
       const conditions: any[] = [];
 
-      const latestCurrent = await this.publicAddressModel
-        .findOne({ userIds: String(currentUserId) })
-        .sort({ updatedAt: -1 })
-        .lean()
-        .exec();
-
-      const currentUserPublicAddress = latestCurrent?.publicKey
-        ? String(latestCurrent.publicKey)
-        : '';
+      let currentUserPublicAddress = '';
+      if (
+        typeof overridePublicAddress === 'string' &&
+        overridePublicAddress.length > 0
+      ) {
+        currentUserPublicAddress = overridePublicAddress;
+      } else {
+        const latestCurrent = await this.publicAddressModel
+          .findOne({ userIds: String(currentUserId) })
+          .sort({ updatedAt: -1 })
+          .lean()
+          .exec();
+        currentUserPublicAddress = latestCurrent?.publicKey
+          ? String(latestCurrent.publicKey)
+          : '';
+      }
 
       if (!currentUserPublicAddress) {
         return {

@@ -211,25 +211,28 @@ export class PasswordViewsService {
         let currentpublicAddress = publicAddress;
 
         try {
-          // First try to get address by telegramId if available
-          if (telegramId) {
-            const addressByTelegramId =
-              await this.publicAddressesService.getLatestAddressByTelegramId(
-                telegramId,
-              );
-            if (addressByTelegramId.success && addressByTelegramId.data) {
-              currentpublicAddress = addressByTelegramId.data.publicKey;
+          if (!currentpublicAddress || currentpublicAddress.trim() === '') {
+            if (telegramId) {
+              const addressByTelegramId =
+                await this.publicAddressesService.getLatestAddressByTelegramId(
+                  telegramId,
+                );
+              if (addressByTelegramId.success && addressByTelegramId.data) {
+                currentpublicAddress = addressByTelegramId.data.publicKey;
+              }
             }
           }
 
           // If no address found by telegramId or telegramId is empty, try by userId
-          if (!currentpublicAddress && userId) {
-            const addressByUserId =
-              await this.publicAddressesService.getLatestAddressByUserId(
-                userId,
-              );
-            if (addressByUserId.success && addressByUserId.data) {
-              currentpublicAddress = addressByUserId.data.publicKey;
+          if (!currentpublicAddress || currentpublicAddress.trim() === '') {
+            if (userId) {
+              const addressByUserId =
+                await this.publicAddressesService.getLatestAddressByUserId(
+                  userId,
+                );
+              if (addressByUserId.success && addressByUserId.data) {
+                currentpublicAddress = addressByUserId.data.publicKey;
+              }
             }
           }
         } catch (error) {

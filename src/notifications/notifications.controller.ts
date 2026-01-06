@@ -217,10 +217,16 @@ export class NotificationsController {
   ) {
     try {
       const currentUserId = await this.usersService.getCurrentUserId(req);
+      const isJwt = req?.authMethod === 'jwt';
+      const overridePublicAddress =
+        isJwt && req?.user?.publicAddress
+          ? String(req.user.publicAddress)
+          : undefined;
       return await this.notificationsService.getMyNotifications(
         currentUserId,
         senderOrrecipient,
         query,
+        overridePublicAddress,
       );
     } catch {
       throw new HttpException(

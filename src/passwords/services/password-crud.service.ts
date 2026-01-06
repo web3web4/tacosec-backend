@@ -375,6 +375,7 @@ export class PasswordCrudService extends PasswordBaseService {
   ): Promise<Password> {
     try {
       let requesterUserId = '';
+      let requesterPublicAddress: string | undefined;
 
       if (req?.user?.id) {
         const user = await this.userModel
@@ -387,6 +388,9 @@ export class PasswordCrudService extends PasswordBaseService {
         }
 
         requesterUserId = String(user._id);
+        requesterPublicAddress =
+          this.extractPublicAddressFromBearerToken(req) ||
+          req.user.publicAddress;
       } else if (req?.headers?.['x-telegram-init-data']) {
         const headerInitData = req.headers['x-telegram-init-data'] as string;
         const parsedData =
@@ -429,8 +433,13 @@ export class PasswordCrudService extends PasswordBaseService {
 
       const latestPublicAddress =
         await this.getLatestPublicAddress(requesterUserId);
+      const effectivePublicAddress =
+        (typeof requesterPublicAddress === 'string' &&
+        requesterPublicAddress.trim()
+          ? requesterPublicAddress
+          : undefined) || latestPublicAddress;
 
-      if (!latestPublicAddress) {
+      if (!effectivePublicAddress) {
         throw new HttpException(
           'You are not authorized to delete this password',
           HttpStatus.FORBIDDEN,
@@ -438,7 +447,7 @@ export class PasswordCrudService extends PasswordBaseService {
       }
 
       if (
-        latestPublicAddress.trim().toLowerCase() !==
+        effectivePublicAddress.trim().toLowerCase() !==
         secretPublicAddress.toLowerCase()
       ) {
         throw new HttpException(

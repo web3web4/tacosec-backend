@@ -93,10 +93,22 @@ Install dependencies:
 npm install
 ```
 
+Using Yarn:
+
+```bash
+yarn install
+```
+
 Run the API:
 
 ```bash
 npm run start:dev
+```
+
+With Yarn:
+
+```bash
+yarn run start:dev
 ```
 
 The server runs on `http://localhost:3000` in non-production environments.
@@ -115,6 +127,40 @@ npm test
 
 # e2e tests
 npm run test:e2e
+```
+
+### Yarn Scripts (equivalents)
+
+```bash
+# lint (auto-fix enabled)
+yarn run lint
+
+# build
+yarn run build
+
+# start (dev watch)
+yarn run start:dev
+
+# start (non-watch)
+yarn run start
+
+# start production (run compiled dist)
+yarn run start:prod
+
+# unit tests
+yarn run test
+
+# e2e tests
+yarn run test:e2e
+
+# integration tests (selected)
+yarn run test:integration
+
+# format code with Prettier
+yarn run format
+
+# Vercel build (CI)
+yarn run vercel-build
 ```
 
 ## Selected Endpoints

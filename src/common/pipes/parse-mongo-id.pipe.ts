@@ -20,9 +20,10 @@ export class ParseMongoIdPipe implements PipeTransform<string, Types.ObjectId> {
  * Same as ParseMongoIdPipe but allows undefined/null values
  */
 @Injectable()
-export class ParseOptionalMongoIdPipe
-  implements PipeTransform<string | undefined, Types.ObjectId | undefined>
-{
+export class ParseOptionalMongoIdPipe implements PipeTransform<
+  string | undefined,
+  Types.ObjectId | undefined
+> {
   transform(value: string | undefined): Types.ObjectId | undefined {
     if (!value) {
       return undefined;

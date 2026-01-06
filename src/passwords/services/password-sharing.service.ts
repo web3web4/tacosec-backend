@@ -1354,32 +1354,4 @@ export class PasswordSharingService extends PasswordBaseService {
       throw new HttpException((error as Error).message, HttpStatus.BAD_REQUEST);
     }
   }
-
-  private extractPublicAddressFromBearerToken(
-    req: AuthenticatedRequest,
-  ): string | undefined {
-    const authHeader = req?.headers?.authorization;
-    if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
-      return undefined;
-    }
-
-    const token = authHeader.substring(7);
-    const parts = token.split('.');
-    if (parts.length < 2) return undefined;
-
-    try {
-      const payloadPart = parts[1];
-      const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
-      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-      const json = Buffer.from(padded, 'base64').toString('utf8');
-      const payload = JSON.parse(json) as { publicAddress?: unknown };
-      const publicAddress = payload?.publicAddress;
-      if (typeof publicAddress === 'string' && publicAddress.length > 0) {
-        return publicAddress;
-      }
-      return undefined;
-    } catch {
-      return undefined;
-    }
-  }
 }

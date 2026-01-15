@@ -1,10 +1,8 @@
 <p align="center">
   <a href="https://nestjs.com/" target="_blank"><img src="https://nestjs.com/img/logo-small.svg" width="100" alt="NestJS Logo" /></a>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://threshold.network/" target="_blank"><img src="https://coin-images.coingecko.com/coins/images/22228/large/nFPNiSbL_400x400.jpg" width="100" alt="Threshold Network Logo" /></a>
 </p>
 
-<h1 align="center">TacoSEC Backend</h1>
+<h1 align="center">TACoSec Backend</h1>
 
 <p align="center">
   A secure, scalable backend API for password management and sharing with multi-factor authentication support.<br/>
@@ -15,9 +13,15 @@
   <a href="https://nestjs.com/"><img src="https://img.shields.io/badge/NestJS-10.x-E0234E?style=flat-square&logo=nestjs" alt="NestJS" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript" alt="TypeScript" /></a>
   <a href="https://www.mongodb.com/"><img src="https://img.shields.io/badge/MongoDB-8.x-47A248?style=flat-square&logo=mongodb" alt="MongoDB" /></a>
-  <a href="https://threshold.network/"><img src="https://img.shields.io/badge/Threshold-Network-7C3AED?style=flat-square" alt="Threshold Network" /></a>
+  <a href="https://taco.build"><img src="https://img.shields.io/badge/Powered%20by-TACo-7C3AED?style=flat-square" alt="Powered by TACo" /></a>
   <img src="https://img.shields.io/badge/License-UNLICENSED-red?style=flat-square" alt="License" />
 </p>
+
+## Built With
+
+[![Nest.js](https://img.shields.io/badge/Nest.js-E0234E?logo=nestjs)](https://nestjs.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Telegram](https://img.shields.io/badge/Telegram-Bot%20API-26A5E4?logo=telegram)](https://core.telegram.org/bots)
 
 ---
 
@@ -43,9 +47,9 @@
 
 ## Overview
 
-TacoSEC is a NestJS-based server application that provides secure password/secret management and sharing capabilities. It uniquely supports dual authentication through both Telegram and EVM wallet signatures, making it suitable for both traditional Web2 users and Web3 crypto-native users.
+TACoSec is a NestJS-based server application that provides secure password/secret management and sharing capabilities. It uniquely supports dual authentication through both Telegram and EVM wallet signatures, making it suitable for both traditional Web2 users and Web3 crypto-native users.
 
-Powered by [Threshold Network](https://threshold.network/), TacoSEC leverages cutting-edge cryptographic primitives to ensure your secrets remain secure and private.
+Powered by [TACo](https://taco.build), TACoSec leverages cutting-edge cryptographic primitives to ensure your secrets remain secure and private.
 
 The application enables users to:
 - Securely store encrypted passwords and secrets
@@ -142,7 +146,7 @@ The application enables users to:
 
 ## Encryption & Security
 
-TacoSEC employs military-grade encryption to protect your secrets. Here's a deep dive into how the encryption works and why it's secure.
+TACoSec employs military-grade encryption to protect your secrets. Here's a deep dive into how the encryption works and why it's secure.
 
 ### Encryption Algorithm: AES-256-CBC
 
@@ -270,7 +274,7 @@ ENCRYPTION_KEY=your-64-char-hex-string
 
 ### Comparison with Other Encryption Methods
 
-| Method | Key Size | Security Level | TacoSEC Uses |
+| Method | Key Size | Security Level | TACoSec Uses |
 |--------|----------|----------------|--------------|
 | AES-128 | 128 bits | Strong | ❌ |
 | **AES-256-CBC** | **256 bits** | **Military-grade** | **✅** |
@@ -343,37 +347,7 @@ ENCRYPTION_KEY=your-64-char-hex-string
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Module Structure
 
-```
-src/
-├── app.module.ts              # Root application module
-├── main.ts                    # Application entry point & serverless handler
-├── common/                    # Shared utilities and services
-│   ├── config/               # App configuration (env variables)
-│   ├── database/             # MongoDB connection setup
-│   ├── dto/                  # Shared DTOs
-│   ├── interfaces/           # TypeScript interfaces
-│   ├── interceptors/         # Request/response interceptors
-│   ├── pipes/                # Custom validation pipes
-│   ├── jwt/                  # JWT module configuration
-│   └── services/             # AuthContextService (centralized auth)
-├── guards/                    # Authentication & authorization guards
-│   ├── flexible-auth.guard.ts     # JWT + Telegram dual auth
-│   ├── telegram-dto-auth.guard.ts # Telegram body auth
-│   └── roles.guard.ts             # Role-based access control
-├── decorators/                # Custom decorators
-├── auth/                      # Authentication module
-├── users/                     # User management module
-├── passwords/                 # Password/secret management module
-├── public-addresses/          # Wallet address linking module
-├── notifications/             # Notification system module
-├── reports/                   # User reporting module
-├── logger/                    # Error logging module
-├── telegram/                  # Telegram validation module
-├── telegram-client/           # Telegram client integration
-└── utils/                     # Crypto utilities
-```
 
 ### Data Flow
 
@@ -767,6 +741,18 @@ This project is **UNLICENSED** - proprietary software.
 
 ---
 
-<p align="center">
-  Built with <a href="https://nestjs.com/" target="_blank">NestJS</a> | Powered by <a href="https://threshold.network/" target="_blank">Threshold Network</a>
-</p>
+## Powered By
+
+🏗️ **[Nest.js](https://nestjs.com/)** — Progressive Node.js framework  
+🗄️ **[MongoDB](https://www.mongodb.com/)** — Document database for encrypted data  
+🔐 **[Telegram Bot API](https://core.telegram.org/bots)** — Authentication for Telegram Mini App users  
+🔑 **[ethers.js](https://docs.ethers.org/)** — Wallet address authentication 
+
+### Authentication
+
+- **Web Users:** Validated via seed phrase wallet signatures.
+- **Telegram Access:** Telegram Mini App & Bot API authentication + seed phrase wallet signatures for the data access.
+
+---
+
+**TACoSec** • [Frontend](https://github.com/yourorg/tacosec-frontend) • [Backend](https://github.com/yourorg/tacosec-backend) (you are here) • *Powered by [TACo](https://taco.build) 💚* • **Built with ❤️ by [Web3Web4](https://web3web4.com)**

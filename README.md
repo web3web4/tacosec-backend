@@ -243,12 +243,12 @@ decrypted += decipher.final('utf8');
 - Even with the fastest supercomputers, brute-forcing would take longer than the age of the universe
 
 #### ✅ Semantic Security
-- **Unique IV per encryption** means encrypting the same password twice produces different ciphertexts
-- Attackers cannot determine if two users have the same password
+- **Unique IV per encryption** means encrypting the same password twice produces different ciphertexts.
+- Attackers cannot determine if two users have the same password.
 
 #### ✅ Tamper Evidence
 - CBC mode's block chaining ensures any modification to ciphertext corrupts decryption
-- Altered data fails to decrypt properly, alerting to tampering
+- Altered data fails to decrypt properly, alerting to tampering.
 
 #### ✅ Key Security
 - Encryption key is **never stored in code** - only in environment variables
@@ -756,3 +756,4 @@ This project is **UNLICENSED** - proprietary software.
 ---
 
 **TACoSec** • [Frontend](https://github.com/yourorg/tacosec-frontend) • [Backend](https://github.com/yourorg/tacosec-backend) (you are here) • *Powered by [TACo](https://taco.build) 💚* • **Built with ❤️ by [Web3Web4](https://web3web4.com)**
+

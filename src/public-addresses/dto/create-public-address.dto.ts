@@ -19,11 +19,11 @@ export class WalletEntryDto {
   'public-key': string;
 
   /**
-   * Secret or private key (will be encrypted)
+   * Signature over the public key (message = public key)
    */
-  @IsString()
   @IsOptional()
-  secret?: string;
+  @IsString()
+  signature?: string;
 }
 
 /**
@@ -38,17 +38,36 @@ export class CreatePublicAddressDto {
   publicKey: string;
 
   /**
-   * Secret or private key (optional, will be encrypted if provided)
+   * Signature over the public key (message = public key)
+   */
+  @IsOptional()
+  @IsString()
+  signature?: string;
+
+  /**
+   * Optional secret to be stored as is
    */
   @IsString()
   @IsOptional()
   secret?: string;
 
   /**
-   * Telegram init data string (populated from headers)
+   * Telegram init data string (populated from headers for Telegram auth)
    * @internal
    */
   telegramInitData?: string;
+
+  /**
+   * User data from JWT token (populated for JWT auth)
+   * @internal
+   */
+  jwtUser?: {
+    id: string;
+    telegramId: string;
+    username: string;
+    firstName: string;
+    lastName: string;
+  };
 }
 
 /**

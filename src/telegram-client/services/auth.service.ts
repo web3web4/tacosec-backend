@@ -8,6 +8,7 @@ import { TelegramClientService } from '../telegram-client.service';
 import { TelegramClient } from 'telegram';
 import { Api } from 'telegram/tl';
 import { SendCodeDto, VerifyCodeDto } from '../dto';
+import { TelegramClientConfig } from '../telegram-client.config';
 
 interface AuthSession {
   phoneCodeHash: string;
@@ -26,7 +27,10 @@ export class AuthService {
   private readonly authSessions = new Map<number, AuthSession>();
   private readonly SESSION_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
-  constructor(private readonly telegramClientService: TelegramClientService) {}
+  constructor(
+    private readonly telegramClientService: TelegramClientService,
+    private readonly telegramClientConfig: TelegramClientConfig,
+  ) {}
 
   /**
    * Send authentication code to phone number
@@ -45,8 +49,8 @@ export class AuthService {
       const result = await client.invoke(
         new Api.auth.SendCode({
           phoneNumber,
-          apiId: parseInt(process.env.TELEGRAM_API_ID || '0'),
-          apiHash: process.env.TELEGRAM_API_HASH || '',
+          apiId: this.telegramClientConfig.apiId,
+          apiHash: this.telegramClientConfig.apiHash,
           settings: new Api.CodeSettings({
             allowFlashcall: false,
             currentNumber: false,

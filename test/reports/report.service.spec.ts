@@ -1,23 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReportService } from '../../src/reports/report.service';
 import { getModelToken } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User, UserDocument } from '../../src/users/schemas/user.schema';
-import {
-  Report,
-  ReportDocument,
-} from '../../src/reports/schemas/report.schema';
-import {
-  Password,
-  PasswordDocument,
-} from '../../src/passwords/schemas/password.schema';
-import { ConfigService } from '@nestjs/config';
+import { User } from '../../src/users/schemas/user.schema';
+import { Report } from '../../src/reports/schemas/report.schema';
+import { Password } from '../../src/passwords/schemas/password.schema';
+import { AppConfigService } from '../../src/common/config/app-config.service';
+import { PublicAddress } from '../../src/public-addresses/schemas/public-address.schema';
+import { PublicAddressesService } from '../../src/public-addresses/public-addresses.service';
+import { TelegramService } from '../../src/telegram/telegram.service';
+import { NotificationsService } from '../../src/notifications/notifications.service';
+import { LoggerService } from '../../src/logger/logger.service';
 
 describe('ReportService', () => {
   let service: ReportService;
-  let userModel: Model<UserDocument>;
-  let reportModel: Model<ReportDocument>;
-  let passwordModel: Model<PasswordDocument>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -53,22 +48,52 @@ describe('ReportService', () => {
           },
         },
         {
-          provide: ConfigService,
+          provide: getModelToken(PublicAddress.name),
           useValue: {
-            get: jest
-              .fn()
-              .mockImplementation((key, defaultValue) => defaultValue),
+            findOne: jest.fn(),
+            find: jest.fn(),
+            findById: jest.fn(),
+            countDocuments: jest.fn(),
+            distinct: jest.fn(),
+          },
+        },
+        {
+          provide: AppConfigService,
+          useValue: {
+            maxReportsBeforeBan: 10,
+            maxPercentageOfReportsRequiredForBan: 0.5,
+          },
+        },
+        {
+          provide: PublicAddressesService,
+          useValue: {
+            getLatestAddressByTelegramId: jest.fn(),
+            getLatestAddressByUserId: jest.fn(),
+          },
+        },
+        {
+          provide: TelegramService,
+          useValue: {
+            sendMessage: jest.fn(),
+          },
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            createNotification: jest.fn(),
+          },
+        },
+        {
+          provide: LoggerService,
+          useValue: {
+            saveSystemLog: jest.fn(),
+            logException: jest.fn(),
           },
         },
       ],
     }).compile();
 
     service = module.get<ReportService>(ReportService);
-    userModel = module.get<Model<UserDocument>>(getModelToken(User.name));
-    reportModel = module.get<Model<ReportDocument>>(getModelToken(Report.name));
-    passwordModel = module.get<Model<PasswordDocument>>(
-      getModelToken(Password.name),
-    );
   });
 
   it('should be defined', () => {

@@ -7,7 +7,7 @@ export type UserDocument = User & Document;
 
 @Schema({ timestamps: true })
 export class User {
-  @Prop({ required: true })
+  @Prop({ required: false })
   telegramId: string;
 
   @Prop()
@@ -40,6 +40,15 @@ export class User {
 
   @Prop({ default: 0 })
   reportCount: number;
+
+  @Prop({ default: false })
+  privacyMode: boolean;
+
+  @Prop({ required: false })
+  phone: string;
+
+  @Prop({ required: false })
+  email: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

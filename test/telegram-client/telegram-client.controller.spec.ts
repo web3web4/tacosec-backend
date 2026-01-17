@@ -9,12 +9,11 @@ import { GetContactsDto } from '../../src/telegram-client/dto/get-contacts.dto';
 import { SearchContactsDto } from '../../src/telegram-client/dto/search-contacts.dto';
 import { ContactSyncStatus } from '../../src/telegram-client/interfaces/contact-sync.interface';
 import { TelegramValidatorService } from '../../src/telegram/telegram-validator.service';
+import { TelegramDtoAuthGuard } from '../../src/guards/telegram-dto-auth.guard';
+import { AuthContextService } from '../../src/common/services/auth-context.service';
 
 describe('TelegramClientController', () => {
   let controller: TelegramClientController;
-  let telegramClientService: TelegramClientService;
-  let authService: AuthService;
-  let contactsService: ContactsService;
 
   const mockTelegramClientService = {
     hasUserSession: jest.fn(),
@@ -38,6 +37,17 @@ describe('TelegramClientController', () => {
     validateTelegramInitData: jest.fn().mockReturnValue(true),
   };
 
+  const mockAuthContextService = {
+    getCurrentUser: jest.fn(),
+    getCurrentUserId: jest.fn(),
+    getAuthenticatedUser: jest.fn(),
+    getTelegramData: jest.fn(),
+    getAuthMethod: jest.fn(),
+    isAuthenticated: jest.fn(),
+    getJwtUserAndPayload: jest.fn(),
+    getTelegramAuthDataFromInitData: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TelegramClientController],
@@ -58,15 +68,18 @@ describe('TelegramClientController', () => {
           provide: TelegramValidatorService,
           useValue: mockTelegramValidatorService,
         },
+        {
+          provide: AuthContextService,
+          useValue: mockAuthContextService,
+        },
+        {
+          provide: TelegramDtoAuthGuard,
+          useValue: { canActivate: jest.fn().mockResolvedValue(true) },
+        },
       ],
     }).compile();
 
     controller = module.get<TelegramClientController>(TelegramClientController);
-    telegramClientService = module.get<TelegramClientService>(
-      TelegramClientService,
-    );
-    authService = module.get<AuthService>(AuthService);
-    contactsService = module.get<ContactsService>(ContactsService);
   });
 
   it('should be defined', () => {
@@ -214,10 +227,6 @@ describe('TelegramClientController', () => {
 
   describe('syncContacts', () => {
     it('should sync contacts successfully', async () => {
-      const contacts = [
-        { name: 'John Doe', phone: '+1234567890' },
-        { name: 'Jane Smith', phone: '+0987654321' },
-      ];
       const userId = 123;
       const expectedResult = {
         status: ContactSyncStatus.COMPLETED,

@@ -10,8 +10,12 @@ import {
 import { TelegramService } from './telegram.service';
 import { GetUsersDto } from './dto/get-users.dto';
 import { SendToAdminDto } from './dto/send-to-admin.dto';
+import { AdminToUserMessageDto } from './dto/admin-to-user-message.dto';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
-import { TelegramDtoAuthGuard } from './dto/telegram-dto-auth.guard';
+import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
+import { Roles } from '../decorators/roles.decorator';
+import { Role } from '../decorators/roles.decorator';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 // import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 
 @Controller('telegram')
@@ -57,14 +61,11 @@ export class TelegramController {
     @Request() req: Request,
     @Body() body: { message: string },
   ): Promise<{ success: boolean }> {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-    const success = await this.telegramService.sendMessage(
-      Number(teleDtoData.telegramId),
+    return await this.telegramService.handleSendMessage(
+      req,
       body.message,
+      this.telegramDtoAuthGuard,
     );
-    return { success };
   }
 
   /**
@@ -88,22 +89,17 @@ export class TelegramController {
    * This endpoint allows regular users to send messages to all admin users
    */
   @Post('send-to-admin')
-  @TelegramDtoAuth()
+  @FlexibleAuth()
   async sendMessageToAdmin(
     @Request() req: Request,
     @Body() sendToAdminDto: SendToAdminDto,
   ): Promise<{ success: boolean; adminCount: number }> {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-
-    const result = await this.telegramService.sendMessageToAdmins(
+    return await this.telegramService.handleSendMessageToAdmin(
+      req,
       sendToAdminDto.message,
-      teleDtoData.telegramId,
       sendToAdminDto.subject,
+      this.telegramDtoAuthGuard,
     );
-
-    return result;
   }
 
   /**
@@ -111,21 +107,41 @@ export class TelegramController {
    * This endpoint allows regular users to send messages to the specific admin
    */
   @Post('send-to-specific-admin')
-  @TelegramDtoAuth()
+  @FlexibleAuth()
   async sendMessageToSpecificAdmin(
     @Request() req: Request,
     @Body() sendToAdminDto: SendToAdminDto,
   ): Promise<{ success: boolean; adminTelegramId?: string }> {
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
-
-    const result = await this.telegramService.sendMessageToSpecificAdmin(
+    return await this.telegramService.handleSendMessageToSpecificAdmin(
+      req,
       sendToAdminDto.message,
-      teleDtoData.telegramId,
       sendToAdminDto.subject,
+      this.telegramDtoAuthGuard,
     );
+  }
 
-    return result;
+  /**
+   * Send a message from admin to a specific user
+   * This endpoint allows admin users to send messages to any user with a Telegram account
+   */
+  @Post('admin-to-user')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async sendAdminToUserMessage(
+    @Request() req: Request,
+    @Body() adminToUserDto: AdminToUserMessageDto,
+  ): Promise<{
+    success: boolean;
+    userFound: boolean;
+    hasTelegram: boolean;
+    userInfo?: any;
+    error?: string;
+  }> {
+    return await this.telegramService.handleAdminToUserMessage(
+      req,
+      adminToUserDto.userId,
+      adminToUserDto.message,
+      adminToUserDto.subject,
+    );
   }
 }

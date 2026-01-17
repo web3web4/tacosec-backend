@@ -12,7 +12,7 @@ import {
 import { TelegramClientService } from './telegram-client.service';
 import { ContactsService } from './services/contacts.service';
 import { AuthService } from './services/auth.service';
-import { TelegramAuthGuard } from '../guards/telegram-auth.guard';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import {
   SendCodeDto,
   VerifyCodeDto,
@@ -26,7 +26,7 @@ import {
  * Provides endpoints for authentication and contact management
  */
 @Controller('telegram-client')
-@UseGuards(TelegramAuthGuard)
+@UseGuards(TelegramDtoAuthGuard)
 export class TelegramClientController {
   constructor(
     private readonly telegramClientService: TelegramClientService,

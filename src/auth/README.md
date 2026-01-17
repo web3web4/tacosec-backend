@@ -56,9 +56,15 @@ Authenticates a user using their public wallet address.
 ## Notes
 
 - The `signature` parameter is currently not validated but must be present in the request
-- The JWT token expires in 24 hours
+- The JWT token expiration time can be configured via the `JWT_EXPIRES_IN` environment variable (default: 24h)
 - The JWT secret can be configured via the `JWT_SECRET` environment variable
 - Users must have an active status to successfully authenticate
+
+## Environment Variables
+
+- `JWT_SECRET`: Secret key for signing JWT tokens (required)
+- `JWT_EXPIRES_IN`: Token expiration time (optional, default: '24h')
+  - Examples: '1h', '24h', '7d', '30d'
 
 ## Testing
 

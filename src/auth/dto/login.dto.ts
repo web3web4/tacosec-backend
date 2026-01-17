@@ -1,16 +1,18 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class LoginDto {
   /**
    * Public address of the wallet
    */
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  publicAddress: string;
+  publicAddress?: string;
 
   /**
-   * Signature (currently not validated, but required)
+   * Signature over the latest challange generated for this publicAddress
    */
+  @IsOptional()
   @IsString()
-  signature: string;
+  signature?: string;
 }

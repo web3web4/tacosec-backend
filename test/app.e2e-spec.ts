@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { TelegramValidatorService } from '../src/telegram/telegram-validator.service';
-import { TelegramDtoAuthGuard } from '../src/telegram/dto/telegram-dto-auth.guard';
+import { TelegramDtoAuthGuard } from '../src/guards/telegram-dto-auth.guard';
 import { TelegramService } from '../src/telegram/telegram.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { User } from '../src/users/schemas/user.schema';

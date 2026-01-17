@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { TelegramInitDto } from './dto/telegram-init.dto';
+import { AppConfigService } from '../common/config/app-config.service';
 
 @Injectable()
 export class TelegramValidatorService {
-  constructor(private configService: ConfigService) {}
+  constructor(private readonly appConfig: AppConfigService) {}
 
   /**
    * Validate raw Telegram init data
@@ -21,8 +21,7 @@ export class TelegramValidatorService {
 
       // console.log('Validating raw init data:', initData);
 
-      const telegramBotToken =
-        this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+      const telegramBotToken = this.appConfig.telegramBotToken;
       // console.log('telegramBotToken', telegramBotToken);
 
       if (!telegramBotToken) {
@@ -103,8 +102,7 @@ export class TelegramValidatorService {
         return false;
       }
 
-      const telegramBotToken =
-        this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+      const telegramBotToken = this.appConfig.telegramBotToken;
 
       if (!telegramBotToken) {
         console.error('TELEGRAM_BOT_TOKEN is not defined in .env file');

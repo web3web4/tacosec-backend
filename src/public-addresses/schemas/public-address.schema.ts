@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { User } from '../../users/schemas/user.schema';
 
 export type PublicAddressDocument = PublicAddress & Document;
@@ -13,10 +13,13 @@ export class PublicAddress {
   // id: string;
 
   /**
-   * Reference to the user who owns this public address
+   * Reference to the users who own this public address
    */
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
-  userId: User;
+  @Prop({
+    type: [{ type: MongooseSchema.Types.ObjectId, ref: 'User' }],
+    default: [],
+  })
+  userIds: User[] | Types.ObjectId[];
 
   /**
    * The public wallet address/key
@@ -40,6 +43,9 @@ export class PublicAddress {
    */
   @Prop({ required: false })
   encryptedSecret: string;
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const PublicAddressSchema = SchemaFactory.createForClass(PublicAddress);

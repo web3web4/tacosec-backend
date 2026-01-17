@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { MongoClient, Db, ServerApiVersion } from 'mongodb';
+import { AppConfigService } from '../config/app-config.service';
 
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
@@ -9,6 +10,8 @@ export class MongoDBService implements OnModuleInit {
   private client: MongoClient | null = null;
   private db: Db | null = null;
 
+  constructor(private readonly appConfig: AppConfigService) {}
+
   async onModuleInit() {
     try {
       if (cachedClient && cachedDb) {
@@ -17,7 +20,7 @@ export class MongoDBService implements OnModuleInit {
         return;
       }
 
-      const uri = process.env.MONGODB_URI;
+      const uri = this.appConfig.mongodbUri;
       if (!uri) {
         console.error('MONGODB_URI is not defined');
         return;

@@ -1,26 +1,26 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, HttpException, HttpStatus } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../../src/app.module';
 import { TelegramInitDto } from '../../src/telegram/dto/telegram-init.dto';
 import { UsersService } from '../../src/users/users.service';
-// import { PasswordService } from '../../src/passwords/password.service';
 import { TelegramValidatorService } from '../../src/telegram/telegram-validator.service';
-import { getModelToken } from '@nestjs/mongoose';
-import { User } from '../../src/users/schemas/user.schema';
-import { TelegramDtoAuthGuard } from '../../src/telegram/dto/telegram-dto-auth.guard';
+import { UsersController } from '../../src/users/users.controller';
+import { TelegramDtoAuthGuard } from '../../src/guards/telegram-dto-auth.guard';
 import { TelegramService } from '../../src/telegram/telegram.service';
-import { TelegramClientService } from '../../src/telegram-client/telegram-client.service';
+import { HttpService } from '@nestjs/axios';
+import { FlexibleAuthGuard } from '../../src/guards/flexible-auth.guard';
+import { RolesGuard } from '../../src/guards/roles.guard';
 // import { Types } from 'mongoose';
 // import { Type } from '../../src/passwords/enums/type.enum';
 
 describe('UserController (e2e)', () => {
   let app: INestApplication;
   let telegramValidatorService: TelegramValidatorService;
-  let userService: UsersService;
-  let telegramDtoAuthGuard: TelegramDtoAuthGuard;
-  let telegramServiceMock;
-  let telegramClientServiceMock;
+  let userService: {
+    createAndUpdateUser: jest.Mock;
+    findByTelegramId: jest.Mock;
+  };
+  let telegramServiceMock: { sendMessage: jest.Mock };
 
   // Fixed authDate to avoid JSON serialization differences
   const fixedDate = new Date().toISOString();
@@ -53,41 +53,60 @@ describe('UserController (e2e)', () => {
       sendMessage: jest.fn().mockResolvedValue({}),
     };
 
-    telegramClientServiceMock = {
-      createClient: jest.fn(),
-      getClientForUser: jest.fn(),
-      getClient: jest.fn(),
-      saveUserSession: jest.fn(),
-      getUserSession: jest.fn(),
-      removeUserSession: jest.fn(),
-      hasUserSession: jest.fn(),
-      disconnectClient: jest.fn(),
+    const usersServiceMock = {
+      createAndUpdateUser: jest.fn(),
+      findByTelegramId: jest.fn(),
     };
 
     // Create a new test module
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      controllers: [UsersController],
+      providers: [
+        {
+          provide: UsersService,
+          useValue: usersServiceMock,
+        },
+        {
+          provide: TelegramDtoAuthGuard,
+          useValue: {
+            canActivate: jest.fn().mockReturnValue(true),
+            parseTelegramInitData: jest
+              .fn()
+              .mockReturnValue(mockTelegramInitDto),
+          },
+        },
+        {
+          provide: TelegramValidatorService,
+          useValue: {
+            validateTelegramInitData: jest.fn().mockReturnValue(true),
+            validateTelegramDto: jest.fn().mockReturnValue(true),
+          },
+        },
+        {
+          provide: TelegramService,
+          useValue: telegramServiceMock,
+        },
+        {
+          provide: HttpService,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
+      ],
     })
-      .overrideProvider(TelegramValidatorService)
-      .useValue({
-        // Mock the validation to always return true
-        validateTelegramInitData: jest.fn().mockReturnValue(true),
-        validateTelegramDto: jest.fn().mockReturnValue(true),
-      })
       .overrideGuard(TelegramDtoAuthGuard)
       .useValue({
         canActivate: jest.fn().mockReturnValue(true),
         parseTelegramInitData: jest.fn().mockReturnValue(mockTelegramInitDto),
       })
-      .overrideProvider(getModelToken(User.name))
+      .overrideGuard(FlexibleAuthGuard)
       .useValue({
-        findOne: jest.fn(),
-        create: jest.fn(),
+        canActivate: jest.fn().mockReturnValue(true),
       })
-      .overrideProvider(TelegramService)
-      .useValue(telegramServiceMock)
-      .overrideProvider(TelegramClientService)
-      .useValue(telegramClientServiceMock)
+      .overrideGuard(RolesGuard)
+      .useValue({
+        canActivate: jest.fn().mockReturnValue(true),
+      })
       .compile();
 
     // Create the app
@@ -97,9 +116,7 @@ describe('UserController (e2e)', () => {
     telegramValidatorService = moduleFixture.get<TelegramValidatorService>(
       TelegramValidatorService,
     );
-    userService = moduleFixture.get<UsersService>(UsersService);
-    telegramDtoAuthGuard =
-      moduleFixture.get<TelegramDtoAuthGuard>(TelegramDtoAuthGuard);
+    userService = moduleFixture.get(UsersService);
 
     // Initialize the app
     await app.init();

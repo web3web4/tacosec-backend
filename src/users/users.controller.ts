@@ -8,13 +8,15 @@ import {
   Delete,
   Query,
   Request,
+  Req,
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { UsersService } from './users.service';
-import { PasswordService } from '../passwords/password.service';
 import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
 import { TelegramAuth } from '../decorators/telegram-auth.decorator';
 import { TelegramDtoAuth } from '../decorators/telegram-dto-auth.decorator';
-import { TelegramDtoAuthGuard } from '../telegram/dto/telegram-dto-auth.guard';
+import { FlexibleAuth } from '../decorators/flexible-auth.decorator';
+import { TelegramDtoAuthGuard } from '../guards/telegram-dto-auth.guard';
 import { Roles, Role } from '../decorators/roles.decorator';
 import {
   Pagination,
@@ -25,12 +27,14 @@ import { TelegramService } from '../telegram/telegram.service';
 import { HttpService } from '@nestjs/axios';
 // import { firstValueFrom } from 'rxjs';
 import { SearchUsersDto } from './dto/search-users.dto';
+import { UpdateUserInfoDto } from './dto/update-user-info.dto';
+import { AdminUsersFilterDto } from './dto/admin-users-filter.dto';
+import { UpdateUserActiveStatusDto } from './dto/update-user-active-status.dto';
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly passwordService: PasswordService,
     private readonly telegramDtoAuthGuard: TelegramDtoAuthGuard,
     private readonly telegramService: TelegramService,
     private readonly httpService: HttpService,
@@ -75,6 +79,16 @@ export class UsersController {
     return this.usersService.createAndUpdateUser(createUserDto);
   }
 
+  @Patch('update-info')
+  @FlexibleAuth()
+  async updateUserInfo(
+    @Body() updateUserInfoDto: UpdateUserInfoDto,
+    @Req() req: any,
+  ) {
+    const currentUserId = await this.usersService.getCurrentUserId(req);
+    return this.usersService.updateUserInfo(currentUserId, updateUserInfoDto);
+  }
+
   @Patch(':id')
   @TelegramDtoAuth()
   updateUser(
@@ -85,6 +99,7 @@ export class UsersController {
   }
 
   @Get('telegram/profile')
+  // @TelegramDtoAuth() // Skip Telegram validation - only check JWT token
   getTelegramProfile(@Query() query: GetTelegramProfileDto) {
     return this.usersService.getTelegramProfile(query.username);
   }
@@ -108,6 +123,23 @@ export class UsersController {
     );
   }
 
+  /**
+   * Get current user information
+   * Supports both JWT token and Telegram init data authentication
+   *
+   * Example usage with JWT:
+   * GET /users/me
+   * Authorization: Bearer <jwt_token>
+   * OR
+   * GET /users/me
+   * X-Telegram-Init-Data: query_id=AAHdF6IQAAAAAN0XohDhrOrc&user=%7B%22id%22%3A123456789...
+   */
+  @Get('me')
+  @FlexibleAuth()
+  async getCurrentUserInfo(@Request() req: ExpressRequest) {
+    return this.usersService.getCurrentUserCompleteInfo(req);
+  }
+
   @Get(':id')
   @TelegramDtoAuth()
   findOne(@Param('id') id: string) {
@@ -129,28 +161,124 @@ export class UsersController {
   }
 
   /**
-   * Search users by username with configurable search type
+   * Search users by username with autocomplete functionality
+   * Prioritizes previously shared contacts in results
    * Supports both 'starts_with' and 'contains' search modes
    * GET /users/search/autocomplete?query=john&searchType=starts_with&limit=10&skip=0
    * GET /users/search/autocomplete?query=john&searchType=contains&limit=10&skip=0
+   * Returns users with isPreviouslyShared flag indicating if they were shared with before
+   *
+   * Authentication: Supports both JWT token (Bearer) and Telegram init data (x-telegram-init-data header)
+   * Priority: JWT token > Telegram init data
    */
   @Get('search/autocomplete')
-  @TelegramDtoAuth()
+  @FlexibleAuth()
   async searchUsersAutocomplete(
     @Query() searchDto: SearchUsersDto,
     @Request() req: Request,
   ) {
-    // Extract telegram ID from auth data
-    const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
-      req.headers['x-telegram-init-data'],
-    );
+    let telegramId: string;
+
+    // Check authentication method and extract telegram ID accordingly
+    if ((req as any).authMethod === 'jwt') {
+      // JWT authentication - get telegramId from user data
+      telegramId = (req as any).user.telegramId;
+    } else {
+      // Telegram authentication - extract from telegram data
+      const teleDtoData = this.telegramDtoAuthGuard.parseTelegramInitData(
+        req.headers['x-telegram-init-data'],
+      );
+      telegramId = teleDtoData.telegramId;
+    }
 
     return this.usersService.searchUsersByUsername(
       searchDto.query || '',
-      teleDtoData.telegramId,
+      telegramId,
       searchDto.searchType,
       searchDto.limit,
       searchDto.skip,
+    );
+  }
+
+  /**
+   * Get complete information about the current user
+   * Supports both JWT token authentication and Telegram init data authentication
+   * Returns all user fields plus the latest public address
+   *
+   * Authentication methods:
+   * 1. JWT token in Authorization header: Bearer <token>
+   * 2. Telegram init data in X-Telegram-Init-Data header
+   *
+   * Example usage:
+   * GET /users/me
+   * Authorization: Bearer <jwt_token>
+   * OR
+   * GET /users/me
+   * X-Telegram-Init-Data: query_id=AAHdF6IQAAAAAN0XohDhrOrc&user=%7B%22id%22%3A123456789...
+   */
+
+  @Patch('me/privacy-mode')
+  @FlexibleAuth()
+  async updateMyPrivacyMode(
+    @Req() req: any,
+    @Body() body: { privacyMode: boolean },
+  ) {
+    // Get current user from JWT token or Telegram data
+    const currentUserId = await this.usersService.getCurrentUserId(req);
+    return this.usersService.updatePrivacyMode(currentUserId, body.privacyMode);
+  }
+
+  /**
+   * Get all users with admin filters and pagination
+   * Admin-only endpoint to manage users with comprehensive filtering options
+   *
+   * Supported filters:
+   * - role: Filter by user role (user, admin)
+   * - sharingRestricted: Filter by sharing restriction status (true/false)
+   * - isActive: Filter by active status (true/false)
+   * - hasTelegramId: Filter users with/without Telegram ID (true/false)
+   * - search: Search in username, firstName, lastName, telegramId
+   * - page: Page number for pagination (default: 1)
+   * - limit: Items per page (default: 10)
+   *
+   * Authentication: Supports both JWT token and Telegram init data
+   * Authorization: Admin role required
+   *
+   * Example usage:
+   * GET /users/admin/all?role=user&isActive=true&page=1&limit=20
+   * GET /users/admin/all?sharingRestricted=true&hasTelegramId=false
+   * GET /users/admin/all?search=john&page=2
+   */
+  @Get('admin/all')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async getAllUsersForAdmin(@Query() filters: AdminUsersFilterDto) {
+    return this.usersService.getAllUsersForAdmin(filters);
+  }
+
+  /**
+   * Update user active status (Admin only)
+   * Admin endpoint to activate or deactivate a specific user
+   *
+   * Authentication: Supports both JWT token and Telegram init data
+   * Authorization: Admin role required
+   *
+   * Example usage:
+   * PATCH /users/admin/active-status/64f1a2b3c4d5e6f7g8h9i0j1
+   * {
+   *   "isActive": false
+   * }
+   */
+  @Patch('admin/active-status/:id')
+  @FlexibleAuth()
+  @Roles(Role.ADMIN)
+  async updateUserActiveStatus(
+    @Param('id') id: string,
+    @Body() updateUserActiveStatusDto: UpdateUserActiveStatusDto,
+  ) {
+    return this.usersService.updateUserActiveStatus(
+      id,
+      updateUserActiveStatusDto.isActive,
     );
   }
 

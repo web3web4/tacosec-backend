@@ -1,16 +1,15 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AppConfigService } from '../common/config/app-config.service';
 import { CryptoUtil } from './crypto.util';
 
 @Module({
-  imports: [ConfigModule],
   providers: [
     {
       provide: CryptoUtil,
-      useFactory: (configService: ConfigService) => {
-        return new CryptoUtil(configService);
+      useFactory: (appConfig: AppConfigService) => {
+        return new CryptoUtil(appConfig.encryptionKey);
       },
-      inject: [ConfigService],
+      inject: [AppConfigService],
     },
   ],
   exports: [CryptoUtil],

@@ -4,9 +4,12 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { TelegramInitDto } from './telegram-init.dto';
-import { TelegramValidatorService } from '../telegram-validator.service';
+import { TelegramInitDto } from '../telegram/dto/telegram-init.dto';
+import { TelegramValidatorService } from '../telegram/telegram-validator.service';
+import { SKIP_TELEGRAM_VALIDATION } from '../decorators/telegram-auth.decorator';
+import { AuthContextService } from '../common/services/auth-context.service';
 
 export interface TelegramUser {
   id: number;
@@ -20,11 +23,60 @@ export interface TelegramUser {
 
 @Injectable()
 export class TelegramDtoAuthGuard implements CanActivate {
-  constructor(private telegramValidator: TelegramValidatorService) {}
+  constructor(
+    private telegramValidator: TelegramValidatorService,
+    private readonly authContextService: AuthContextService,
+    private reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
 
+    // Get metadata to check if Telegram validation should be skipped
+    const skipTelegramValidation = this.reflector.getAllAndOverride<boolean>(
+      SKIP_TELEGRAM_VALIDATION,
+      [context.getHandler(), context.getClass()],
+    );
+
+    // Check for JWT token in Authorization header first
+    const authHeader = request.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        const { user, payload } =
+          await this.authContextService.getJwtUserAndPayload(token);
+
+        // If skipTelegramValidation is true, don't check telegramId
+        if (!skipTelegramValidation) {
+          // Check if user has a valid telegramId
+          if (!user.telegramId || user.telegramId === '') {
+            throw new UnauthorizedException(
+              'User does not have a valid linked Telegram account',
+            );
+          }
+        }
+
+        // Store user data in request for later use
+        (request as any).user = {
+          id: user._id.toString(),
+          telegramId: user.telegramId || '',
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          publicAddress: payload.publicAddress || '',
+        };
+
+        // Token is valid and user exists
+        return true;
+      } catch (error) {
+        if (error instanceof UnauthorizedException) {
+          throw error;
+        }
+        throw new UnauthorizedException('Invalid or expired token');
+      }
+    }
+
+    // If no valid JWT token, proceed with Telegram data validation
     // console.log('Request body:', JSON.stringify(request.body));
 
     // First try to extract raw Telegram data if it's included
@@ -47,10 +99,10 @@ export class TelegramDtoAuthGuard implements CanActivate {
         ) {
           if (
             telegramDataDto.telegramId !==
-              telegramDataBody.telegramId.toString() ||
+              String(telegramDataBody.telegramId || '') ||
             telegramDataDto.hash !== telegramDataBody.hash ||
             telegramDataDto.authDate !==
-              parseInt(telegramDataBody.authDate.toString())
+              parseInt(String(telegramDataBody.authDate || 0))
           ) {
             throw new UnauthorizedException('Invalid Telegram data');
           } else {
@@ -61,10 +113,10 @@ export class TelegramDtoAuthGuard implements CanActivate {
           if (telegramDataBody.initData) {
             if (
               telegramDataDto.telegramId !==
-                telegramDataBody.initData.telegramId.toString() ||
+                String(telegramDataBody.initData?.telegramId || '') ||
               telegramDataDto.hash !== telegramDataBody.initData.hash ||
               telegramDataDto.authDate !==
-                parseInt(telegramDataBody.initData.authDate.toString())
+                parseInt(String(telegramDataBody.initData?.authDate || 0))
             ) {
               throw new UnauthorizedException('Invalid Telegram data');
             } else {
@@ -191,12 +243,12 @@ export class TelegramDtoAuthGuard implements CanActivate {
     }
 
     return {
-      telegramId: user.id.toString(),
-      firstName: user.first_name,
-      lastName: user.last_name,
-      username: user.username,
+      telegramId: user.id ? user.id.toString() : '',
+      firstName: user.first_name || '',
+      lastName: user.last_name || '',
+      username: user.username || '',
       authDate: parseInt(params.get('auth_date') || '0'),
-      hash: params.get('hash'),
+      hash: params.get('hash') || '',
     };
   }
 }

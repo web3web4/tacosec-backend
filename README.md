@@ -2,6 +2,8 @@
 
 Backend API for TACoSec - Secure secret storage and sharing with dual authentication (Telegram + Ethereum wallet signatures).
 
+> [Frontend Repository](https://github.com/web3web4/tacosec-frontend) | **Backend Repository** (you are here)
+
 ## Built With
 
 [![Nest.js](https://img.shields.io/badge/Nest.js-E0234E?logo=nestjs)](https://nestjs.com/)

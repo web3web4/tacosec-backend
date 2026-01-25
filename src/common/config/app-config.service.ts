@@ -1,14 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { StringValue } from 'ms';
+import ms = require('ms');
+type MsStringValue = ms.StringValue;
 
 export type AppConfig = {
   nodeEnv: string;
   mongodbUri: string;
   jwtSecret: string;
-  jwtExpiresIn: StringValue;
-  jwtAccessTokenExpiresIn: StringValue;
-  jwtRefreshTokenExpiresIn: StringValue;
+  jwtExpiresIn: MsStringValue;
+  jwtAccessTokenExpiresIn: MsStringValue;
+  jwtRefreshTokenExpiresIn: MsStringValue;
   encryptionKey: string;
   authChallangeExpiresInMinutes: number;
   telegramBotToken?: string;
@@ -43,13 +44,13 @@ export class AppConfigService {
       jwtSecret: this.getRequiredString('JWT_SECRET'),
       jwtExpiresIn: this.getString('JWT_EXPIRES_IN', {
         defaultValue: '24h',
-      })! as StringValue,
+      })! as MsStringValue,
       jwtAccessTokenExpiresIn: this.getString('JWT_ACCESS_TOKEN_EXPIRES_IN', {
         defaultValue: '15m',
-      })! as StringValue,
+      })! as MsStringValue,
       jwtRefreshTokenExpiresIn: this.getString('JWT_REFRESH_TOKEN_EXPIRES_IN', {
         defaultValue: '7d',
-      })! as StringValue,
+      })! as MsStringValue,
       encryptionKey: this.getRequiredString('ENCRYPTION_KEY'),
       authChallangeExpiresInMinutes: this.getNumber(
         'AUTH_CHALLANGE_EXPIRES_IN_MINUTES',
@@ -116,15 +117,15 @@ export class AppConfigService {
     return this.cfg.jwtSecret;
   }
 
-  get jwtExpiresIn(): StringValue {
+  get jwtExpiresIn(): MsStringValue {
     return this.cfg.jwtExpiresIn;
   }
 
-  get jwtAccessTokenExpiresIn(): StringValue {
+  get jwtAccessTokenExpiresIn(): MsStringValue {
     return this.cfg.jwtAccessTokenExpiresIn;
   }
 
-  get jwtRefreshTokenExpiresIn(): StringValue {
+  get jwtRefreshTokenExpiresIn(): MsStringValue {
     return this.cfg.jwtRefreshTokenExpiresIn;
   }
 

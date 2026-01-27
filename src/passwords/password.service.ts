@@ -21,7 +21,7 @@ import {
   PublicAddress,
   PublicAddressDocument,
 } from '../public-addresses/schemas/public-address.schema';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 import { SharedWithMeResponse } from '../types/share-with-me-pass.types';
 import {

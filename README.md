@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://nestjs.com/" target="_blank"><img src="https://nestjs.com/img/logo-small.svg" width="100" alt="NestJS Logo" /></a>
+  <img src="public/logo512.png" width="128" alt="TACoSec Logo" />
 </p>
 
 <h1 align="center">TACoSec Backend</h1>
@@ -756,4 +756,5 @@ This project is **UNLICENSED** - proprietary software.
 ---
 
 **TACoSec** • [Frontend](https://github.com/yourorg/tacosec-frontend) • [Backend](https://github.com/yourorg/tacosec-backend) (you are here) • *Powered by [TACo](https://taco.build) 💚* • **Built with ❤️ by [Web3Web4](https://web3web4.com)**
+
 

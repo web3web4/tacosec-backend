@@ -677,16 +677,39 @@ As a result:
 
     if (isPublicAddressQuery) {
       return this.searchByPublicAddress(searchQuery, currentUser, false);
-    } else {
-      // Handle username search (existing logic)
-      return this.searchByUsername(
-        searchQuery,
-        currentUser,
-        searchType,
-        limit,
-        skip,
-      );
     }
+
+    const [usernameResults, publicAddressResults] = await Promise.all([
+      this.searchByUsername(searchQuery, currentUser, searchType),
+      this.searchByPublicAddressPartial(searchQuery, currentUser, searchType),
+    ]);
+
+    const mergedMap = new Map<string, any>();
+    publicAddressResults.data.forEach((user) => {
+      mergedMap.set(user.userId, user);
+    });
+    usernameResults.data.forEach((user) => {
+      mergedMap.set(user.userId, user);
+    });
+
+    const mergedUsers = Array.from(mergedMap.values());
+    const previouslySharedUsers = mergedUsers.filter(
+      (user) => user.isPreviouslyShared,
+    );
+    const newUsers = mergedUsers.filter((user) => !user.isPreviouslyShared);
+
+    previouslySharedUsers.sort((a, b) =>
+      (a.username || '').localeCompare(b.username || ''),
+    );
+    newUsers.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
+
+    const sortedUsers = [...previouslySharedUsers, ...newUsers];
+    const paginatedUsers = sortedUsers.slice(skip, skip + limit);
+
+    return {
+      data: paginatedUsers,
+      total: sortedUsers.length,
+    };
   }
 
   /**
@@ -795,6 +818,122 @@ As a result:
     }
   }
 
+  private async searchByPublicAddressPartial(
+    searchQuery: string,
+    currentUser: any,
+    searchType: SearchType,
+  ): Promise<{
+    data: {
+      userId: string;
+      username: string;
+      firstName?: string;
+      lastName?: string;
+      isPreviouslyShared?: boolean;
+      latestPublicAddress?: string;
+    }[];
+    total: number;
+  }> {
+    if (!searchQuery || !searchQuery.trim()) {
+      return {
+        data: [],
+        total: 0,
+      };
+    }
+
+    const sharedPasswords = await this.passwordModel
+      .find({
+        userId: currentUser._id,
+        isActive: true,
+        'sharedWith.0': { $exists: true },
+      })
+      .select('sharedWith')
+      .exec();
+
+    const sharedUsernames = new Set<string>();
+    const sharedPublicAddresses = new Set<string>();
+    sharedPasswords.forEach((password) => {
+      password.sharedWith?.forEach((shared) => {
+        if (shared.username) {
+          sharedUsernames.add(shared.username.toLowerCase());
+        }
+        if (shared.publicAddress) {
+          sharedPublicAddresses.add(shared.publicAddress);
+        }
+      });
+    });
+
+    const regexPattern =
+      searchType === SearchType.STARTS_WITH
+        ? `^${searchQuery.toLowerCase()}`
+        : searchQuery.toLowerCase();
+
+    const addressRecords = await this.publicAddressModel
+      .find({
+        publicKey: {
+          $regex: regexPattern,
+          $options: 'i',
+        },
+      })
+      .sort({ updatedAt: -1 })
+      .populate('userIds')
+      .exec();
+
+    const resultsMap = new Map<string, any>();
+
+    for (const record of addressRecords) {
+      const recordUsers = record.userIds as UserDocument[];
+      for (const user of recordUsers) {
+        if (
+          !user ||
+          !user.isActive ||
+          user._id.toString() === currentUser._id.toString()
+        ) {
+          continue;
+        }
+
+        let displayUsername = user.username;
+        if (!user.telegramId) {
+          displayUsername = 'User has no Telegram account currently';
+        }
+
+        const isPreviouslyShared =
+          (user.username &&
+            sharedUsernames.has(user.username.toLowerCase())) ||
+          sharedPublicAddresses.has(record.publicKey);
+
+        const userId = user._id.toString();
+        if (!resultsMap.has(userId)) {
+          resultsMap.set(userId, {
+            userId,
+            username: displayUsername,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            isPreviouslyShared,
+            latestPublicAddress: record.publicKey,
+          });
+        }
+      }
+    }
+
+    const results = Array.from(resultsMap.values());
+    const previouslySharedUsers = results.filter(
+      (user) => user.isPreviouslyShared,
+    );
+    const newUsers = results.filter((user) => !user.isPreviouslyShared);
+
+    previouslySharedUsers.sort((a, b) =>
+      (a.username || '').localeCompare(b.username || ''),
+    );
+    newUsers.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
+
+    const sortedUsers = [...previouslySharedUsers, ...newUsers];
+
+    return {
+      data: sortedUsers,
+      total: sortedUsers.length,
+    };
+  }
+
   /**
    * Search users by username (existing logic extracted to separate method)
    * @param searchQuery - The username search query
@@ -808,8 +947,6 @@ As a result:
     searchQuery: string,
     currentUser: any,
     searchType: SearchType,
-    limit: number,
-    skip: number,
   ): Promise<{
     data: {
       userId: string;
@@ -930,11 +1067,8 @@ As a result:
     // Combine arrays with previously shared users first
     const sortedUsers = [...previouslySharedUsers, ...newUsers];
 
-    // Apply pagination to the sorted results
-    const paginatedUsers = sortedUsers.slice(skip, skip + limit);
-
     return {
-      data: paginatedUsers,
+      data: sortedUsers,
       total: sortedUsers.length,
     };
   }

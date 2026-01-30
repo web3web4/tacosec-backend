@@ -766,7 +766,8 @@ As a result:
         // Check if user has telegram account linked
         let displayUsername = user.username;
         if (!user.telegramId) {
-          displayUsername = 'User has no Telegram account currently';
+          // displayUsername = 'User has no Telegram account currently';
+          displayUsername = '';
         }
 
         // Check if this user was previously shared with
@@ -893,7 +894,8 @@ As a result:
 
         let displayUsername = user.username;
         if (!user.telegramId) {
-          displayUsername = 'User has no Telegram account currently';
+          // displayUsername = 'User has no Telegram account currently';
+          displayUsername = '';
         }
 
         const isPreviouslyShared =

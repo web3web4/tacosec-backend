@@ -226,13 +226,17 @@ export class PasswordNotificationService extends PasswordBaseService {
       const childUserDisplayName = this.getUserDisplayName(childUser);
       const dateTime = this.formatDateTime(new Date());
 
-      const message = `🔐 <b>Child Secret Response</b>
+      const message = `🔔 <b>New Child Secret Response</b>
 
-User <span class="tg-spoiler"><b>${childUserDisplayName}</b></span> (user public address : ${formattedSenderAddress}) has responded to your secret with a new secret 🔄
+👤 <b>User:</b> ${childUserDisplayName}
+🆔 <b>Public Address:</b> ${formattedSenderAddress}
+🕒 <b>Time:</b> ${dateTime}
 
-📅 <b>Response Date & Time:</b> ${dateTime}
+🔄 <b>Update:</b> ❝❞
+A new secret has been sent in response to yours.
 
-You can view the response in your secrets list 📋.`;
+📋 <b>Action:</b>
+Check your Secrets List to view it`;
 
       const replyMarkup = {
         inline_keyboard: [
@@ -357,14 +361,16 @@ You can view the response in your secrets list 📋.`;
               continue;
             }
 
-            const message = `🔐 <b>Reply to Shared Secret</b>
+            const message = `🔐 <b>Secret Reply Received</b> ❝❞
 
-User <b>${childUserDisplayName}</b> (user public address: ${formattedChildAddress}) has replied to <b>${parentOwnerDisplayName}</b>'s secret (user public address: ${formattedParentAddress}) that was previously shared with you 🔄
+👤 <b>From:</b> ${childUserDisplayName}
+🕒 <b>Time:</b> ${dateTime}
 
-📅 <b>Reply Date & Time:</b> ${dateTime}
+🔄 <b>Update:</b> ❝❞
+There's a new reply to a secret shared with you.
 
-You can view the reply in your shared secrets list 📋.
-<i>Note: If you have public address, you can view the secret.</i>`;
+📋 <b>Action:</b>
+View it in your Shared Secrets List`;
 
             const replyMarkup = {
               inline_keyboard: [
@@ -494,14 +500,29 @@ You can view the reply in your shared secrets list 📋.
   }
 
   private formatDateTime(date: Date): string {
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZoneName: 'short',
-    });
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    const month = months[date.getUTCMonth()];
+    const day = date.getUTCDate();
+    const year = date.getUTCFullYear();
+    const hours = date.getUTCHours();
+    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    const formattedHour = hour12.toString().padStart(2, '0');
+    return `${month} ${day}, ${year} · ${formattedHour}:${minutes} ${ampm} (UTC)`;
   }
 
   private async sendFallbackNotification(
@@ -516,10 +537,7 @@ You can view the reply in your shared secrets list 📋.
         String(recipient.userId),
       );
 
-      const fallbackMessage = `Secret shared with you.
-User ${sender.username} (user public address : ${formattedSenderAddress}) has shared a secret with you.
-You can view it under the "Shared with me" tab.
-Note: If you have public address, you can view the secret.`;
+      const fallbackMessage = `🔐 Secret Shared With You\n\n👤 From: ${sender.username}\n🆔 Public Address: ${formattedSenderAddress}\n🕐 Time: ${this.formatDateTime(new Date())}\n\n📝 Update:\nA new secret has been shared with you.\n\n📁 Action:\nView it in your Shared Secrets List`;
 
       await this.notificationsService.logNotificationWithResult(
         {
@@ -565,12 +583,17 @@ Note: If you have public address, you can view the secret.`;
 
     const userName = this.getUserDisplayName(sender);
 
-    const message = `🔐 <b>Secret Shared With You</b>
+    const message = `🔐 <b>Secret Shared With You</b> ❝❞
 
-User <span class="tg-spoiler"><b>${userName}</b></span> (user public address : ${formattedSenderAddress}) has shared a secret with you 🔁.
+👤 <b>From:</b> ${userName}
+🆔 <b>Public Address:</b> ${formattedSenderAddress}
+🕒 <b>Time:</b> ${this.formatDateTime(new Date())}
 
-You can view it under the <b>"Shared with me"</b> tab 📂.
-<i>Note: If you have public address, you can view the secret.</i>`;
+🔄 <b>Update:</b> ❝❞
+A new secret has been shared with you.
+
+📋 <b>Action:</b>
+View it in your Shared Secrets List`;
 
     const replyMarkup = {
       inline_keyboard: [
@@ -626,8 +649,7 @@ You can view it under the <b>"Shared with me"</b> tab 📂.
         String(parentOwner._id),
       );
 
-      const fallbackMessage = `Child secret response.
-User ${childUser.username} (user public address : ${formattedSenderAddress}) has responded to your secret with a new secret.`;
+      const fallbackMessage = `🔔 New Child Secret Response\n\n👤 User: ${childUser.username}\n🆔 Public Address: ${formattedSenderAddress}\n🕐 Time: ${this.formatDateTime(new Date())}\n\n📝 Update:\nA new secret has been sent in response to yours.\n\n📁 Action:\nCheck your Secrets List to view it`;
 
       await this.notificationsService.logNotificationWithResult(
         {
@@ -679,9 +701,7 @@ User ${childUser.username} (user public address : ${formattedSenderAddress}) has
         String(childUser._id),
       );
 
-      const fallbackMessage = `Reply to Shared Secret.
-User ${childUser.username} (user public address: ${formattedChildAddress}) has replied to ${parentOwner.username}'s secret (user public address: ${formattedParentAddress}) that was previously shared with you.
-Note: If you have public address, you can view the secret.`;
+      const fallbackMessage = `📬 Secret Reply Received\n\n👤 From: ${childUser.username}\n🕐 Time: ${this.formatDateTime(new Date())}\n\n🔄 Update:\nThere's a new reply to a secret shared with you.\n\n📁 Action:\nView it in your Shared Secrets List`;
 
       await this.notificationsService.logNotificationWithResult(
         {

@@ -101,6 +101,7 @@ export class TelegramService {
       parentId?: Types.ObjectId;
       metadata?: Record<string, any>;
       tabName?: string;
+      dbMessage?: string;
     },
   ): Promise<boolean> {
     const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
@@ -118,13 +119,23 @@ export class TelegramService {
 
     const originalMessage = message;
     let recipientUser = null;
+    let effectiveReplyMarkup = replyMarkup;
 
     // Check user's privacy mode and get recipient info
     try {
       recipientUser = await this.usersService.findByTelegramId(String(userId));
       if (recipientUser && recipientUser.privacyMode) {
-        // Replace message with privacy-friendly text
-        message = 'please check your data';
+        // Replace message with privacy-friendly text based on notification type
+        const notifType = notificationData?.type;
+        if (notifType === NotificationType.PASSWORD_CHILD_RESPONSE) {
+          message = `🔐 <b>Secret Reply</b> ❝❞\n\nSomeone replied to something which might interest you.\n\n🔒 Max Privacy mode is enabled.\nOnly limited information is shown.`;
+        } else if (notifType === NotificationType.PASSWORD_SHARED) {
+          message = `🔐 <b>Secret Shared</b> ❝❞\n\nSomeone shared something that might be interesting.\n\n🔒 Max Privacy mode is enabled.\nOnly limited information is shown.`;
+        } else {
+          message = `🔐 <b>Notification</b>\n\nYou have a new notification.\n\n🔒 Max Privacy mode is enabled.\nOnly limited information is shown.`;
+        }
+        // Remove reply markup in privacy mode
+        effectiveReplyMarkup = undefined;
         console.log('User has privacy mode enabled, using generic message');
       }
     } catch (error) {
@@ -144,7 +155,7 @@ export class TelegramService {
 
     // Prepare notification log data
     const logData: NotificationLogData = {
-      message: originalMessage,
+      message: notificationData?.dbMessage || originalMessage,
       type: notificationData?.type || NotificationType.GENERAL,
       recipientUserId: recipientUser?._id || undefined,
       recipientUsername: recipientUser?.telegramUsername || undefined,
@@ -170,8 +181,8 @@ export class TelegramService {
           parse_mode: 'HTML',
         };
 
-        if (replyMarkup) {
-          requestBody.reply_markup = replyMarkup;
+        if (effectiveReplyMarkup) {
+          requestBody.reply_markup = effectiveReplyMarkup;
         }
 
         console.log('Request body:', JSON.stringify(requestBody));

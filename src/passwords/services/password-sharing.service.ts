@@ -1299,7 +1299,7 @@ export class PasswordSharingService extends PasswordBaseService {
                 userId: passwordUserId,
                 username: ownerUsername,
                 telegramId: ownerTelegramId,
-                PublicAddress: ownerLatestPublicAddress || null,
+                publicAddress: ownerLatestPublicAddress || null,
               },
               sharedWith: password.sharedWith || [], // Include sharedWith field in response
               reports: reports, // Include complete reports data as stored in MongoDB

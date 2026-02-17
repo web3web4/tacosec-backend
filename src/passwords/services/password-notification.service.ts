@@ -144,6 +144,7 @@ export class PasswordNotificationService extends PasswordBaseService {
                 recipientInfo,
                 passwordUser,
                 formattedSenderAddress,
+                senderPublicAddress,
               );
             }
           } catch (error) {
@@ -229,7 +230,7 @@ export class PasswordNotificationService extends PasswordBaseService {
       const message = `🔔 <b>New Child Secret Response</b>
 
 👤 <b>User:</b> ${childUserDisplayName}
-🆔 <b>Public Address:</b> ${formattedSenderAddress}
+🆔 <b>Public Address:</b> ${senderPublicAddress || 'N/A'}
 🕒 <b>Time:</b> ${dateTime}
 
 🔄 <b>Update:</b> ❝❞
@@ -576,17 +577,19 @@ View it in your Shared Secrets List`;
     recipient: any,
     password: Password,
     formattedSenderAddress: string,
+    fullSenderAddress?: string,
   ): Promise<void> {
     console.log(
       `[DEBUG] sendTelegramShareNotification called for recipient: ${recipient.username} (${recipient.telegramId})`,
     );
 
     const userName = this.getUserDisplayName(sender);
+    const displayAddress = fullSenderAddress || formattedSenderAddress;
 
     const message = `🔐 <b>Secret Shared With You</b> ❝❞
 
 👤 <b>From:</b> ${userName}
-🆔 <b>Public Address:</b> ${formattedSenderAddress}
+🆔 <b>Public Address:</b> ${displayAddress}
 🕒 <b>Time:</b> ${this.formatDateTime(new Date())}
 
 🔄 <b>Update:</b> ❝❞

@@ -899,8 +899,7 @@ As a result:
         }
 
         const isPreviouslyShared =
-          (user.username &&
-            sharedUsernames.has(user.username.toLowerCase())) ||
+          (user.username && sharedUsernames.has(user.username.toLowerCase())) ||
           sharedPublicAddresses.has(record.publicKey);
 
         const userId = user._id.toString();
